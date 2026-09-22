@@ -26,7 +26,7 @@ export function PwaInstallPrompt() {
     }
 
     // Inject manifest dynamically so it only exists on this page
-    let manifestLink = document.querySelector('link[rel="manifest"]');
+    let manifestLink = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
     if (!manifestLink) {
       manifestLink = document.createElement('link');
       manifestLink.rel = 'manifest';
