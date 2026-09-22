@@ -1,0 +1,1 @@
+UPDATE public.orders SET track_code = order_code WHERE track_code IS DISTINCT FROM order_code;

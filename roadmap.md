@@ -1,0 +1,7 @@
+- [x] Add client CRM tab with clickable customer records and payment/order details
+- [x] Add admin voucher generation and management
+- [x] Add optional voucher entry, validation, and discounted totals to checkout
+- [x] Validate the complete CRM and voucher workflow
+- [ ] Add privacy-safe social proof flyers with received and delivered versions, downloads, and WhatsApp sharing
+- [ ] Add separate owner and staff admin access with owner-only correction and deletion controls
+- [ ] Allow custom voucher names alongside voucher codes

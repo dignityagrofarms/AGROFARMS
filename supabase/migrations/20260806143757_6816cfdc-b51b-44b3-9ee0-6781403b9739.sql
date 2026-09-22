@@ -1,0 +1,1 @@
+DELETE FROM public.orders WHERE order_code = 'DAF-88781' AND customer_name = 'Test User';
