@@ -244,7 +244,7 @@ function AdminOrders() {
 
   return (
     <SiteLayout>
-      <PwaInstallPrompt />
+      {passcode && <PwaInstallPrompt />}
       <section className="bg-[#0F3D24] py-12 text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div>

@@ -25,6 +25,20 @@ export function PwaInstallPrompt() {
       setIsIOS(true);
     }
 
+    // Inject manifest dynamically so it only exists on this page
+    let manifestLink = document.querySelector('link[rel="manifest"]');
+    if (!manifestLink) {
+      manifestLink = document.createElement('link');
+      manifestLink.rel = 'manifest';
+      manifestLink.setAttribute('href', '/manifest.json');
+      document.head.appendChild(manifestLink);
+    }
+
+    // Register service worker dynamically
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+    }
+
     // Listen for Android/Chrome install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();

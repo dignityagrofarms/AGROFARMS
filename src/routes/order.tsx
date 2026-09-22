@@ -235,17 +235,33 @@ function OrderPage() {
     } catch { /* noop */ }
   };
 
-  const customerWaLink = () => {
-    const digits = form.phone.replace(/\D+/g, "");
-    const e164 = digits.startsWith("234") ? digits : digits.startsWith("0") ? "234" + digits.slice(1) : "234" + digits;
+  const adminWaLink = () => {
+    const enrichedForm = {
+      ...form,
+      customerName: form.name,
+      deliveryZone: zone,
+      items: [{
+        product: mode === "preorder" ? `PRE-ORDER · ${product.name}` : product.name,
+        option: preorderLabel ? `${option.label} · ${preorderLabel}` : option.label,
+        qty,
+      }],
+    };
+    const itemsText = enrichedForm.items.map(item => `- ${item.qty}x ${item.product} (${item.option})`).join("\\n");
     const text = encodeURIComponent(
-      `Dignity Agro Farms order confirmation\n\nOrder: ${orderCode}\nTracking / receipt: ${trackCode}\nAmount due: ${naira(total)}\n\nSend payment to Opay 7083476366 (Ihemegbulem) only. Tap "I have made payment" on the order page after transferring.\n\nTrack your order at https://dignityagrofarms.com/track-order`
+      `Hello Dignity Agro Farms! I have just placed an order on the website.\\n\\n` +
+      `*Order ID:* ${orderCode}\\n` +
+      `*Customer:* ${enrichedForm.customerName}\\n` +
+      `*Phone:* ${enrichedForm.phone}\\n` +
+      `*Delivery Address:* ${enrichedForm.address} (${enrichedForm.deliveryZone})\\n\\n` +
+      `*Items Ordered:*\\n${itemsText}\\n\\n` +
+      `*Amount Due:* ${naira(total)}\\n\\n` +
+      `I am proceeding to make the payment now, and I will send the payment receipt here shortly.`
     );
-    return `https://wa.me/${e164}?text=${text}`;
+    return `https://wa.me/2347083476366?text=${text}`;
   };
 
-  const sendToMyWhatsApp = () => {
-    window.open(customerWaLink(), "_blank");
+  const sendToAdminWhatsApp = () => {
+    window.open(adminWaLink(), "_blank");
   };
 
   return (
@@ -285,12 +301,12 @@ function OrderPage() {
               {form.phone && (
                 <div className="mt-4">
                   <button
-                    onClick={sendToMyWhatsApp}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#25D366] bg-[#25D366]/10 px-5 py-3 text-sm font-semibold text-[#128C7E] transition hover:bg-[#25D366]/20"
+                    onClick={sendToAdminWhatsApp}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[#25D366] bg-[#25D366] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#128C7E]"
                   >
-                    <MessageCircle size={16} /> Send order details to my WhatsApp
+                    <MessageCircle size={16} /> Send order details to our WhatsApp
                   </button>
-                  <p className="mt-1 text-xs text-[#0F3D24]/60">Tap to save your order code and bank details to your own WhatsApp chat.</p>
+                  <p className="mt-2 text-xs font-medium text-[#0F3D24]/80 text-center">Tap the button above to notify us, then <strong className="text-[#0F3D24]">drop your payment receipt in the chat</strong> so we can confirm your order immediately.</p>
                 </div>
               )}
 
