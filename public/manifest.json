@@ -1,0 +1,16 @@
+{
+  "name": "Dignity Agro farms",
+  "short_name": "Dignity Agro farms",
+  "start_url": "/admin/admin-orders",
+  "display": "standalone",
+  "background_color": "#F7F5F0",
+  "theme_color": "#0F3D24",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
