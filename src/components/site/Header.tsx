@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Menu, X } from "lucide-react";
-import logo from "@/assets/dignity-logo.jpeg.asset.json";
+import logo from "@/assets/logo.png";
 
 const nav = [
   { to: "/", label: "Home" },
@@ -34,7 +34,7 @@ export function Header() {
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2">
-          <img src={logo.url} alt="Dignity Agro Farms" className="h-11 w-11 rounded-full object-cover ring-2 ring-[#3F8F3F]/60" />
+          <img src={logo} alt="Dignity Agro Farms" className="h-11 w-11 rounded-full object-cover ring-2 ring-[#3F8F3F]/60" />
           <div className="hidden sm:block leading-tight">
             <div className="font-display text-lg font-semibold text-white">Dignity</div>
             <div className="text-[10px] uppercase tracking-widest text-[#a8e6a8]">Agro Farms Ltd</div>

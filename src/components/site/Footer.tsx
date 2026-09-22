@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Instagram, Facebook, Phone, MapPin, Mail } from "lucide-react";
-import logo from "@/assets/dignity-logo.jpeg.asset.json";
+import logo from "@/assets/logo.png";
 
 export function Footer() {
   return (
@@ -9,7 +9,7 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 lg:grid-cols-4 lg:px-8">
         <div>
           <div className="flex items-center gap-3">
-            <img src={logo.url} alt="Dignity Agro Farms" className="h-12 w-12 rounded-full object-cover ring-2 ring-[#3F8F3F]/60" />
+            <img src={logo} alt="Dignity Agro Farms" className="h-12 w-12 rounded-full object-cover ring-2 ring-[#3F8F3F]/60" />
             <div>
               <div className="font-display text-lg font-semibold text-white">Dignity Agro Farms</div>
               <div className="text-[11px] uppercase tracking-widest text-[#a8e6a8]">Limited</div>

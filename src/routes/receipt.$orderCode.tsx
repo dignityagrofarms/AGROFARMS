@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { Printer, CheckCircle2, AlertTriangle } from "lucide-react";
-import logo from "@/assets/dignity-logo.jpeg.asset.json";
+import logo from "@/assets/logo.png";
 import { getOrderReceipt } from "@/lib/orders.functions";
 
 export const Route = createFileRoute("/receipt/$orderCode")({
@@ -85,7 +85,7 @@ function ReceiptPage() {
       <div className="print-sheet rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-10">
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#0F3D24]/10 pb-6">
           <div className="flex items-center gap-3">
-            <img src={logo.url} alt="Dignity Agro Farms logo" className="h-14 w-14 rounded-full object-cover" />
+            <img src={logo} alt="Dignity Agro Farms logo" className="h-14 w-14 rounded-full object-cover" />
             <div>
               <div className="text-lg font-semibold text-[#0F3D24]">Dignity Agro Farms Limited</div>
               <div className="text-xs text-[#0F3D24]/60">9 Oduobi Crescent, Ikenegbu, Owerri</div>
