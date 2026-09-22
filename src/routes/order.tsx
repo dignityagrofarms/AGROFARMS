@@ -9,10 +9,12 @@ import { createOrder, markPaymentSubmitted, MIN_ORDER_SUBTOTAL, validateVoucher 
 export const Route = createFileRoute("/order")({
   head: () => ({
     meta: [
-      { title: "Place an Order · Dignity Agro Farms" },
+      { title: "Checkout & Place Order | Dignity Agro Farms" },
       { name: "description", content: "Order live or dressed broilers by the Kg, fresh eggs and more. Transparent pricing with quick home delivery in Owerri town." },
-      { property: "og:title", content: "Place an Order · Dignity Agro Farms" },
+      { property: "og:title", content: "Checkout & Place Order | Dignity Agro Farms" },
       { property: "og:description", content: "Pick your product, choose your Kg, and see your total instantly. Free delivery within Owerri town." },
+      { property: "og:url", content: "/order" },
+      { property: "og:image", content: "https://dignityagrofarms.com/favicon.png" },
     ],
     links: [{ rel: "canonical", href: "/order" }],
   }),
@@ -496,10 +498,10 @@ function OrderPage() {
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">5. Your details</div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
-                  <input required type="tel" placeholder="Phone (WhatsApp)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
-                  <input required placeholder="Street address (house number, street)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="sm:col-span-2 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
-                  <textarea rows={3} maxLength={500} placeholder="Notes (e.g. dress the bird, delivery time…)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="sm:col-span-2 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
+                  <input required placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none transition-all duration-300 focus:border-[#3F8F3F] focus:ring-4 focus:ring-[#3F8F3F]/20" />
+                  <input required type="tel" placeholder="Phone (WhatsApp)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none transition-all duration-300 focus:border-[#3F8F3F] focus:ring-4 focus:ring-[#3F8F3F]/20" />
+                  <input required placeholder="Street address (house number, street)" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} className="sm:col-span-2 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none transition-all duration-300 focus:border-[#3F8F3F] focus:ring-4 focus:ring-[#3F8F3F]/20" />
+                  <textarea rows={3} maxLength={500} placeholder="Notes (e.g. dress the bird, delivery time…)" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="sm:col-span-2 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none transition-all duration-300 focus:border-[#3F8F3F] focus:ring-4 focus:ring-[#3F8F3F]/20" />
                 </div>
               </div>
 
@@ -515,7 +517,7 @@ function OrderPage() {
                       setVoucherMessage(null);
                     }}
                     placeholder="Enter voucher code"
-                    className="min-w-0 flex-1 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm uppercase outline-none focus:border-[#3F8F3F]"
+                    className="min-w-0 flex-1 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm uppercase outline-none transition-all duration-300 focus:border-[#3F8F3F] focus:ring-4 focus:ring-[#3F8F3F]/20"
                   />
                   <button
                     type="button"
@@ -541,14 +543,14 @@ function OrderPage() {
               {errorMsg && (
                 <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{errorMsg}</div>
               )}
-              <button type="submit" disabled={submitting || belowMinimum} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-6 py-4 text-sm font-semibold text-white transition hover:bg-[#134a2c] disabled:opacity-60">
+              <button type="submit" disabled={submitting || belowMinimum} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-6 py-4 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#134a2c] hover:shadow-[0_10px_20px_rgba(15,61,36,0.3)] disabled:transform-none disabled:opacity-60 disabled:shadow-none">
                 <ShoppingBag size={16} /> {submitting ? "Sending..." : `Place order · ${naira(total)}`}
               </button>
             </form>
           )}
         </div>
 
-        <aside className="h-max rounded-3xl bg-[#0F3D24] p-6 text-white shadow-sm sm:p-8 lg:sticky lg:top-24">
+        <aside className="h-max rounded-3xl bg-gradient-to-br from-[#0F3D24] to-[#1a5a3a] p-6 text-white shadow-2xl shadow-[#0F3D24]/20 ring-1 ring-white/10 sm:p-8 lg:sticky lg:top-24">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a8e6a8]">Order summary</p>
           <div className="mt-4 space-y-3 text-sm">
             <Row label="Product" value={product.name} />
@@ -571,6 +573,32 @@ function OrderPage() {
           </div>
           <Link to="/products" className="mt-4 block text-center text-xs font-semibold uppercase tracking-wider text-[#a8e6a8] hover:text-white">See full price list →</Link>
         </aside>
+      </section>
+
+      {/* SEO WRITE-UPS */}
+      <section className="bg-[#0F3D24]/5 py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-12 md:grid-cols-3">
+            <div>
+              <h3 className="text-xl font-semibold text-[#0F3D24]">Wholesale vs Retail Ordering</h3>
+              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
+                Whether you're picking up a single tray of eggs for your household or ordering 50 crates for a restaurant, Dignity Agro Farms scales to your needs. Our checkout seamlessly handles retail quantities, but for bulk and wholesale purchases, our direct lines are always open. We prioritize large-scale distributors with consistent stock and preferential bulk rates.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-[#0F3D24]">Transparent Pricing & Fulfillment</h3>
+              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
+                When you check out on our platform, the price you see is the price you pay. There are no hidden fees. We price our live broilers transparently by the kilogram, and delivery fees within and outside Owerri are flat and predictable. Once your order is placed, our fulfillment team immediately begins picking, weighing, and dispatching your items for peak freshness.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-[#0F3D24]">Secure Bank Transfers</h3>
+              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
+                To keep our checkout fast and friction-free, we accept direct bank transfers to our dedicated Opay account. This ensures your payment is processed instantly and securely without relying on third-party card gateways. Simply make the transfer, click the WhatsApp confirmation button, and attach your receipt. We instantly verify against bank alerts for rapid dispatch.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
     </SiteLayout>
   );

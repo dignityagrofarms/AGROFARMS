@@ -12,6 +12,17 @@ import eggsImg from "@/assets/eggs.jpg.asset.json";
 import farmBanner from "@/assets/farm-banner.jpg.asset.json";
 
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Dignity Agro Farms | Fresh Poultry & Eggs in Owerri" },
+      { name: "description", content: "Buy live broilers, dressed chicken, and farm-fresh eggs straight from our poultry farm in Owerri. Fast delivery, wholesale & retail." },
+      { property: "og:title", content: "Dignity Agro Farms | Fresh Poultry & Eggs in Owerri" },
+      { property: "og:description", content: "Buy live broilers, dressed chicken, and farm-fresh eggs straight from our poultry farm in Owerri. Fast delivery, wholesale & retail." },
+      { property: "og:url", content: "/" },
+      { property: "og:image", content: farmBanner.url },
+    ],
+    links: [{ rel: "canonical", href: "/" }],
+  }),
   component: Index,
 });
 
@@ -57,27 +68,27 @@ function Index() {
             fetchPriority="high"
             className="absolute inset-0 h-full w-full object-cover"
           />
-          {/* Readability overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#0F3D24]/90 via-[#0F3D24]/70 to-[#0F3D24]/30" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0F3D24]/70 via-transparent to-transparent" />
+          {/* Readability overlay - Richer Gradient Mesh */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#0F3D24]/95 via-[#0F3D24]/70 to-[#3F8F3F]/30 mix-blend-multiply" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0F3D24] via-transparent to-[#0F3D24]/20" />
 
           <div className="relative z-10 mx-auto flex h-full max-w-7xl items-center px-4 sm:px-6 lg:px-8">
             <div className="max-w-2xl text-white">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-xs uppercase tracking-widest text-[#a8e6a8] backdrop-blur">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#a8e6a8]/30 bg-[#3F8F3F]/20 px-4 py-1.5 text-xs uppercase tracking-widest text-[#a8e6a8] backdrop-blur-sm animate-in fade-in slide-in-from-bottom-6 duration-700 fill-mode-both">
                 <Leaf size={14} /> Inside Our Farm
               </span>
-              <h1 className="mt-6 font-display text-4xl font-semibold leading-[1.05] drop-shadow-lg sm:text-5xl lg:text-6xl">
+              <h1 className="mt-6 font-display text-4xl font-semibold leading-[1.05] drop-shadow-2xl sm:text-5xl lg:text-6xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-150 fill-mode-both">
                 Farm-Fresh Chicken. <br />
                 <span className="text-[#a8e6a8]">Straight to Your Door.</span>
               </h1>
-              <p className="mt-6 max-w-xl text-lg text-white/90 drop-shadow">
+              <p className="mt-6 max-w-xl text-lg text-white/90 drop-shadow-md animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-both">
                 Healthy live broilers sold by the kilogram at farm price, farm-fresh eggs, and quick home delivery, straight from Dignity Agro Farms to your kitchen.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-[#4ea94e]">
+              <div className="mt-8 flex flex-wrap gap-3 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 fill-mode-both">
+                <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(63,143,63,0.4)] transition-all hover:bg-[#4ea94e] hover:shadow-[0_0_25px_rgba(63,143,63,0.6)] hover:-translate-y-0.5">
                   Order Now
                 </Link>
-                <a href="tel:+2347083476366" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15">
+                <a href="tel:+2347083476366" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition-all hover:bg-white/15 hover:-translate-y-0.5">
                   <PhoneCall size={16} /> Call 070 8347 6366
                 </a>
               </div>
@@ -91,6 +102,32 @@ function Index() {
         <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#3F8F3F]">Our Mission</span>
         <h2 className="mt-4 text-3xl font-semibold sm:text-4xl">{MISSION_HEADLINE}</h2>
         <p className="mt-5 text-lg leading-relaxed text-[#0F3D24]/80">{MISSION_BODY}</p>
+      </section>
+
+      {/* SEO WRITE-UPS */}
+      <section className="bg-white/40 py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid gap-12 md:grid-cols-3">
+            <div>
+              <h3 className="text-xl font-semibold text-[#0F3D24]">Sustainable Farming Practices</h3>
+              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
+                At Dignity Agro Farms, we believe that the best poultry comes from farms that respect nature. Our birds are raised using sustainable, environmentally friendly practices right here in Owerri. By focusing on high-quality, balanced feed and proper ventilation, we ensure every broiler reaches its full, healthy weight naturally without the use of harmful growth hormones.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-[#0F3D24]">Strict Biosecurity & Health</h3>
+              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
+                The health of our flock is our highest priority. We maintain a closed, strictly monitored farm environment to prevent the spread of diseases. Our farm operates on rigorous biosecurity protocols, meaning every egg you buy and every chicken you consume is guaranteed safe, disease-free, and farm-fresh, making us one of the safest poultry providers in the region.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-xl font-semibold text-[#0F3D24]">Fast & Secure Local Delivery</h3>
+              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
+                Getting farm-fresh produce shouldn't be a hassle. Whether you are a household buying a single crate of eggs, or a restaurant ordering wholesale dressed chickens, we offer fast and secure delivery across Owerri. From our pens to your kitchen, our logistics ensure your products arrive in pristine condition, preserving their freshness and quality.
+              </p>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* COMPETITIVE EDGE */}
@@ -107,9 +144,11 @@ function Index() {
               { icon: BadgeCheck, title: "Weighed in Your Presence", body: "Transparent Kg-based pricing. What the scale shows is what you pay." },
               { icon: Clock, title: "Quick Delivery", body: "We move fast once your payment is confirmed. Live or freshly dressed on request." },
             ].map(({ icon: Icon, title, body }) => (
-              <div key={title} className="rounded-2xl bg-[#0F3D24] p-6 text-white ring-1 ring-white/5">
-                <Icon className="text-[#a8e6a8]" size={26} />
-                <h3 className="mt-3 text-xl font-semibold">{title}</h3>
+              <div key={title} className="group rounded-3xl bg-[#0F3D24] p-8 text-white ring-1 ring-white/10 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(15,61,36,0.3)]">
+                <div className="mb-4 inline-flex rounded-2xl bg-white/10 p-3 transition-colors group-hover:bg-[#3F8F3F]/40">
+                  <Icon className="text-[#a8e6a8]" size={28} />
+                </div>
+                <h3 className="text-xl font-semibold">{title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-white/80">{body}</p>
               </div>
             ))}
@@ -133,17 +172,17 @@ function Index() {
           {featured.map((p) => {
             const chosen = selected[p.id];
             return (
-              <div key={p.id} className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/5 transition hover:-translate-y-1 hover:shadow-lg">
-                <div className="relative h-56 overflow-hidden">
+              <div key={p.id} className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/5 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:ring-[#0F3D24]/10">
+                <div className="relative h-60 overflow-hidden">
                   <img
                     src={p.img}
                     alt={p.title}
                     loading="lazy"
                     width={1024}
                     height={1024}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
                   />
-                  <span className="absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#0F3D24] shadow">{p.tag}</span>
+                  <span className="absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#0F3D24] shadow-md backdrop-blur-sm">{p.tag}</span>
                 </div>
                 <div className="flex flex-1 flex-col p-6">
                   <h3 className="text-xl font-semibold">{p.title}</h3>

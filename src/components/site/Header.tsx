@@ -26,10 +26,10 @@ export function Header() {
 
   return (
     <header
-      className={`sticky top-0 z-40 transition-all duration-300 ${
+      className={`sticky top-0 z-40 transition-all duration-500 ${
         scrolled
-          ? "bg-[#0B2E1B] shadow-lg"
-          : "bg-[#0F3D24]"
+          ? "bg-[#0F3D24]/85 shadow-[0_4px_30px_rgba(0,0,0,0.1)] backdrop-blur-md border-b border-white/10 py-2"
+          : "bg-[#0F3D24] py-3"
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
@@ -47,8 +47,8 @@ export function Header() {
               key={n.to}
               to={n.to}
               activeOptions={{ exact: n.to === "/" }}
-              className="rounded-full px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-              activeProps={{ className: "!bg-[#3F8F3F] !text-white shadow" }}
+              className="rounded-full px-4 py-2 text-sm font-semibold text-white/90 transition-all duration-300 hover:bg-white/10 hover:text-white"
+              activeProps={{ className: "!bg-[#3F8F3F] !text-white shadow-md shadow-[#3F8F3F]/30" }}
             >
               {n.label}
             </Link>
