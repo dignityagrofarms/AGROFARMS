@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { CheckCircle2, PhoneCall, ShoppingBag, Copy, AlertTriangle, MessageCircle, CalendarClock, Truck } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { createOrder, markPaymentSubmitted, MIN_ORDER_SUBTOTAL, validateVoucher } from "@/lib/orders.functions";
+import { PRODUCTS } from "@/lib/products";
 
 export const Route = createFileRoute("/order")({
   head: () => ({
@@ -45,59 +46,6 @@ const OWERRI_TOWNS = [
 ];
 const OUTSIDE_TOWN = "Somewhere else (outside Owerri town)";
 
-type Product = {
-  id: string;
-  name: string;
-  unitLabel: string;
-  options: { label: string; price: number; qtyLabel?: string }[];
-};
-
-const PRODUCTS: Product[] = [
-  {
-    id: "live",
-    name: "Live Broiler (weighed at farm)",
-    unitLabel: "per bird",
-    options: [
-      { label: "Small · 1.5 Kg", price: 5250 },
-      { label: "Medium · 2 Kg", price: 7000 },
-      { label: "Medium plus · 2.5 Kg", price: 8750 },
-      { label: "Large · 3 Kg", price: 10500 },
-      { label: "Extra Large · 3.5 Kg", price: 12250 },
-    ],
-  },
-  {
-    id: "dressed",
-    name: "Dressed Chicken (ready-to-cook)",
-    unitLabel: "per bird",
-    options: [
-      { label: "Small · 1.5 Kg", price: 6000 },
-      { label: "Medium · 2 Kg", price: 8000 },
-      { label: "Medium plus · 2.5 Kg", price: 10000 },
-      { label: "Large · 3 Kg", price: 12000 },
-      { label: "Extra Large · 3.5 Kg", price: 14000 },
-    ],
-  },
-  {
-    id: "eggs",
-    name: "Fresh Table Eggs",
-    unitLabel: "per pack",
-    options: [
-      { label: "Dozen (12)", price: 1800 },
-      { label: "Half crate (15)", price: 2300 },
-      { label: "Full crate or tray (30)", price: 4500 },
-    ],
-  },
-  {
-    id: "consult",
-    name: "Poultry Consultancy",
-    unitLabel: "per session",
-    options: [
-      { label: "Starter session (1 hr)", price: 25000 },
-      { label: "Farm visit & setup review", price: 50000 },
-      { label: "Full training program", price: 120000 },
-    ],
-  },
-];
 
 const naira = (n: number) => "\u20a6" + n.toLocaleString("en-NG");
 

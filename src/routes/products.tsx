@@ -1,17 +1,70 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Drumstick, Scale, Home, PhoneCall, Egg, Feather, GraduationCap, CalendarClock } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
+import { PRODUCTS } from "@/lib/products";
+
+// Auto-generate JSON-LD schema from the shared products catalog.
+// When you change a price or name in src/lib/products.ts, this schema updates automatically.
+function buildProductSchema() {
+  const itemListElement = PRODUCTS.map((p, idx) => ({
+    "@type": "ListItem",
+    "position": idx + 1,
+    "item": {
+      "@type": "Product",
+      "@id": `https://dignityagrofarms.com/products#${p.id}`,
+      "name": p.name,
+      "description": p.description,
+      "image": p.image,
+      "brand": {
+        "@type": "Brand",
+        "name": "Dignity Agro Farms"
+      },
+      "offers": p.options.map((opt) => ({
+        "@type": "Offer",
+        "name": opt.label,
+        "price": opt.price,
+        "priceCurrency": "NGN",
+        "availability": "https://schema.org/InStock",
+        "seller": {
+          "@type": "Organization",
+          "name": "Dignity Agro Farms Limited"
+        },
+        "url": "https://dignityagrofarms.com/order",
+        "areaServed": {
+          "@type": "City",
+          "name": "Owerri"
+        }
+      }))
+    }
+  }));
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "Dignity Agro Farms Products & Prices",
+    "description": "Live broiler chickens, dressed chicken, fresh eggs and poultry consultancy in Owerri, Nigeria.",
+    "url": "https://dignityagrofarms.com/products",
+    "numberOfItems": PRODUCTS.length,
+    "itemListElement": itemListElement,
+  };
+}
 
 export const Route = createFileRoute("/products")({
   head: () => ({
     meta: [
-      { title: "Live Broilers Sold by Kg · Dignity Agro Farms" },
-      { name: "description", content: "Healthy live broiler chickens sold by the kilogram at farm price, with fast home delivery across the city." },
-      { property: "og:title", content: "Live Broilers by the Kg · Dignity Agro Farms" },
-      { property: "og:description", content: "Farm-fresh live birds sold by weight. Home delivery at farm price." },
-      { property: "og:url", content: "/products" },
+      { title: "Products & Prices · Live Broilers, Dressed Chicken & Eggs | Dignity Agro Farms" },
+      { name: "description", content: "Buy live broiler chickens by Kg, freshly dressed chicken, farm-fresh eggs and poultry consultancy services in Owerri. Farm price, fast delivery." },
+      { property: "og:title", content: "Products & Prices | Dignity Agro Farms" },
+      { property: "og:description", content: "Live broilers, dressed chicken, fresh eggs and consultancy. All at farm price with fast delivery in Owerri." },
+      { property: "og:url", content: "https://dignityagrofarms.com/products" },
+      { property: "og:image", content: "https://dignityagrofarms.com/assets/live-broiler.jpg" },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Farm-Fresh Chicken & Eggs | Dignity Agro Farms" },
+      { name: "twitter:description", content: "Live broilers, dressed chicken and farm-fresh eggs in Owerri at honest farm prices." },
+      { name: "twitter:image", content: "https://dignityagrofarms.com/assets/live-broiler.jpg" },
     ],
-    links: [{ rel: "canonical", href: "/products" }],
+    links: [{ rel: "canonical", href: "https://dignityagrofarms.com/products" }],
   }),
   component: ProductsPage,
 });
@@ -25,54 +78,26 @@ const whatWeDo = [
   { icon: CalendarClock, title: "Pre-Orders", body: "Reserve birds or eggs ahead of time for a chosen date, perfect for events and festive seasons." },
 ];
 
-const items = [
-  {
-    icon: Drumstick,
-    title: "Live Broiler Chickens",
-    desc: "Healthy, well-raised live birds ready for consumption: clean, active and farm fresh. Pick your bird; we weigh it in front of you.",
-    price: "\u20a63,500 / Kg",
-    ideal: "Households • Events • Restaurants",
-  },
-  {
-    icon: Scale,
-    title: "Dressed Chicken (Ready-to-Cook)",
-    desc: "Prefer it dressed? We clean, dress and pack your bird fresh, never frozen, before it leaves the farm.",
-    price: "\u20a64,000 / Kg",
-    ideal: "Bulk buyers • Weekly meat plans • Families",
-  },
-  {
-    icon: Home,
-    title: "Fresh Table Eggs",
-    desc: "Farm-fresh eggs collected daily from our layer flock, supplied in trays and crates for homes, shops and bakeries.",
-    price: "Tray (30) \u20a64,500 \u2022 Half crate \u20a62,300 \u2022 Dozen \u20a61,800",
-    ideal: "Busy homes • Offices • Repeat customers",
-  },
-  {
-    icon: CalendarClock,
-    title: "Pre-Order (Buy Ahead)",
-    desc: "Reserve your birds or eggs for a future date \u2014 weddings, Christmas, Easter, weekly meat plans. Pay now, we raise and hold them for your chosen delivery day.",
-    price: "Same per-Kg prices \u2022 Reserve from 2 days to 8 weeks ahead",
-    ideal: "Events \u2022 Festive seasons \u2022 Weekly meat plans",
-  },
-  {
-    icon: Drumstick,
-    title: "Poultry Consultancy & Training",
-    desc: "Pen setup guidance, feeding programs, biosecurity and hands-on training for new and growing farmers.",
-    price: "From \u20a625,000 / session",
-    ideal: "New farmers • Cooperatives • Investors",
-  },
-  {
-    icon: Scale,
-    title: "Bulk & Event Orders",
-    desc: "Weddings, parties, church programs, restaurants \u2014 order in volume with reliable timing and consistent quality.",
-    price: "10 birds+: 5% off \u2022 Custom quotes on request",
-    ideal: "Caterers \u2022 Event planners \u2022 Eateries",
-  },
-];
+const naira = (n: number) => "\u20a6" + n.toLocaleString("en-NG");
+
+const ICONS: Record<string, React.ElementType> = {
+  live: Drumstick,
+  dressed: Scale,
+  eggs: Home,
+  consult: GraduationCap,
+};
 
 function ProductsPage() {
+  const productSchema = buildProductSchema();
+
   return (
     <SiteLayout>
+      {/* Auto-generated JSON-LD Product Schema from shared products catalog */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+      />
+
       <section className="bg-[#0F3D24] py-20 text-white">
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
           <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#a8e6a8]">Products, Services & Prices</span>
@@ -113,24 +138,41 @@ function ProductsPage() {
           </div>
         </div>
 
+        {/* Product cards auto-generated from PRODUCTS catalog */}
         <div className="grid gap-6 md:grid-cols-2">
-          {items.map(({ icon: Icon, title, desc, ideal, price }) => (
-            <article key={title} className="group rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5 transition hover:-translate-y-1 hover:shadow-md">
-              <div className="flex items-center gap-4">
-                <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#0F3D24] text-[#a8e6a8] transition group-hover:bg-[#3F8F3F] group-hover:text-white">
-                  <Icon size={26} />
+          {PRODUCTS.map((product) => {
+            const Icon = ICONS[product.id] ?? Drumstick;
+            const lowestPrice = Math.min(...product.options.map((o) => o.price));
+            return (
+              <article
+                key={product.id}
+                id={product.id}
+                className="group rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5 transition hover:-translate-y-1 hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#0F3D24] text-[#a8e6a8] transition group-hover:bg-[#3F8F3F] group-hover:text-white">
+                    <Icon size={26} />
+                  </div>
+                  <h2 className="text-2xl font-semibold">{product.name}</h2>
                 </div>
-                <h2 className="text-2xl font-semibold">{title}</h2>
-              </div>
-              <p className="mt-5 leading-relaxed text-[#0F3D24]/75">{desc}</p>
-              <p className="mt-4 inline-block rounded-full bg-[#3F8F3F]/10 px-4 py-1.5 text-sm font-semibold text-[#0F3D24]">{price}</p>
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Ideal for: <span className="font-medium normal-case tracking-normal text-[#0F3D24]/70">{ideal}</span></p>
-              <div className="mt-6 flex gap-3">
-                <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4ea94e]">Order Now</Link>
-                <Link to="/contact" className="inline-flex items-center rounded-full border border-[#0F3D24]/15 px-5 py-2.5 text-sm font-semibold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white">Enquire</Link>
-              </div>
-            </article>
-          ))}
+                <p className="mt-5 leading-relaxed text-[#0F3D24]/75">{product.description}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {product.options.map((opt) => (
+                    <span key={opt.label} className="rounded-full bg-[#3F8F3F]/10 px-3 py-1 text-xs font-semibold text-[#0F3D24]">
+                      {opt.label} — {naira(opt.price)}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-4 text-sm font-semibold text-[#3F8F3F]">
+                  From {naira(lowestPrice)} / {product.unitLabel}
+                </p>
+                <div className="mt-6 flex gap-3">
+                  <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4ea94e]">Order Now</Link>
+                  <Link to="/contact" className="inline-flex items-center rounded-full border border-[#0F3D24]/15 px-5 py-2.5 text-sm font-semibold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white">Enquire</Link>
+                </div>
+              </article>
+            );
+          })}
         </div>
 
         <div className="mt-12 grid gap-6 rounded-3xl bg-[#0F3D24] p-8 text-white sm:grid-cols-3">
