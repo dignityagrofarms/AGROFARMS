@@ -326,7 +326,8 @@ async function checkPasscode(value: string): Promise<AdminRole> {
   }
 
   const master = process.env.ADMIN_PASSCODE;
-  if (credential.username === "owner" && master && credential.passcode === master) return "owner";
+  const masterUsername = process.env.ADMIN_USERNAME;
+  if (masterUsername && credential.username === masterUsername && master && credential.passcode === master) return "owner";
 
   const { data: staffSetting } = await supabaseAdmin
     .from("app_settings")

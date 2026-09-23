@@ -12,6 +12,7 @@ export const Route = createFileRoute("/contact")({
       { property: "og:title", content: "Contact · Dignity Agro Farms" },
       { property: "og:description", content: "Reach the farm for enquiries, consultancy and support." },
       { property: "og:url", content: "/contact" },
+      { property: "og:image", content: "https://dignityagrofarms.com/favicon.png" },
     ],
     links: [{ rel: "canonical", href: "/contact" }],
   }),

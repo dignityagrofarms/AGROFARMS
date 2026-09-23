@@ -13,6 +13,7 @@ export const Route = createFileRoute("/blog")({
       { property: "og:title", content: "Farm Updates · Dignity Agro Farms" },
       { property: "og:description", content: "Tips, updates, and stories from the farm." },
       { property: "og:url", content: "/blog" },
+      { property: "og:image", content: farmBanner.url },
     ],
     links: [{ rel: "canonical", href: "/blog" }],
   }),
