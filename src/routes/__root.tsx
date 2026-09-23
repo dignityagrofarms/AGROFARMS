@@ -128,7 +128,11 @@ function RootShell({ children }: { children: ReactNode }) {
       "streetAddress": "9 Oduobi Crescent",
       "addressLocality": "Ikenegbu",
       "addressCountry": "NG"
-    }
+    },
+    "sameAs": [
+      "https://facebook.com/dignityagrofarms",
+      "https://instagram.com/dignityagrofarms"
+    ]
   };
 
   return (
