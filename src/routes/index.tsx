@@ -104,32 +104,6 @@ function Index() {
         <p className="mt-5 text-lg leading-relaxed text-[#0F3D24]/80">{MISSION_BODY}</p>
       </section>
 
-      {/* SEO WRITE-UPS */}
-      <section className="bg-white/40 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 md:grid-cols-3">
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Sustainable Farming Practices</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                At Dignity Agro Farms, we believe that the best poultry comes from farms that respect nature. Our birds are raised using sustainable, environmentally friendly practices right here in Owerri. By focusing on high-quality, balanced feed and proper ventilation, we ensure every broiler reaches its full, healthy weight naturally without the use of harmful growth hormones.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Strict Biosecurity & Health</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                The health of our flock is our highest priority. We maintain a closed, strictly monitored farm environment to prevent the spread of diseases. Our farm operates on rigorous biosecurity protocols, meaning every egg you buy and every chicken you consume is guaranteed safe, disease-free, and farm-fresh, making us one of the safest poultry providers in the region.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Fast & Secure Local Delivery</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                Getting farm-fresh produce shouldn't be a hassle. Whether you are a household buying a single crate of eggs, or a restaurant ordering wholesale dressed chickens, we offer fast and secure delivery across Owerri. From our pens to your kitchen, our logistics ensure your products arrive in pristine condition, preserving their freshness and quality.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* COMPETITIVE EDGE */}
       <section className="bg-white/60">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
