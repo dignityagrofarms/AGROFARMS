@@ -16,6 +16,13 @@ const nav = [
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsAdmin(!!localStorage.getItem("daf_admin_passcode"));
+    }
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -53,6 +60,15 @@ export function Header() {
               {n.label}
             </Link>
           ))}
+          {isAdmin && (
+            <Link
+              to="/admin/admin-orders"
+              className="rounded-full px-4 py-2 text-sm font-semibold text-white/90 transition-all duration-300 hover:bg-white/10 hover:text-white"
+              activeProps={{ className: "!bg-[#3F8F3F] !text-white shadow-md shadow-[#3F8F3F]/30" }}
+            >
+              Admin Panel
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
@@ -86,6 +102,16 @@ export function Header() {
                 {n.label}
               </Link>
             ))}
+            {isAdmin && (
+              <Link
+                to="/admin/admin-orders"
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-4 py-3 text-sm font-semibold text-white hover:bg-white/15"
+                activeProps={{ className: "!bg-[#3F8F3F] !text-white" }}
+              >
+                Admin Panel
+              </Link>
+            )}
             <Link
               to="/order"
               onClick={() => setOpen(false)}

@@ -179,12 +179,83 @@ function AdminOrders() {
   const listFn = useServerFn(adminListOrders);
   const qc = useQueryClient();
 
+  const signOut = () => {
+    if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
+    setPasscode(null);
+    qc.removeQueries({ queryKey: ["admin-orders"] });
+  };
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) setPasscode(saved);
-    }
-  }, []);
+    if (typeof window === "undefined") return;
+    let throttleTimeout: NodeJS.Timeout | null = null;
+    
+    const checkSession = () => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.loginAt) {
+          parsed.loginAt = Date.now();
+          parsed.lastActive = Date.now();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        }
+        
+        const now = Date.now();
+        // If we have query.data.role use it, else guess based on username
+        const role = query.data?.role || (parsed.username === "staff" ? "staff" : "owner");
+
+        if (role === "owner") {
+          // Admin absolute expiry 24 hours
+          if (now - parsed.loginAt > 24 * 60 * 60 * 1000) {
+            signOut();
+            return;
+          }
+        } else {
+          // Staff idle expiry 7 hours
+          if (now - parsed.lastActive > 7 * 60 * 60 * 1000) {
+            signOut();
+            return;
+          }
+        }
+        setPasscode(saved);
+      } catch {
+        // Fallback for old plaintext passcodes
+        const migrated = JSON.stringify({ username: "unknown", passcode: saved, loginAt: Date.now(), lastActive: Date.now() });
+        localStorage.setItem(STORAGE_KEY, migrated);
+        setPasscode(migrated);
+      }
+    };
+
+    const updateActivity = () => {
+      if (throttleTimeout) return;
+      throttleTimeout = setTimeout(() => { throttleTimeout = null; }, 5000);
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          parsed.lastActive = Date.now();
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
+        } catch { /* ignore */ }
+      }
+    };
+
+    checkSession();
+    const interval = setInterval(checkSession, 60000);
+    
+    window.addEventListener("mousemove", updateActivity, { passive: true });
+    window.addEventListener("keydown", updateActivity, { passive: true });
+    window.addEventListener("click", updateActivity, { passive: true });
+    window.addEventListener("touchstart", updateActivity, { passive: true });
+
+    return () => {
+      clearInterval(interval);
+      if (throttleTimeout) clearTimeout(throttleTimeout);
+      window.removeEventListener("mousemove", updateActivity);
+      window.removeEventListener("keydown", updateActivity);
+      window.removeEventListener("click", updateActivity);
+      window.removeEventListener("touchstart", updateActivity);
+    };
+  }, [query.data?.role, qc]);
 
   const query = useQuery({
     queryKey: ["admin-orders", passcode, applied],
@@ -218,16 +289,12 @@ function AdminOrders() {
   useEffect(() => {
     if (query.error && passcode) {
       setAuthError((query.error as Error).message);
-      sessionStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY);
       setPasscode(null);
     }
   }, [query.error, passcode]);
 
-  const signOut = () => {
-    sessionStorage.removeItem(STORAGE_KEY);
-    setPasscode(null);
-    qc.removeQueries({ queryKey: ["admin-orders"] });
-  };
+
 
   const submitPasscode = (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,8 +302,8 @@ function AdminOrders() {
     const p = input;
     const u = username.trim().toLowerCase();
     if (!u || !p) return;
-    const credential = JSON.stringify({ username: u, passcode: p });
-    sessionStorage.setItem(STORAGE_KEY, credential);
+    const credential = JSON.stringify({ username: u, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
+    localStorage.setItem(STORAGE_KEY, credential);
     setPasscode(credential);
     setInput("");
     setUsername("");
