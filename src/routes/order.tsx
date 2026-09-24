@@ -206,7 +206,7 @@ function OrderPage() {
         qty,
       }],
     };
-    const itemsText = enrichedForm.items.map(item => `- ${item.qty}x ${item.product} (${item.option})`).join("\\n");
+    const itemsText = enrichedForm.items.map(item => `- ${item.qty}x ${item.product} (${item.option})`).join("\n");
     const text = encodeURIComponent(
       `🛒 New Website Order — Dignity Agro Farms\n\n` +
       `📦 Order ID: ${orderCode}\n` +

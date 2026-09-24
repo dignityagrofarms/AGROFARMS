@@ -17,7 +17,7 @@ export type Product = {
   options: ProductOption[];
 };
 
-const BASE = "";
+const BASE = "https://dignityagrofarms.com";
 
 export const PRODUCTS: Product[] = [
   {
