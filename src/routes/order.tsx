@@ -151,15 +151,25 @@ function OrderPage() {
     try {
       await markPaidFn({ data: { trackCode } });
       setPaymentClaimed(true);
-      const msg =
-        `Payment made · Dignity Agro Farms%0A%0A` +
-        `Order ID: ${orderCode}%0A` +
-        `Tracking code: ${trackCode}%0A` +
-        `Amount: ${naira(total)}%0A` +
-        `Name: ${form.name}%0A` +
-        `Phone: ${form.phone}%0A` +
-        `Address: ${form.address}%0A%0A` +
-        `I have transferred ${naira(total)} to Opay 7083476366 (Ihemegbulem). Please confirm and start my order.`;
+      const msg = encodeURIComponent(
+        `💳 Payment Submitted — Dignity Agro Farms
+
+` +
+        `📦 Order ID: ${orderCode}
+` +
+        `🔍 Track Code: ${trackCode}
+` +
+        `💰 Amount: ${naira(total)}
+` +
+        `👤 Name: ${form.name}
+` +
+        `📞 Phone: ${form.phone}
+` +
+        `📍 Address: ${form.address}
+
+` +
+        `I have transferred ${naira(total)} to Opay 7083476366 (Ihemegbulem). Please confirm and process my order.`
+      );
       window.open(`https://wa.me/2347083476366?text=${msg}`, "_blank");
     } catch (err) {
       setClaimError(err instanceof Error ? err.message : "Could not mark as paid.");
@@ -198,14 +208,14 @@ function OrderPage() {
     };
     const itemsText = enrichedForm.items.map(item => `- ${item.qty}x ${item.product} (${item.option})`).join("\\n");
     const text = encodeURIComponent(
-      `Hello Dignity Agro Farms! I have just placed an order on the website.\\n\\n` +
-      `*Order ID:* ${orderCode}\\n` +
-      `*Customer:* ${enrichedForm.customerName}\\n` +
-      `*Phone:* ${enrichedForm.phone}\\n` +
-      `*Delivery Address:* ${enrichedForm.address} (${enrichedForm.deliveryZone})\\n\\n` +
-      `*Items Ordered:*\\n${itemsText}\\n\\n` +
-      `*Amount Due:* ${naira(total)}\\n\\n` +
-      `I am proceeding to make the payment now, and I will send the payment receipt here shortly.`
+      `🛒 New Website Order — Dignity Agro Farms\n\n` +
+      `📦 Order ID: ${orderCode}\n` +
+      `👤 Customer: ${enrichedForm.customerName}\n` +
+      `📞 Phone: ${enrichedForm.phone}\n` +
+      `📍 Address: ${enrichedForm.address} (${enrichedForm.deliveryZone})\n\n` +
+      `🍗 Items Ordered:\n${itemsText}\n\n` +
+      `💰 Amount Due: ${naira(total)}\n\n` +
+      `Payment is being made now. Receipt to follow.`
     );
     return `https://wa.me/2347083476366?text=${text}`;
   };
@@ -521,32 +531,6 @@ function OrderPage() {
           </div>
           <Link to="/products" className="mt-4 block text-center text-xs font-semibold uppercase tracking-wider text-[#a8e6a8] hover:text-white">See full price list →</Link>
         </aside>
-      </section>
-
-      {/* SEO WRITE-UPS */}
-      <section className="bg-[#0F3D24]/5 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 md:grid-cols-3">
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Wholesale vs Retail Ordering</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                Whether you're picking up a single tray of eggs for your household or ordering 50 crates for a restaurant, Dignity Agro Farms scales to your needs. Our checkout seamlessly handles retail quantities, but for bulk and wholesale purchases, our direct lines are always open. We prioritize large-scale distributors with consistent stock and preferential bulk rates.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Transparent Pricing & Fulfillment</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                When you check out on our platform, the price you see is the price you pay. There are no hidden fees. We price our live broilers transparently by the kilogram, and delivery fees within and outside Owerri are flat and predictable. Once your order is placed, our fulfillment team immediately begins picking, weighing, and dispatching your items for peak freshness.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Secure Bank Transfers</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                To keep our checkout fast and friction-free, we accept direct bank transfers to our dedicated Opay account. This ensures your payment is processed instantly and securely without relying on third-party card gateways. Simply make the transfer, click the WhatsApp confirmation button, and attach your receipt. We instantly verify against bank alerts for rapid dispatch.
-              </p>
-            </div>
-          </div>
-        </div>
       </section>
     </SiteLayout>
   );

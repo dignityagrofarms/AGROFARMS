@@ -1,9 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
-import farmBanner from "@/assets/farm-banner.jpg.asset.json";
-import eggsImg from "@/assets/eggs.jpg.asset.json";
-import broilerImg from "@/assets/live-broiler.jpg.asset.json";
-import dressedImg from "@/assets/dressed-chicken.jpg.asset.json";
+
 
 export const Route = createFileRoute("/blog")({
   head: () => ({
@@ -13,7 +10,7 @@ export const Route = createFileRoute("/blog")({
       { property: "og:title", content: "Farm Updates · Dignity Agro Farms" },
       { property: "og:description", content: "Tips, updates, and stories from the farm." },
       { property: "og:url", content: "/blog" },
-      { property: "og:image", content: farmBanner.url },
+      { property: "og:image", content: "https://dignityagrofarms.com/assets/farm-banner.jpg" },
     ],
     links: [{ rel: "canonical", href: "/blog" }],
   }),
@@ -25,42 +22,42 @@ const posts = [
     cat: "Behind the Scenes",
     title: "A morning at Dignity: from feeding to egg collection",
     excerpt: "Every day starts early at the farm. We check feed, water, ventilation and flock health before the first eggs are collected and packed for delivery.",
-    img: farmBanner.url,
+    img: "/assets/farm-banner.jpg",
     date: "5 August 2026",
   },
   {
     cat: "Farm Tips",
     title: "Why live weight matters when buying chicken",
     excerpt: "Buying by the kilogram means you pay for exactly what you get. Learn why open weighing protects you from overpaying for ice, feathers or guesswork.",
-    img: broilerImg.url,
+    img: "/assets/live-broiler.jpg",
     date: "1 August 2026",
   },
   {
     cat: "Announcement",
     title: "Fresh egg supply now open for weekly household delivery",
     excerpt: "Get a tray or half crate of farm-fresh eggs delivered weekly. No market queues, no broken eggs, just consistent quality from our layer flock.",
-    img: eggsImg.url,
+    img: "/assets/eggs.jpg",
     date: "28 July 2026",
   },
   {
     cat: "Farm Tips",
     title: "Dressed vs live: which should you order?",
     excerpt: "Live birds are great for events and personal processing. Dressed chicken saves time and is ready for the pot. Here is how to choose.",
-    img: dressedImg.url,
+    img: "/assets/dressed-chicken.jpg",
     date: "22 July 2026",
   },
   {
     cat: "Farm Tips",
     title: "Biosecurity basics every small poultry farm should follow",
     excerpt: "Simple habits like foot dips, visitor control and clean water do more for flock health than expensive drugs. Here are the basics we practise daily.",
-    img: farmBanner.url,
+    img: "/assets/farm-banner.jpg",
     date: "15 July 2026",
   },
   {
     cat: "Announcement",
     title: "Pre-order your birds for events and festive seasons",
     excerpt: "Reserve broilers ahead of Christmas, Easter, weddings or family events. Pay now and we will raise and hold your birds for your chosen delivery date.",
-    img: broilerImg.url,
+    img: "/assets/live-broiler.jpg",
     date: "8 July 2026",
   },
 ];

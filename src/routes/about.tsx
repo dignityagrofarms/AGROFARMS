@@ -2,10 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Leaf, HeartHandshake, ShieldCheck, Sprout } from "lucide-react";
 import { SiteLayout, LeafDividerSection } from "@/components/site/Layout";
 import { MISSION_HEADLINE, MISSION_BODY } from "@/lib/brand";
-import director from "@/assets/director.jpg.asset.json";
-import farmLife1 from "@/assets/farm-life-1.jpg.asset.json";
-import farmLife2 from "@/assets/farm-life-2.jpg.asset.json";
-import farmLife3 from "@/assets/farm-life-3.jpg.asset.json";
+
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -15,7 +12,7 @@ export const Route = createFileRoute("/about")({
       { property: "og:title", content: "About Us | Dignity Agro Farms" },
       { property: "og:description", content: "Our story and the values behind our poultry farm in Owerri." },
       { property: "og:url", content: "/about" },
-      { property: "og:image", content: director.url },
+      { property: "og:image", content: "https://dignityagrofarms.com/assets/director.jpg" },
     ],
     links: [{ rel: "canonical", href: "/about" }],
   }),
@@ -55,31 +52,6 @@ function AboutPage() {
         ))}
       </section>
 
-      {/* SEO WRITE-UPS */}
-      <section className="bg-white/40 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-12 md:grid-cols-3">
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Our Deep Roots in Owerri</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                Our farm is not just a business; it is a proud local institution in Owerri, Imo State. We started right here in our community with a vision to feed households with reliable, clean, and nutritious poultry products. Over the years, our roots have grown deeper, and we have become the go-to farm for families and businesses seeking true agricultural quality.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Community Impact & Employment</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                At Dignity Agro Farms, empowering our local community is central to our operations. We actively provide employment opportunities, train young agriculturists, and support local vendors who distribute our eggs and chickens in local markets. When you support us, you are directly supporting the economic growth and agricultural independence of our region.
-              </p>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-[#0F3D24]">Quality Assurance Guarantee</h3>
-              <p className="mt-3 text-sm text-[#0F3D24]/75 leading-relaxed">
-                Integrity is in our name, and it shows in our rigorous quality control. Every single egg is checked for structural integrity, and every bird is graded and weighed meticulously before it leaves our premises. We guarantee that the product you receive perfectly matches what you ordered—fresh, wholesome, and farmed with dignity.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <LeafDividerSection />
 
@@ -108,7 +80,7 @@ function AboutPage() {
         </div>
         <div className="mx-auto mt-10 grid max-w-3xl gap-8 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5 sm:grid-cols-[220px_1fr] sm:items-center">
           <img
-            src={director.url}
+            src="/assets/director.jpg"
             alt="The Director of Dignity Agro Farms Limited in farm workwear"
             loading="lazy"
             className="mx-auto h-56 w-56 rounded-3xl object-cover object-top ring-4 ring-[#3F8F3F]/20"
@@ -131,9 +103,9 @@ function AboutPage() {
         </div>
         <div className="mt-10 grid gap-5 md:grid-cols-3">
           {[
-            { img: farmLife1.url, title: "Inside the pen house", body: "Clean, well-ventilated and freshly prepared housing, the foundation of healthy birds." },
-            { img: farmLife2.url, title: "Hands-on management", body: "Our founder on the grounds daily, checking the flock, feed and biosecurity in person." },
-            { img: farmLife3.url, title: "Room to grow", body: "Spacious, tree-shaded grounds in Owerri with multiple pen blocks for broilers and layers." },
+            { img: "/assets/farm-life-1.jpg", title: "Inside the pen house", body: "Clean, well-ventilated and freshly prepared housing, the foundation of healthy birds." },
+            { img: "/assets/farm-life-2.jpg", title: "Hands-on management", body: "Our founder on the grounds daily, checking the flock, feed and biosecurity in person." },
+            { img: "/assets/farm-life-3.jpg", title: "Room to grow", body: "Spacious, tree-shaded grounds in Owerri with multiple pen blocks for broilers and layers." },
           ].map((f) => (
             <figure key={f.title} className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/5">
               <img src={f.img} alt={f.title} loading="lazy" className="h-72 w-full object-cover" />

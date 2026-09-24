@@ -6,10 +6,9 @@ import { PhoneCall, Leaf, BadgeCheck, Wallet, Clock, CheckCircle2, Instagram, Fa
 import { SiteLayout, LeafDividerSection } from "@/components/site/Layout";
 import { MISSION_HEADLINE, MISSION_BODY } from "@/lib/brand";
 import { subscribeToNewsletter } from "@/lib/newsletter.functions";
-import broilerImg from "@/assets/live-broiler.jpg.asset.json";
-import dressedImg from "@/assets/dressed-chicken.jpg.asset.json";
-import eggsImg from "@/assets/eggs.jpg.asset.json";
-import farmBanner from "@/assets/farm-banner.jpg.asset.json";
+
+
+const FARM_BANNER = "/assets/farm-banner.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -19,7 +18,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Dignity Agro Farms | Fresh Poultry & Eggs in Owerri" },
       { property: "og:description", content: "Buy live broilers, dressed chicken, and farm-fresh eggs straight from our poultry farm in Owerri. Fast delivery, wholesale & retail." },
       { property: "og:url", content: "/" },
-      { property: "og:image", content: farmBanner.url },
+      { property: "og:image", content: "https://dignityagrofarms.com/assets/farm-banner.jpg" },
     ],
     links: [{ rel: "canonical", href: "/" }],
   }),
@@ -32,7 +31,7 @@ const featured = [
     title: "Live Broilers",
     desc: "Healthy, active birds, chosen and weighed with you before delivery.",
     tag: "Sold by the Kg",
-    img: broilerImg.url,
+    img: "/assets/live-broiler.jpg",
     sizes: ["Small (1.5–2kg)", "Medium (2–2.5kg)", "Large (2.5–3kg+)"],
   },
   {
@@ -40,7 +39,7 @@ const featured = [
     title: "Dressed on Request",
     desc: "Prefer it ready to cook? We clean and dress your bird before delivery.",
     tag: "Fresh, Not Frozen",
-    img: dressedImg.url,
+    img: "/assets/dressed-chicken.jpg",
     sizes: ["Whole Dressed", "Cut in Parts", "Deboned"],
   },
   {
@@ -48,7 +47,7 @@ const featured = [
     title: "Fresh Table Eggs",
     desc: "Collected daily from our layer flock and supplied in trays and crates.",
     tag: "Collected Daily",
-    img: eggsImg.url,
+    img: "/assets/eggs.jpg",
     sizes: ["Dozen", "Half crate", "Tray (30)"],
   },
 ];
@@ -61,7 +60,7 @@ function Index() {
       <section className="relative isolate overflow-hidden">
         <div className="relative h-[560px] w-full sm:h-[640px] lg:h-[720px]">
           <img
-            src={farmBanner.url}
+            src={FARM_BANNER}
             alt="The pen houses at Dignity Agro Farms in Owerri"
             width={1600}
             height={1100}
