@@ -179,6 +179,14 @@ function AdminOrders() {
   const listFn = useServerFn(adminListOrders);
   const qc = useQueryClient();
 
+  const query = useQuery({
+    queryKey: ["admin-orders", passcode, applied],
+    queryFn: () => listFn({ data: { passcode: passcode!, ...applied } }),
+    enabled: !!passcode,
+    refetchInterval: 20000,
+    retry: false,
+  });
+
   const signOut = () => {
     if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
     setPasscode(null);
@@ -257,13 +265,7 @@ function AdminOrders() {
     };
   }, [query.data?.role, qc]);
 
-  const query = useQuery({
-    queryKey: ["admin-orders", passcode, applied],
-    queryFn: () => listFn({ data: { passcode: passcode!, ...applied } }),
-    enabled: !!passcode,
-    refetchInterval: 20000,
-    retry: false,
-  });
+
 
   const applyFilters = () => {
     setApplied({ from, to, status: statusFilter, paymentStatus: payFilter, zone: zoneFilter, search: search.trim() });
