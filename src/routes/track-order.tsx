@@ -165,8 +165,8 @@ function TrackOrder() {
                   <div className="mt-4 rounded-xl bg-[#0F3D24] p-4 text-sm text-white">
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a8e6a8]">Send payment to</p>
                     <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
-                      <span className="text-white/60">Opay</span><span className="text-right font-semibold">Ihemegbulem</span>
-                      <span className="text-white/60">Account</span><span className="text-right font-mono font-semibold">7083476366</span>
+                      <span className="text-white/60">Moniepoint MFB</span><span className="text-right font-semibold">Dignity Agro Farms</span>
+                      <span className="text-white/60">Account</span><span className="text-right font-mono font-semibold">4006179439</span>
                       <span className="text-white/60">Amount</span><span className="text-right font-semibold">{naira(order.total)}</span>
                     </div>
                   </div>

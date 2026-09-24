@@ -156,7 +156,7 @@ function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", rea
   const text =
     decision === "approved"
       ? `Hi ${first}, this is Dignity Agro Farms. Your payment of ${naira(order.total)} for order ${order.orderCode} has been CONFIRMED. ✅\nCurrent status: ${STATUS_LABEL[order.status]}.${order.eta ? ` ETA: ${order.eta}.` : ""}\nTrack your order anytime on our website with your tracking code ${order.trackCode}. Thank you!`
-      : `Hi ${first}, this is Dignity Agro Farms. We could not confirm your payment of ${naira(order.total)} for order ${order.orderCode}.${reason ? ` Reason: ${reason}.` : ""}\nCurrent status: ${STATUS_LABEL[order.status]}.\nPlease send payment to 7083476366 (Opay · Ihemegbulem) only, then tap "I have made payment" again. Call 07083476366 for help.`;
+      : `Hi ${first}, this is Dignity Agro Farms. We could not confirm your payment of ${naira(order.total)} for order ${order.orderCode}.${reason ? ` Reason: ${reason}.` : ""}\nCurrent status: ${STATUS_LABEL[order.status]}.\nPlease send payment to 4006179439 (Moniepoint MFB · Dignity Agro Farms Limited) only, then tap "I have made payment" again. Call 07083476366 for help.`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 

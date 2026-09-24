@@ -118,8 +118,8 @@ function ReceiptPage() {
                 Awaiting payment
               </div>
             )}
-            <div className="mt-2 text-sm text-[#0F3D24]/70">Bank transfer · Opay</div>
-            <div className="text-sm text-[#0F3D24]/70">7083476366 · Ihemegbulem</div>
+            <div className="mt-2 text-sm text-[#0F3D24]/70">Bank transfer · Moniepoint MFB</div>
+            <div className="text-sm text-[#0F3D24]/70">4006179439 · Dignity Agro Farms Limited</div>
           </div>
         </div>
 
@@ -154,7 +154,7 @@ function ReceiptPage() {
 
         {!paid && (
           <div className="mt-6 rounded-2xl bg-[#F7F5F0] p-4 text-xs text-[#0F3D24]/80 ring-1 ring-[#0F3D24]/10">
-            <strong>Payment instructions:</strong> send {naira(o.total)} to Opay account <strong>7083476366</strong> (Ihemegbulem) only,
+            <strong>Payment instructions:</strong> send {naira(o.total)} to Moniepoint MFB account <strong>4006179439</strong> (Dignity Agro Farms Limited) only,
             then tap "I have made payment" on your order page. Never send money to any other account.
           </div>
         )}

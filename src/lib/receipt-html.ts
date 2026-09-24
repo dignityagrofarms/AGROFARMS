@@ -65,7 +65,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
   <div><span>Delivery</span><span>${o.deliveryFee === 0 ? "FREE" : naira(o.deliveryFee)}</span></div>
   <div class="total"><span>Total</span><span>${naira(o.total)}</span></div>
 </div>
-<div class="muted" style="margin-top:16px">Payment: Bank transfer · Opay · 7083476366 · Ihemegbulem</div>
+<div class="muted" style="margin-top:16px">Payment: Bank transfer · Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited</div>
 ${o.status === "cancelled" ? `<div class="muted" style="margin-top:8px;color:#b91c1c">Order cancelled by ${o.cancelledBy === "customer" ? "customer" : "the farm"}${o.cancelReason ? `: ${esc(o.cancelReason)}` : ""}${o.cancelledAt ? ` on ${new Date(o.cancelledAt).toLocaleString()}` : ""}</div>` : ""}
 <footer>Thank you for choosing Dignity Agro Farms. Farm fresh chicken, straight to your door.</footer>
 </div></body></html>`;

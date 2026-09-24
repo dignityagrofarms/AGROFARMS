@@ -168,7 +168,7 @@ function OrderPage() {
         `📍 Address: ${form.address}
 
 ` +
-        `I have transferred ${naira(total)} to Opay 7083476366 (Ihemegbulem). Please confirm and process my order.`
+        `I have transferred ${naira(total)} to Moniepoint MFB 4006179439 (Dignity Agro Farms Limited). Please confirm and process my order.`
       );
       window.open(`https://wa.me/2347083476366?text=${msg}`, "_blank");
     } catch (err) {
@@ -180,7 +180,7 @@ function OrderPage() {
 
   const copyAccount = async () => {
     try {
-      await navigator.clipboard.writeText("7083476366");
+      await navigator.clipboard.writeText("4006179439");
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { /* noop */ }
@@ -275,16 +275,16 @@ function OrderPage() {
                 <div className="mt-3 grid gap-1 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-white/60">Bank</span>
-                    <span className="font-semibold">Opay</span>
+                    <span className="font-semibold">Moniepoint MFB</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-white/60">Account name</span>
-                    <span className="font-semibold">Ihemegbulem</span>
+                    <span className="font-semibold">Dignity Agro Farms Limited</span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-white/60">Account number</span>
                     <span className="flex items-center gap-2">
-                      <span className="font-mono text-lg font-semibold">7083476366</span>
+                      <span className="font-mono text-lg font-semibold">4006179439</span>
                       <button type="button" onClick={copyAccount} className="rounded-full bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider hover:bg-white/20">
                         <Copy size={12} className="inline" /> {copied ? "Copied" : "Copy"}
                       </button>
@@ -300,7 +300,7 @@ function OrderPage() {
               <div className="mt-4 flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-left ring-1 ring-red-200">
                 <AlertTriangle className="mt-0.5 shrink-0 text-red-600" size={18} />
                 <p className="text-xs text-red-800">
-                  <span className="font-bold">Security warning:</span> Only send payment to the account above (Opay · 7083476366 · Ihemegbulem). Do not pay any other account you may be sent. Dignity Agro Farms will never ask you to pay a different account. If in doubt, call <a href="tel:+2347083476366" className="font-semibold underline">070 8347 6366</a> before paying.
+                  <span className="font-bold">Security warning:</span> Only send payment to the account above (Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited). Do not pay any other account you may be sent. Dignity Agro Farms will never ask you to pay a different account. If in doubt, call <a href="tel:+2347083476366" className="font-semibold underline">070 8347 6366</a> before paying.
                 </p>
               </div>
 
