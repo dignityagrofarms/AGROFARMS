@@ -393,7 +393,6 @@ function OrderPage() {
                     </p>
                   </div>
                 )}
-              </div>
 
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">1. Choose a product</div>
