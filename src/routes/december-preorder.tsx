@@ -288,7 +288,7 @@ function DecemberPreorderPage() {
   const qty = Math.max(1, parseInt(form.qty) || 1);
   const unitPrice = selectedProduct?.price ?? 0;
   const totalAmount = unitPrice * qty;
-  const depositAmount = reservationType === "slot_reserved" ? SLOT_FEE : reservationType === "outright" ? totalAmount : 0;
+  const depositAmount = reservationType === "slot_reserved" ? (SLOT_FEE * qty) : reservationType === "outright" ? totalAmount : 0;
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));

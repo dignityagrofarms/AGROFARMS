@@ -90,7 +90,7 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-white/10 bg-[#0F3D24] px-4 py-3">
+        <div className="xl:hidden border-t border-white/10 bg-[#0F3D24] px-4 py-3">
           <nav className="flex flex-col gap-1">
             {nav.map((n) => (
               <Link
