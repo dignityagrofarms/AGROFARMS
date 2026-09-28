@@ -26,19 +26,7 @@ const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
 const SLOT_FEE = 3500;
 
 const DECEMBER_PRODUCTS = [
-  { label: "Live Broiler Chicken · Small (1.5 Kg)", price: 5250 },
-  { label: "Live Broiler Chicken · Medium (2 Kg)", price: 7000 },
-  { label: "Live Broiler Chicken · Medium Plus (2.5 Kg)", price: 8750 },
-  { label: "Live Broiler Chicken · Large (3 Kg)", price: 10500 },
-  { label: "Live Broiler Chicken · Extra Large (3.5 Kg)", price: 12250 },
-  { label: "Dressed Chicken · Small (1.5 Kg)", price: 6000 },
-  { label: "Dressed Chicken · Medium (2 Kg)", price: 8000 },
-  { label: "Dressed Chicken · Medium Plus (2.5 Kg)", price: 10000 },
-  { label: "Dressed Chicken · Large (3 Kg)", price: 12000 },
-  { label: "Dressed Chicken · Extra Large (3.5 Kg)", price: 14000 },
-  { label: "Fresh Table Eggs · Dozen (12)", price: 1800 },
-  { label: "Fresh Table Eggs · Half Crate (15)", price: 2300 },
-  { label: "Fresh Table Eggs · Full Crate (30)", price: 4500 },
+  { label: "December Pre-Order Chicken", price: 12250 },
 ];
 
 const RESERVATION_OPTIONS: { type: ReservationType; title: string; amount: string; badge: string; badgeColor: string; desc: string; warning?: string }[] = [
