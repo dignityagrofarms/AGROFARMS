@@ -293,6 +293,7 @@ function AdminOrders() {
       setAuthError((query.error as Error).message);
       localStorage.removeItem(STORAGE_KEY);
       setPasscode(null);
+      qc.removeQueries({ queryKey: ["admin-orders"] });
     }
   }, [query.error, passcode]);
 
@@ -378,7 +379,7 @@ function AdminOrders() {
               className="mt-3 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
             />
             {authError && <p className="mt-2 text-sm text-red-600">{authError}</p>}
-            <button className="mt-4 w-full rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]">
+            <button type="submit" className="mt-4 w-full rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]">
               Sign in
             </button>
             <p className="mt-4 text-center text-xs text-[#0F3D24]/55">Owner access can review or change the staff passcode from the Passcode panel.</p>
