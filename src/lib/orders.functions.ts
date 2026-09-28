@@ -312,7 +312,7 @@ async function hashPasscode(passcode: string): Promise<string> {
 
 // Owner and staff use separate credentials. The permanent ADMIN_PASSCODE is
 // the owner recovery credential; the saved app setting is the staff credential.
-async function checkPasscode(value: string): Promise<AdminRole> {
+export async function checkPasscode(value: string): Promise<AdminRole> {
   if (!value) throw new Error("Invalid login details.");
   const credential = parseAdminCredential(value);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
