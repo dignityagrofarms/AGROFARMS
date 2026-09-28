@@ -11,7 +11,10 @@ export const Route = createFileRoute("/december-preorder")({
       { property: "og:image", content: "https://dignityagrofarms.com/assets/december-flyer.png" },
       { property: "og:url", content: "https://dignityagrofarms.com/december-preorder" },
     ],
-    links: [{ rel: "canonical", href: "/december-preorder" }],
+    links: [
+      { rel: "canonical", href: "/december-preorder" },
+      { rel: "preload", as: "image", href: "/assets/december-flyer.png" }
+    ],
   }),
   component: FlyerLandingPage,
 });
@@ -24,11 +27,13 @@ function FlyerLandingPage() {
       <div className="bg-[#0F3D24] min-h-[calc(100vh-80px)] py-12">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           
-          <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-[#3F8F3F]/30 bg-[#3F8F3F]/10 aspect-[4/5] max-w-lg mb-8">
+          <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-white/30 bg-white aspect-[4/5] max-w-lg mb-8">
             <img 
               src="/assets/december-flyer.png" 
               alt="December Pre-order Flyer" 
-              className="absolute inset-0 h-full w-full object-cover object-top"
+              fetchpriority="high"
+              loading="eager"
+              className="absolute inset-0 h-full w-full object-contain object-center"
               onError={(e) => {
                 // Fallback text if they haven't uploaded it yet
                 const target = e.target as HTMLImageElement;
