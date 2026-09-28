@@ -26,7 +26,7 @@ const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
 const SLOT_FEE = 3500;
 
 const DECEMBER_PRODUCTS = [
-  { label: "December Pre-Order Chicken", price: 12250 },
+  { label: "Live Broiler Chicken (3kg and above)", price: 12250 },
 ];
 
 const RESERVATION_OPTIONS: { type: ReservationType; title: string; amount: string; badge: string; badgeColor: string; desc: string; warning?: string }[] = [
@@ -254,7 +254,7 @@ function DecemberPreorderPage() {
 
   const [step, setStep] = useState<Step>("form");
   const [reservationType, setReservationType] = useState<ReservationType>("slot_reserved");
-  const [form, setForm] = useState({ name: "", phone: "", email: "", address: "", product: "", qty: "1", notes: "", deliveryDate: "" });
+  const [form, setForm] = useState({ name: "", phone: "", email: "", zone: "", address: "", product: "", qty: "1", notes: "", deliveryDate: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
@@ -293,7 +293,7 @@ function DecemberPreorderPage() {
           customerName: form.name,
           phone: form.phone,
           email: form.email || "",
-          address: form.address,
+          address: `${form.zone} - ${form.address}`,
           product: form.product,
           quantity: qty,
           unitPrice,
@@ -405,9 +405,31 @@ function DecemberPreorderPage() {
                   <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Email address</label>
                   <input type="email" value={form.email} onChange={set("email")} placeholder="Optional — for invoice by email" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
                 </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Delivery address *</label>
-                  <input required value={form.address} onChange={set("address")} placeholder="Your delivery address in Owerri" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Delivery Zone (Owerri) *</label>
+                    <select required value={form.zone} onChange={set("zone")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white">
+                      <option value="">Select an area</option>
+                      <option value="Ikenegbu">Ikenegbu</option>
+                      <option value="Aladinma">Aladinma</option>
+                      <option value="Wetheral">Wetheral</option>
+                      <option value="Amakohia">Amakohia</option>
+                      <option value="Akwakuma">Akwakuma</option>
+                      <option value="Orji">Orji</option>
+                      <option value="Irete">Irete</option>
+                      <option value="World Bank">World Bank</option>
+                      <option value="New Owerri">New Owerri</option>
+                      <option value="Egbu">Egbu</option>
+                      <option value="Naze">Naze</option>
+                      <option value="Nekede">Nekede</option>
+                      <option value="Control Post / Assumpta">Control Post / Assumpta</option>
+                      <option value="Other Owerri Area">Other Owerri Area</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Full Delivery Address *</label>
+                    <input required value={form.address} onChange={set("address")} placeholder="Street name and house number" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
+                  </div>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Product *</label>
@@ -424,8 +446,8 @@ function DecemberPreorderPage() {
                     <input required type="number" min="1" max="500" value={form.qty} onChange={set("qty")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Preferred delivery date</label>
-                    <input type="date" value={form.deliveryDate} onChange={set("deliveryDate")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white" />
+                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Preferred delivery date (Dec only)</label>
+                    <input type="date" min="2026-12-01" max="2026-12-31" value={form.deliveryDate} onChange={set("deliveryDate")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white" />
                   </div>
                 </div>
                 <div>
