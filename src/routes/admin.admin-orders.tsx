@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2 } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -349,13 +349,13 @@ function AdminOrders() {
           />
         )}
         {passcode && (
-          <div className="mb-6 flex flex-wrap gap-2 border-b border-[#0F3D24]/10 pb-3" role="tablist" aria-label="Admin sections">
-            {query.data?.role && <span className="inline-flex items-center rounded-full bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24]">Signed in as {query.data.role}</span>}
-            <AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders and reports</AdminTab>
-            <AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Client CRM</AdminTab>
-            <AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab>
-             <AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab>
-             <AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<span>🎄</span>}>December Pre-Orders</AdminTab>
+          <div className="mb-6 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-[#0F3D24]/10 pb-3" style={{ scrollbarWidth: "none" }} role="tablist" aria-label="Admin sections">
+            {query.data?.role && <span className="inline-flex shrink-0 items-center rounded-full bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24]">Signed in as {query.data.role}</span>}
+            <div className="shrink-0"><AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders and reports</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Client CRM</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<Gift size={15} />}>December Pre-Orders</AdminTab></div>
           </div>
         )}
         {!passcode ? (
@@ -1419,6 +1419,13 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, phone or code" className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#3F8F3F]" />
           <button type="submit" className="rounded-xl bg-[#0F3D24] px-4 py-2 text-sm font-semibold text-white">Search</button>
         </form>
+
+        {query.isError && (
+          <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200 mb-4">
+            <strong className="block mb-1">Failed to load pre-orders:</strong>
+            {query.error instanceof Error ? query.error.message : "Unknown error occurred"}
+          </div>
+        )}
 
         {query.isLoading && <p className="text-center text-sm text-slate-500 py-4">Loading pre-orders...</p>}
         {query.data && (

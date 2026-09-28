@@ -432,7 +432,7 @@ function DecemberPreorderPage() {
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Preferred delivery date</label>
-                    <input type="text" value={form.deliveryDate} onChange={set("deliveryDate")} placeholder="e.g. 23rd December 2025" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
+                    <input type="date" value={form.deliveryDate} onChange={set("deliveryDate")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white" />
                   </div>
                 </div>
                 <div>
