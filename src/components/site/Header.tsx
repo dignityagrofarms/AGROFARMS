@@ -6,11 +6,11 @@ import logo from "@/assets/logo.png";
 const nav = [
   { to: "/", label: "Home" },
   { to: "/about", label: "About" },
-  { to: "/products", label: "Products & Services" },
-  { to: "/december-preorder", label: "December Pre-Order Sales" },
-  { to: "/order", label: "Order" },
-  { to: "/blog", label: "Farm Updates" },
-  { to: "/track-order", label: "Track Order" },
+  { to: "/products", label: "Products" },
+  { to: "/december-preorder", label: "Dec Pre-Orders" },
+  { to: "/order", label: "Order Now" },
+  { to: "/blog", label: "Blog" },
+  { to: "/track-order", label: "Track" },
   { to: "/contact", label: "Contact" },
 ] as const;
 
