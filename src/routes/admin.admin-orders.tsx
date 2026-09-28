@@ -1454,6 +1454,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
 }
 
 function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; passcode: string; role: string; onSaved: () => void }) {
+  const [expanded, setExpanded] = useState(false);
   const [deliveryStatus, setDeliveryStatus] = useState(preorder.deliveryStatus);
   const [customNote, setCustomNote] = useState("");
   const [editing, setEditing] = useState(false);
@@ -1504,12 +1505,12 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
   };
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 transition-all">
+      <button type="button" onClick={() => setExpanded(e => !e)} className="w-full text-left flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="font-mono text-lg font-semibold text-[#3F8F3F]">{preorder.preorderCode}</div>
           <div className="mt-1 text-sm">
-            <span className="font-semibold text-[#0F3D24]">{preorder.customerName}</span> · <a className="text-[#3F8F3F]" href={`tel:${preorder.phone}`}>{preorder.phone}</a>
+            <span className="font-semibold text-[#0F3D24]">{preorder.customerName}</span> · <span className="text-[#3F8F3F]" onClick={(e) => e.stopPropagation()}><a href={`tel:${preorder.phone}`}>{preorder.phone}</a></span>
           </div>
           <div className="mt-1 text-sm text-[#0F3D24]/70">{preorder.address}</div>
           {preorder.notes && <div className="mt-2 text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
@@ -1538,9 +1539,11 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
             Balance: <span className="font-semibold text-red-600">₦{preorder.balance.toLocaleString()}</span>
           </div>
         </div>
-      </div>
+      </button>
 
-      <div className="mt-4 rounded-2xl bg-[#F7F5F0] p-3 text-sm">
+      {expanded && (
+        <div className="mt-4 pt-2 border-t border-transparent">
+          <div className="mt-2 rounded-2xl bg-[#F7F5F0] p-3 text-sm">
         <div className="flex justify-between">
           <span className="font-semibold text-[#0F3D24]">{preorder.product} × {preorder.quantity}</span>
         </div>
@@ -1631,6 +1634,8 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
           <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
           {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+        </div>
+      )}
         </div>
       )}
     </div>
