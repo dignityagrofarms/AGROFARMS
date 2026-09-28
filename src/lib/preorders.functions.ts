@@ -93,9 +93,9 @@ function mapPayment(r: Record<string, unknown>): PreorderPayment {
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
-async function checkAdminPasscode(passcode: string): Promise<void> {
+async function checkAdminPasscode(passcode: string): Promise<string> {
   const { checkPasscode } = await import("@/lib/orders.functions");
-  await checkPasscode(passcode);
+  return await checkPasscode(passcode);
 }
 
 // ─── Server Functions ─────────────────────────────────────────────────────────
@@ -244,8 +244,8 @@ const adminListPreordersSchema = z.object({
 
 export const adminListPreorders = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => adminListPreordersSchema.parse(data))
-  .handler(async ({ data }): Promise<{ preorders: Preorder[] }> => {
-    await checkAdminPasscode(data.passcode);
+  .handler(async ({ data }): Promise<{ preorders: Preorder[]; role: string }> => {
+    const role = await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let q = supabaseAdmin.from("preorders").select("*");
@@ -258,7 +258,7 @@ export const adminListPreorders = createServerFn({ method: "POST" })
     }
     const { data: rows, error } = await q.order("created_at", { ascending: false }).limit(1000);
     if (error) throw new Error(error.message);
-    return { preorders: (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>)) };
+    return { preorders: (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>)), role };
   });
 
 // ─── Admin: get single pre-order with payments ────────────────────────────────
@@ -384,4 +384,45 @@ export const adminListPendingPayments = createServerFn({ method: "POST" })
       payment: mapPayment(r as Record<string, unknown>),
       preorder: mapPreorder((r as Record<string, unknown>).preorders as Record<string, unknown>),
     }));
+  });
+
+// ─── Admin: delete a preorder ──────────────────────────────────────────────────
+
+export const adminDeletePreorder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), preorderId: z.string().uuid() }).parse(data)
+  )
+  .handler(async ({ data }): Promise<void> => {
+    await checkAdminPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("preorders").delete().eq("id", data.preorderId);
+    if (error) throw new Error(error.message);
+  });
+
+// ─── Admin: correct preorder details ──────────────────────────────────────────
+
+export const adminCorrectPreorder = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string().min(1),
+      preorderId: z.string().uuid(),
+      customerName: z.string().min(1),
+      phone: z.string().min(1),
+      address: z.string().min(1),
+      notes: z.string().nullable(),
+    }).parse(data)
+  )
+  .handler(async ({ data }): Promise<void> => {
+    await checkAdminPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("preorders")
+      .update({
+        customer_name: data.customerName,
+        phone: data.phone,
+        address: data.address,
+        notes: data.notes,
+      })
+      .eq("id", data.preorderId);
+    if (error) throw new Error(error.message);
   });

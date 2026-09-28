@@ -9,7 +9,7 @@ import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
-import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
+import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -1431,7 +1431,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         {query.data && (
           <div className="space-y-4">
             {query.data.preorders.map((o) => (
-              <PreorderRow key={o.id} preorder={o} passcode={passcode} onSaved={() => query.refetch()} />
+              <PreorderRow key={o.id} preorder={o} passcode={passcode} role={query.data.role} onSaved={() => query.refetch()} />
             ))}
             {query.data.preorders.length === 0 && <p className="text-center text-sm text-[#0F3D24]/60">No pre-orders found.</p>}
           </div>
@@ -1441,15 +1441,33 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   );
 }
 
-function PreorderRow({ preorder, passcode, onSaved }: { preorder: any; passcode: string; onSaved: () => void }) {
+function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; passcode: string; role: string; onSaved: () => void }) {
   const [deliveryStatus, setDeliveryStatus] = useState(preorder.deliveryStatus);
   const [customNote, setCustomNote] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [customerName, setCustomerName] = useState(preorder.customerName);
+  const [phone, setPhone] = useState(preorder.phone);
+  const [address, setAddress] = useState(preorder.address);
+  const [notes, setNotes] = useState(preorder.notes ?? "");
+
   const updateDeliveryFn = useServerFn(adminUpdatePreorderDelivery);
   const addPaymentFn = useServerFn(adminAddPreorderPayment);
+  const correctFn = useServerFn(adminCorrectPreorder);
+  const deleteFn = useServerFn(adminDeletePreorder);
   
   const mutation = useMutation({
     mutationFn: () => updateDeliveryFn({ data: { passcode, preorderId: preorder.id, deliveryStatus } }),
     onSuccess: () => onSaved(),
+  });
+
+  const correctionMutation = useMutation({
+    mutationFn: () => correctFn({ data: { passcode, preorderId: preorder.id, customerName, phone, address, notes: notes || null } }),
+    onSuccess: () => { setEditing(false); onSaved(); },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteFn({ data: { passcode, preorderId: preorder.id } }),
+    onSuccess: onSaved,
   });
 
   const dirty = deliveryStatus !== preorder.deliveryStatus;
@@ -1581,11 +1599,28 @@ function PreorderRow({ preorder, passcode, onSaved }: { preorder: any; passcode:
             await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || "MANUAL_ADD" } });
             onSaved();
           }}
-          className="ml-auto inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+          className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
         >
           <span className="text-emerald-700">＋ Add manual payment</span>
         </button>
+        {role === "owner" && (
+          <>
+            <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
+            <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete pre-order ${preorder.preorderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete pre-order</button>
+          </>
+        )}
       </div>
+
+      {role === "owner" && editing && (
+        <div className="mt-4 grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+          <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
+          {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+        </div>
+      )}
     </div>
   );
 }
