@@ -82,7 +82,7 @@ function TrackOrder() {
         {activeCode && (
           <div className="mt-6 flex items-center justify-between text-sm text-[#0F3D24]/70">
             <span>
-              {query.isFetching ? "Refreshing…" : query.data ? (query.data.orders.length ? "Order found" : "") : ""}
+              {query.isFetching ? "Refreshing…" : query.data ? (query.data.result ? "Order found" : "") : ""}
             </span>
             <button onClick={() => query.refetch()} className="inline-flex items-center gap-1 text-[#3F8F3F] hover:underline">
               <RefreshCw size={14} /> Refresh now
