@@ -11,7 +11,12 @@ export const Route = createFileRoute("/december-preorder")({
     meta: [
       { title: "December Pre-Order Sales · Dignity Agro Farms" },
       { name: "description", content: "Secure your December poultry order early with Dignity Agro Farms. Reserve a slot or pay outrightly for fresh broiler chickens, dressed chicken and eggs delivered in December." },
+      { property: "og:title", content: "December Pre-Order Sales · Dignity Agro Farms" },
+      { property: "og:description", content: "Reserve a slot or pay outrightly for fresh broiler chickens, dressed chicken and eggs delivered in December." },
+      { property: "og:image", content: "https://dignityagrofarms.com/assets/farm-banner.jpg" },
+      { property: "og:url", content: "https://dignityagrofarms.com/december-preorder" },
     ],
+    links: [{ rel: "canonical", href: "/december-preorder" }],
   }),
   component: DecemberPreorderPage,
 });
