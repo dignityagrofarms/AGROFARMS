@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2 } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -163,6 +163,7 @@ function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", rea
 
 function AdminOrders() {
   const [passcode, setPasscode] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
@@ -306,11 +307,16 @@ function AdminOrders() {
     const p = input;
     const u = username.trim().toLowerCase();
     if (!u || !p) return;
-    const credential = JSON.stringify({ username: u, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
-    localStorage.setItem(STORAGE_KEY, credential);
-    setPasscode(credential);
-    setInput("");
-    setUsername("");
+    
+    setIsLoggingIn(true);
+    setTimeout(() => {
+      const credential = JSON.stringify({ username: u, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
+      localStorage.setItem(STORAGE_KEY, credential);
+      setPasscode(credential);
+      setInput("");
+      setUsername("");
+      setIsLoggingIn(false);
+    }, 400);
   };
 
   return (
@@ -381,8 +387,9 @@ function AdminOrders() {
               className="mt-3 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
             />
             {authError && <p className="mt-2 text-sm text-red-600">{authError}</p>}
-            <button type="submit" className="mt-4 w-full rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]">
-              Sign in
+            <button type="submit" disabled={isLoggingIn} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#134a2c] disabled:opacity-75">
+              {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
+              {isLoggingIn ? "Signing in..." : "Sign in"}
             </button>
             <p className="mt-4 text-center text-xs text-[#0F3D24]/55">Owner access can review or change the staff passcode from the Passcode panel.</p>
           </form>
