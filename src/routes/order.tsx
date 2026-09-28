@@ -6,6 +6,7 @@ import { CheckCircle2, PhoneCall, ShoppingBag, Copy, AlertTriangle, MessageCircl
 import { SiteLayout } from "@/components/site/Layout";
 import { createOrder, markPaymentSubmitted, MIN_ORDER_SUBTOTAL, validateVoucher } from "@/lib/orders.functions";
 import { PRODUCTS } from "@/lib/products";
+import { DecemberPreorderForm } from "@/components/DecemberPreorderForm";
 
 export const Route = createFileRoute("/order")({
   head: () => ({
@@ -19,6 +20,11 @@ export const Route = createFileRoute("/order")({
     ],
     links: [{ rel: "canonical", href: "/order" }],
   }),
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      mode: (search.mode as "now" | "preorder" | "december") || undefined,
+    };
+  },
   component: OrderPage,
 });
 
@@ -55,7 +61,8 @@ function OrderPage() {
   const [qty, setQty] = useState(1);
   const [town, setTown] = useState(OWERRI_TOWNS[0]!);
   const zone: "owerri" | "outside" = town === OUTSIDE_TOWN ? "outside" : "owerri";
-  const [mode, setMode] = useState<"now" | "preorder">("now");
+  const search = Route.useSearch();
+  const [mode, setMode] = useState<"now" | "preorder" | "december">(search.mode || "now");
   const [preorderDate, setPreorderDate] = useState("");
   const [form, setForm] = useState({ name: "", phone: "", address: "", notes: "" });
   const [sent, setSent] = useState(false);
@@ -328,10 +335,10 @@ function OrderPage() {
               )}
             </div>
           ) : (
-            <form onSubmit={submit} className="space-y-6">
+            <div className="space-y-6">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">When do you need it?</div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   <button
                     type="button"
                     onClick={() => setMode("now")}
@@ -339,7 +346,7 @@ function OrderPage() {
                       mode === "now" ? "border-[#3F8F3F] bg-[#3F8F3F]/10" : "border-[#0F3D24]/15 hover:border-[#3F8F3F]"
                     }`}
                   >
-                    <Truck size={16} /> Deliver now (quick delivery)
+                    <Truck size={16} /> Deliver now (quick)
                   </button>
                   <button
                     type="button"
@@ -348,10 +355,27 @@ function OrderPage() {
                       mode === "preorder" ? "border-[#3F8F3F] bg-[#3F8F3F]/10" : "border-[#0F3D24]/15 hover:border-[#3F8F3F]"
                     }`}
                   >
-                    <CalendarClock size={16} /> Pre-order for a later date
+                    <CalendarClock size={16} /> Pre-order later
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("december")}
+                    className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-sm font-bold uppercase tracking-wider transition ${
+                      mode === "december" ? "border-red-600 bg-red-600 text-white" : "border-red-500/30 bg-red-50 text-red-700 hover:bg-red-100"
+                    }`}
+                  >
+                    🎄 December Pre-order
                   </button>
                 </div>
-                {mode === "preorder" && (
+              </div>
+
+              {mode === "december" ? (
+                <div className="-mx-6 sm:-mx-8">
+                  <DecemberPreorderForm />
+                </div>
+              ) : (
+                <form onSubmit={submit} className="space-y-6">
+                  {mode === "preorder" && (
                   <div className="mt-3 rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10">
                     <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
                       Delivery date
