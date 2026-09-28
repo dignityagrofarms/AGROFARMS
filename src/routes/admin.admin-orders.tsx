@@ -1427,49 +1427,164 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           </div>
         )}
 
-        {query.isLoading && <p className="text-center text-sm text-slate-500 py-4">Loading pre-orders...</p>}
+        {query.isLoading && <p className="text-center text-sm text-[#0F3D24]/60 py-4">Loading pre-orders...</p>}
         {query.data && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {query.data.preorders.map((o) => (
-              <div key={o.id} className="rounded-xl border border-slate-200 p-4 text-sm">
-                <div className="flex flex-wrap justify-between gap-2 mb-2">
-                  <div className="font-bold text-[#0F3D24]">{o.preorderCode}</div>
-                  <div className="flex gap-1">
-                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase">{o.reservationType.replace("_", " ")}</span>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${o.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" : o.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" : "bg-slate-100"}`}>{o.paymentStatus.replace("_", " ")}</span>
-                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${o.deliveryStatus === "delivered" ? "bg-teal-100 text-teal-800" : "bg-slate-100"}`}>{o.deliveryStatus}</span>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-600 mb-3">
-                  <div><strong className="text-slate-900">Customer:</strong> {o.customerName}</div>
-                  <div><strong className="text-slate-900">Phone:</strong> {o.phone}</div>
-                  <div><strong className="text-slate-900">Product:</strong> {o.product} (Qty: {o.quantity})</div>
-                  <div><strong className="text-slate-900">Total:</strong> ₦{o.totalAmount.toLocaleString()}</div>
-                  <div><strong className="text-slate-900">Paid:</strong> ₦{o.amountPaid.toLocaleString()}</div>
-                  <div><strong className="text-slate-900">Balance:</strong> ₦{o.balance.toLocaleString()}</div>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  <button onClick={async () => {
-                    const amt = prompt("Enter amount to add manually:");
-                    const ref = prompt("Enter payment reference:");
-                    if (amt && ref) {
-                      await addPaymentFn({ data: { passcode, preorderId: o.id, amount: parseInt(amt, 10), paymentReference: ref } });
-                      query.refetch();
-                    }
-                  }} className="text-xs font-semibold text-emerald-600 hover:underline">Add Manual Payment</button>
-                  <button onClick={async () => {
-                    const newStatus = o.deliveryStatus === "pending" ? "delivered" : "pending";
-                    if(confirm(`Mark delivery as ${newStatus}?`)) {
-                      await updateDeliveryFn({ data: { passcode, preorderId: o.id, deliveryStatus: newStatus } });
-                      query.refetch();
-                    }
-                  }} className="text-xs font-semibold text-slate-600 hover:underline">Toggle Delivery Status</button>
-                </div>
-              </div>
+              <PreorderRow key={o.id} preorder={o} passcode={passcode} onSaved={() => query.refetch()} />
             ))}
-            {query.data.preorders.length === 0 && <p className="text-center text-sm text-slate-500">No pre-orders found.</p>}
+            {query.data.preorders.length === 0 && <p className="text-center text-sm text-[#0F3D24]/60">No pre-orders found.</p>}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function PreorderRow({ preorder, passcode, onSaved }: { preorder: any; passcode: string; onSaved: () => void }) {
+  const [deliveryStatus, setDeliveryStatus] = useState(preorder.deliveryStatus);
+  const [customNote, setCustomNote] = useState("");
+  const updateDeliveryFn = useServerFn(adminUpdatePreorderDelivery);
+  const addPaymentFn = useServerFn(adminAddPreorderPayment);
+  
+  const mutation = useMutation({
+    mutationFn: () => updateDeliveryFn({ data: { passcode, preorderId: preorder.id, deliveryStatus } }),
+    onSuccess: () => onSaved(),
+  });
+
+  const dirty = deliveryStatus !== preorder.deliveryStatus;
+
+  const getWaLink = (overrides?: any) => {
+    const status = overrides?.deliveryStatus ?? preorder.deliveryStatus;
+    const digits = preorder.phone.replace(/\D+/g, "");
+    const first = preorder.customerName.split(" ")[0];
+    let msg = `Hi ${first}, your December pre-order ${preorder.preorderCode} status update:\n`;
+    if (status === "delivered") {
+      msg += "Your order has been delivered! Thank you for choosing Dignity Agro Farms. Happy Holidays! 🎄";
+    } else {
+      msg += "Your order is pending delivery. We will reach out when it is ready.";
+    }
+    if (customNote) msg += `\nNote: ${customNote}`;
+    return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+  };
+
+  const saveAndNotify = () => {
+    window.open(getWaLink({ deliveryStatus }), "_blank", "noopener,noreferrer");
+    mutation.mutate();
+  };
+
+  return (
+    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="font-mono text-lg font-semibold text-[#3F8F3F]">{preorder.preorderCode}</div>
+          <div className="mt-1 text-sm">
+            <span className="font-semibold text-[#0F3D24]">{preorder.customerName}</span> · <a className="text-[#3F8F3F]" href={`tel:${preorder.phone}`}>{preorder.phone}</a>
+          </div>
+          <div className="mt-1 text-sm text-[#0F3D24]/70">{preorder.address}</div>
+          {preorder.notes && <div className="mt-2 text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
+          
+          <div className="mt-3 flex gap-2">
+            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">
+              {preorder.reservationType.replace("_", " ")}
+            </span>
+            <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${
+              preorder.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" :
+              preorder.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" :
+              "bg-slate-100 text-slate-600"
+            }`}>
+              {preorder.paymentStatus.replace("_", " ")}
+            </span>
+          </div>
+        </div>
+        
+        <div className="text-right">
+          <div className="text-xs uppercase tracking-widest text-[#0F3D24]/60">Total Amount</div>
+          <div className="text-lg font-semibold text-[#0F3D24]">₦{preorder.totalAmount.toLocaleString()}</div>
+          <div className="mt-1 text-xs text-[#0F3D24]/70">
+            Paid: <span className="font-semibold text-[#3F8F3F]">₦{preorder.amountPaid.toLocaleString()}</span>
+          </div>
+          <div className="text-xs text-[#0F3D24]/70">
+            Balance: <span className="font-semibold text-red-600">₦{preorder.balance.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl bg-[#F7F5F0] p-3 text-sm">
+        <div className="flex justify-between">
+          <span className="font-semibold text-[#0F3D24]">{preorder.product} × {preorder.quantity}</span>
+        </div>
+        {preorder.preferredDeliveryDate && (
+          <div className="mt-1 flex justify-between text-xs text-[#0F3D24]/60">
+            <span>Preferred Date</span>
+            <span className="font-semibold">{new Date(preorder.preferredDeliveryDate).toLocaleDateString()}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+          Delivery Status
+          <select
+            value={deliveryStatus}
+            onChange={(e) => setDeliveryStatus(e.target.value)}
+            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0] px-3 py-2 text-sm font-semibold outline-none focus:border-[#3F8F3F]"
+          >
+            <option value="pending">Pending</option>
+            <option value="delivered">Delivered</option>
+          </select>
+        </label>
+        <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+          WhatsApp Note (optional)
+          <input
+            value={customNote}
+            onChange={(e) => setCustomNote(e.target.value)}
+            placeholder="e.g. ETA tomorrow afternoon"
+            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+          />
+        </label>
+        <div className="flex items-end">
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={!dirty || mutation.isPending}
+            className="w-full rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50 sm:w-auto"
+          >
+            {mutation.isPending ? "Saving…" : "Save Only"}
+          </button>
+        </div>
+      </div>
+
+      {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
+      {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
+
+      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
+        <button
+          onClick={saveAndNotify}
+          disabled={mutation.isPending}
+          className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
+        >
+          <MessageCircle size={16} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
+        </button>
+        <a
+          href={getWaLink()}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs font-semibold text-[#0F3D24]/60 underline hover:text-[#0F3D24]"
+        >
+          Open message
+        </a>
+        <button
+          onClick={async () => {
+            const amt = prompt("Enter amount to add manually (e.g. 3500):");
+            if (!amt) return;
+            const ref = prompt("Enter payment reference (optional):");
+            await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || "MANUAL_ADD" } });
+            onSaved();
+          }}
+          className="ml-auto inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+        >
+          <span className="text-emerald-700">＋ Add manual payment</span>
+        </button>
       </div>
     </div>
   );
