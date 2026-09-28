@@ -31,7 +31,7 @@ function FlyerLandingPage() {
             <img 
               src="/assets/december-flyer.png" 
               alt="December Pre-order Flyer" 
-              fetchpriority="high"
+              fetchPriority="high"
               loading="eager"
               className="block w-full h-auto"
               onError={(e) => {

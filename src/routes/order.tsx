@@ -90,10 +90,16 @@ function OrderPage() {
   const delivery = zone === "owerri" ? 0 : 1000;
   const total = subtotal + delivery - voucherDiscount;
   const belowMinimum = subtotal < MIN_ORDER_SUBTOTAL;
-  const minPreorderDate = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
-  const preorderLabel = mode === "preorder" && preorderDate
-    ? `Pre-order for ${new Date(preorderDate + "T00:00:00").toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}`
-    : null;
+  // Calculate minPreorderDate safely for SSR
+  const [minPreorderDate, setMinPreorderDate] = useState("");
+  const [preorderLabel, setPreorderLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMinPreorderDate(new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10));
+    if (mode === "preorder" && preorderDate) {
+      setPreorderLabel(`Pre-order for ${new Date(preorderDate + "T00:00:00").toLocaleDateString("en-NG", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}`);
+    }
+  }, [mode, preorderDate]);
 
   const voucherMutation = useMutation({
     mutationFn: () => validateVoucherFn({ data: { code: voucherInput, subtotal } }),
