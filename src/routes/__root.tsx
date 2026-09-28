@@ -39,6 +39,20 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
+
+    // Auto-recovery for hydration mismatches and transient crashes
+    if (typeof window !== "undefined") {
+      const errorKey = "daf_error_recovery_time";
+      const lastError = sessionStorage.getItem(errorKey);
+      const now = Date.now();
+      
+      // Only auto-reload if we haven't done so in the last 5 seconds to prevent infinite reload loops
+      if (!lastError || now - parseInt(lastError, 10) > 5000) {
+        sessionStorage.setItem(errorKey, now.toString());
+        console.warn("Auto-reloading page to recover from crash...");
+        window.location.reload();
+      }
+    }
   }, [error]);
 
   return (
