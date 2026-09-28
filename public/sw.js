@@ -1,32 +1,45 @@
 // Basic Service Worker to satisfy PWA install requirements.
 // We are using a cache-first network-fallback strategy for the shell.
-const CACHE_NAME = 'dignity-admin-pwa-v1';
-const urlsToCache = [
-  '/',
-  '/admin/admin-orders',
-  '/favicon.png',
-  '/manifest.json'
-];
+const CACHE_NAME = 'dignity-admin-pwa-v2';
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  // Clear old caches
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
   );
+  event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('fetch', event => {
-  // Simple fetch handler to satisfy Chrome's PWA criteria
+  if (event.request.method !== 'GET') return;
+  
   event.respondWith(
-    caches.match(event.request)
+    fetch(event.request)
       .then(response => {
-        // Cache hit - return response
-        if (response) {
-          return response;
+        // Cache successful GET requests
+        if (response.ok && event.request.url.startsWith('http')) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, clone);
+          });
         }
-        return fetch(event.request);
+        return response;
+      })
+      .catch(() => {
+        // Network failed, fallback to cache
+        return caches.match(event.request);
       })
   );
 });

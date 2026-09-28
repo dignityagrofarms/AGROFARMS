@@ -21,11 +21,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!assets/|favicon\\.png|manifest\\.json).*\\.([a-zA-Z0-9]+)$)",
-      "destination": "/index.html"
-    },
-    {
-      "source": "/(.*)",
+      "source": "/((?!assets/|favicon\\.png|manifest\\.json|sw\\.js).*)",
       "destination": "/index.html"
     }
   ]
