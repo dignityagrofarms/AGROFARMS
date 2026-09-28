@@ -24,16 +24,16 @@ function FlyerLandingPage() {
 
   return (
     <SiteLayout>
-      <div className="bg-[#0F3D24] min-h-[calc(100vh-80px)] py-12">
+      <div className="bg-white min-h-[calc(100vh-80px)] py-12">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           
-          <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-white/30 bg-white aspect-[4/5] max-w-lg mb-8">
+          <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-[#3F8F3F]/30 bg-[#3F8F3F]/10 aspect-[4/5] max-w-lg mb-8">
             <img 
               src="/assets/december-flyer.png" 
               alt="December Pre-order Flyer" 
               fetchpriority="high"
               loading="eager"
-              className="absolute inset-0 h-full w-full object-contain object-center"
+              className="absolute inset-0 h-full w-full object-cover object-top"
               onError={(e) => {
                 // Fallback text if they haven't uploaded it yet
                 const target = e.target as HTMLImageElement;
@@ -48,8 +48,8 @@ function FlyerLandingPage() {
             />
           </div>
 
-          <h1 className="mb-4 text-3xl font-bold text-white sm:text-4xl font-display">You Can Preorder Your Christmas Chicken Now</h1>
-          <p className="mb-8 text-lg text-white/80">Pay small small, secure your slots, and enjoy free delivery within Owerri Municipal.</p>
+          <h1 className="mb-4 text-3xl font-bold text-[#0F3D24] sm:text-4xl font-display">You Can Preorder Your Christmas Chicken Now</h1>
+          <p className="mb-8 text-lg text-[#0F3D24]/80">Pay small small, secure your slots, and enjoy free delivery within Owerri Municipal.</p>
           
           <button 
             onClick={() => navigate({ to: "/order", search: { mode: "december" } })} 
@@ -58,7 +58,7 @@ function FlyerLandingPage() {
             Order Now <ArrowRight size={24} />
           </button>
           
-          <p className="mt-6 text-sm text-white/50">By clicking Order Now, you will be redirected to the main order page.</p>
+          <p className="mt-6 text-sm text-[#0F3D24]/60">By clicking Order Now, you will be redirected to the main order page.</p>
         </div>
       </div>
     </SiteLayout>
