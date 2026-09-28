@@ -680,7 +680,7 @@ export function DecemberPreorderForm() {
             })()}
           </div>
         )}
-      </section>
+      </div>
 
       {/* Contact CTA */}
       <section className="bg-[#F7F5F0] py-10">
@@ -690,7 +690,7 @@ export function DecemberPreorderForm() {
             <Phone size={15} /> 07083476366
           </a>
         </div>
-      </div>
+      </section>
     </div>
   );
 }

@@ -530,6 +530,8 @@ function OrderPage() {
             </form>
           )}
         </div>
+      )}
+    </div>
 
         <aside className="h-max rounded-3xl bg-gradient-to-br from-[#0F3D24] to-[#1a5a3a] p-6 text-white shadow-2xl shadow-[#0F3D24]/20 ring-1 ring-white/10 sm:p-8 lg:sticky lg:top-24">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a8e6a8]">Order summary</p>
