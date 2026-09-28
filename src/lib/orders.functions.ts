@@ -111,16 +111,47 @@ export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createOrderSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { PRODUCTS } = await import("@/lib/products");
+    
+    // RECALCULATE SUBTOTAL FROM TRUE BACKEND PRICES
+    let trueSubtotal = 0;
+    const validatedItems = data.items.map(item => {
+      // Find base product name (strip out "PRE-ORDER · " prefix if present)
+      const baseProductName = item.product.replace(/^PRE-ORDER · /, "");
+      const product = PRODUCTS.find(p => p.name === baseProductName);
+      if (!product) throw new Error(`Product "${baseProductName}" not found on the server.`);
+      
+      // Find option (strip out preorder date suffixes)
+      const optionMatch = product.options.find(o => item.option.startsWith(o.label));
+      if (!optionMatch) throw new Error(`Option "${item.option}" not found for ${baseProductName}.`);
+      
+      const truePrice = optionMatch.price;
+      trueSubtotal += truePrice * item.qty;
+      
+      return {
+        product: item.product,
+        option: item.option,
+        qty: item.qty,
+        unitPrice: truePrice // Overwrite with true backend price
+      };
+    });
+
+    if (trueSubtotal < MIN_ORDER_SUBTOTAL) {
+      throw new Error(`Minimum order is ₦${MIN_ORDER_SUBTOTAL.toLocaleString("en-NG")}. Please add a little more to your order.`);
+    }
+
+    const trueDeliveryFee = data.deliveryZone === "owerri" ? 0 : 1000;
     const phone = normalizePhone(data.phone);
+    
     let discountAmount = 0;
     let voucherCode: string | null = null;
     if (data.voucherCode?.trim()) {
       const voucher = await findUsableVoucher(data.voucherCode);
       if (!voucher) throw new Error("That voucher is invalid, expired, inactive, or fully used.");
-      discountAmount = calculateVoucherDiscount(voucher, data.subtotal);
+      discountAmount = calculateVoucherDiscount(voucher, trueSubtotal);
       voucherCode = voucher.code;
     }
-    const finalTotal = data.subtotal + data.deliveryFee - discountAmount;
+    const finalTotal = trueSubtotal + trueDeliveryFee - discountAmount;
 
     // Retry a few times on the unlikely event of an order_code collision.
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -135,9 +166,9 @@ export const createOrder = createServerFn({ method: "POST" })
           phone,
           address: data.address,
           delivery_zone: data.deliveryZone,
-          items: data.items,
-          subtotal: data.subtotal,
-          delivery_fee: data.deliveryFee,
+          items: validatedItems,
+          subtotal: trueSubtotal,
+          delivery_fee: trueDeliveryFee,
           total: finalTotal,
           discount_amount: discountAmount,
           voucher_code: voucherCode,

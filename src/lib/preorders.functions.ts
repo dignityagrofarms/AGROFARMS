@@ -119,6 +119,20 @@ export const createPreorder = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ preorderCode: string }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // RECALCULATE PRICE ON BACKEND TO PREVENT SPOOFING
+    // Hardcode the December Products list here to ensure absolute truth
+    const DECEMBER_PRODUCTS = [
+      { label: "Live Broiler Chicken (3kg and above)", price: 12250 },
+    ];
+    
+    const productDef = DECEMBER_PRODUCTS.find(p => p.label === data.product);
+    if (!productDef) {
+      throw new Error(`Invalid product selected: ${data.product}`);
+    }
+
+    const trueUnitPrice = productDef.price;
+    const trueTotalAmount = trueUnitPrice * data.quantity;
+
     // For slot_reserved, the initial payment is ₦3,500 — submitted immediately
     // but NOT confirmed (admin must confirm). The balance is unchanged until confirmation.
     const preorderCode = makePreorderCode();
@@ -130,8 +144,8 @@ export const createPreorder = createServerFn({ method: "POST" })
       address: data.address,
       product: data.product,
       quantity: data.quantity,
-      unit_price: data.unitPrice,
-      total_amount: data.totalAmount,
+      unit_price: trueUnitPrice, // Safe
+      total_amount: trueTotalAmount, // Safe
       amount_paid: 0,
       reservation_type: data.reservationType,
       payment_status: "pending",
