@@ -9,6 +9,7 @@ import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
+import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -174,7 +175,7 @@ function AdminOrders() {
   const [search, setSearch] = useState("");
   const [reasonFilter, setReasonFilter] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "clients" | "vouchers" | "flyers">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "clients" | "vouchers" | "flyers" | "december">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const listFn = useServerFn(adminListOrders);
   const qc = useQueryClient();
@@ -354,6 +355,7 @@ function AdminOrders() {
             <AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Client CRM</AdminTab>
             <AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab>
              <AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab>
+             <AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<span>🎄</span>}>December Pre-Orders</AdminTab>
           </div>
         )}
         {!passcode ? (
@@ -448,6 +450,8 @@ function AdminOrders() {
                <ClientCrmPanel passcode={passcode} />
               ) : activeTab === "vouchers" ? (
                <VoucherPanel passcode={passcode} />
+              ) : activeTab === "december" ? (
+               <DecemberPreorderPanel passcode={passcode} />
               ) : (
                 <SocialProofPanel orders={allOrders} />
              )}
@@ -1326,6 +1330,140 @@ function PaymentSection({
           Customer confirmed payment {new Date(order.paymentSubmittedAt).toLocaleString()}
         </p>
       )}
+    </div>
+  );
+}
+
+function DecemberPreorderPanel({ passcode }: { passcode: string }) {
+  const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+
+  const listFn = useServerFn(adminListPreorders);
+  const qc = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ["admin-preorders", passcode, filter, appliedSearch],
+    queryFn: () => {
+      const data: any = { passcode, search: appliedSearch || undefined };
+      if (filter === "slot_reserved") data.reservationType = "slot_reserved";
+      if (filter === "free_reservation") data.reservationType = "free_reservation";
+      if (filter === "outright") data.reservationType = "outright";
+      if (filter === "pending") data.paymentStatus = "pending";
+      if (filter === "partially_paid") data.paymentStatus = "partially_paid";
+      if (filter === "fully_paid") data.paymentStatus = "fully_paid";
+      if (filter === "delivery_pending") data.deliveryStatus = "pending";
+      if (filter === "delivered") data.deliveryStatus = "delivered";
+      return listFn({ data });
+    },
+    refetchInterval: 15000,
+  });
+
+  const confirmPaymentFn = useServerFn(adminConfirmPreorderPayment);
+  const deletePaymentFn = useServerFn(adminDeletePreorderPayment);
+  const updateDeliveryFn = useServerFn(adminUpdatePreorderDelivery);
+  const addPaymentFn = useServerFn(adminAddPreorderPayment);
+  const pendingPaymentsFn = useServerFn(adminListPendingPayments);
+
+  const pendingQuery = useQuery({
+    queryKey: ["admin-preorders-pending-payments", passcode],
+    queryFn: () => pendingPaymentsFn({ data: { passcode } }),
+    refetchInterval: 15000,
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
+        <h2 className="text-xl font-semibold text-[#0F3D24]">December Pre-Orders</h2>
+        
+        {/* Pending Payments Alert */}
+        {pendingQuery.data && pendingQuery.data.length > 0 && (
+          <div className="mt-4 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+            <h3 className="font-semibold text-amber-800 mb-2">Payment Approvals Needed ({pendingQuery.data.length})</h3>
+            <div className="space-y-2">
+              {pendingQuery.data.map(({ payment, preorder }) => (
+                <div key={payment.id} className="flex items-center justify-between rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100">
+                  <div>
+                    <span className="font-bold text-[#0F3D24]">{preorder.preorderCode}</span> · ₦{payment.amount.toLocaleString()}
+                    <span className="block text-xs text-slate-500">Ref: {payment.paymentReference} · {preorder.customerName}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700">Approve</button>
+                    <button onClick={async () => { if(confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-200">Reject</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-wrap gap-2 mb-4">
+          {[
+            { id: "all", label: "All Orders" },
+            { id: "slot_reserved", label: "Slot Reserved" },
+            { id: "free_reservation", label: "Free Reservation" },
+            { id: "outright", label: "Paid Outrightly" },
+            { id: "partially_paid", label: "Partially Paid" },
+            { id: "fully_paid", label: "Fully Paid" },
+            { id: "pending", label: "Payment Pending" },
+            { id: "delivery_pending", label: "Delivery Pending" },
+            { id: "delivered", label: "Delivered" },
+          ].map((f) => (
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${filter === f.id ? "bg-[#0F3D24] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        <form onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }} className="flex gap-2 mb-4">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, phone or code" className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#3F8F3F]" />
+          <button type="submit" className="rounded-xl bg-[#0F3D24] px-4 py-2 text-sm font-semibold text-white">Search</button>
+        </form>
+
+        {query.isLoading && <p className="text-center text-sm text-slate-500 py-4">Loading pre-orders...</p>}
+        {query.data && (
+          <div className="space-y-3">
+            {query.data.preorders.map((o) => (
+              <div key={o.id} className="rounded-xl border border-slate-200 p-4 text-sm">
+                <div className="flex flex-wrap justify-between gap-2 mb-2">
+                  <div className="font-bold text-[#0F3D24]">{o.preorderCode}</div>
+                  <div className="flex gap-1">
+                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase">{o.reservationType.replace("_", " ")}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${o.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" : o.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" : "bg-slate-100"}`}>{o.paymentStatus.replace("_", " ")}</span>
+                    <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${o.deliveryStatus === "delivered" ? "bg-teal-100 text-teal-800" : "bg-slate-100"}`}>{o.deliveryStatus}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-600 mb-3">
+                  <div><strong className="text-slate-900">Customer:</strong> {o.customerName}</div>
+                  <div><strong className="text-slate-900">Phone:</strong> {o.phone}</div>
+                  <div><strong className="text-slate-900">Product:</strong> {o.product} (Qty: {o.quantity})</div>
+                  <div><strong className="text-slate-900">Total:</strong> ₦{o.totalAmount.toLocaleString()}</div>
+                  <div><strong className="text-slate-900">Paid:</strong> ₦{o.amountPaid.toLocaleString()}</div>
+                  <div><strong className="text-slate-900">Balance:</strong> ₦{o.balance.toLocaleString()}</div>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                  <button onClick={async () => {
+                    const amt = prompt("Enter amount to add manually:");
+                    const ref = prompt("Enter payment reference:");
+                    if (amt && ref) {
+                      await addPaymentFn({ data: { passcode, preorderId: o.id, amount: parseInt(amt, 10), paymentReference: ref } });
+                      query.refetch();
+                    }
+                  }} className="text-xs font-semibold text-emerald-600 hover:underline">Add Manual Payment</button>
+                  <button onClick={async () => {
+                    const newStatus = o.deliveryStatus === "pending" ? "delivered" : "pending";
+                    if(confirm(`Mark delivery as ${newStatus}?`)) {
+                      await updateDeliveryFn({ data: { passcode, preorderId: o.id, deliveryStatus: newStatus } });
+                      query.refetch();
+                    }
+                  }} className="text-xs font-semibold text-slate-600 hover:underline">Toggle Delivery Status</button>
+                </div>
+              </div>
+            ))}
+            {query.data.preorders.length === 0 && <p className="text-center text-sm text-slate-500">No pre-orders found.</p>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
