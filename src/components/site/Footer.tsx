@@ -55,7 +55,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-white/10">
-        <div className="mx-auto max-w-7xl px-4 py-5 text-center text-xs text-white/60 sm:px-6 lg:px-8">
+        <div suppressHydrationWarning className="mx-auto max-w-7xl px-4 py-5 text-center text-xs text-white/60 sm:px-6 lg:px-8">
           © {new Date().getFullYear()} Dignity Agro Farms Limited. All rights reserved.
         </div>
       </div>

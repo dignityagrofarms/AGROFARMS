@@ -113,7 +113,7 @@ function TrackOrder() {
                   <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Order</div>
                   <div className="font-mono text-2xl font-semibold">{order.orderCode}</div>
             <div className="mt-1 font-mono text-xs text-[#0F3D24]/60">Tracking / receipt no: {order.orderCode}</div>
-                  <div className="mt-1 text-xs text-[#0F3D24]/60">Placed {new Date(order.createdAt).toLocaleString()}</div>
+                  <div suppressHydrationWarning className="mt-1 text-xs text-[#0F3D24]/60">Placed {new Date(order.createdAt).toLocaleString()}</div>
                 </div>
                 <div className="text-right">
                   <div className="text-xs uppercase tracking-widest text-[#0F3D24]/60">Total</div>
@@ -197,7 +197,7 @@ function TrackOrder() {
                 </ol>
               )}
 
-              <p className="mt-4 text-right text-[10px] uppercase tracking-widest text-[#0F3D24]/40">
+              <p suppressHydrationWarning className="mt-4 text-right text-[10px] uppercase tracking-widest text-[#0F3D24]/40">
                 Last updated {new Date(order.updatedAt).toLocaleTimeString()}
               </p>
 
@@ -284,7 +284,7 @@ function RecoverBox({ onPick }: { onPick: (code: string) => void }) {
                       className="flex w-full flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#F7F5F0] px-4 py-2 text-left text-sm ring-1 ring-[#0F3D24]/10 hover:ring-[#3F8F3F]/40"
                     >
                       <span className="font-mono font-semibold text-[#0F3D24]">{c.code}</span>
-                      <span className="text-xs text-[#0F3D24]/60">
+                      <span suppressHydrationWarning className="text-xs text-[#0F3D24]/60">
                         {new Date(c.createdAt).toLocaleDateString()} · {naira(c.total)}
                       </span>
                     </button>

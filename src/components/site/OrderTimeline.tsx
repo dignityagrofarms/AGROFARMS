@@ -59,7 +59,7 @@ export function OrderTimeline({ order }: { order: TimelineOrder }) {
               <Icon size={16} className={`mt-0.5 shrink-0 ${color}`} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-[#0F3D24]">{e.label}</div>
-                {e.when && <div className="text-xs text-[#0F3D24]/55">{e.when}</div>}
+                {e.when && <div suppressHydrationWarning className="text-xs text-[#0F3D24]/55">{e.when}</div>}
               </div>
             </li>
           );

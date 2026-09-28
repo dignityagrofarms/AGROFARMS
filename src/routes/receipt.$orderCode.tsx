@@ -95,7 +95,7 @@ function ReceiptPage() {
           <div className="text-right">
             <div className="text-2xl font-semibold tracking-wide text-[#0F3D24]">{docTitle}</div>
             <div className="font-mono text-sm font-semibold text-[#3F8F3F]">{o.orderCode}</div>
-            <div className="text-xs text-[#0F3D24]/60">{dateLine}</div>
+            <div suppressHydrationWarning className="text-xs text-[#0F3D24]/60">{dateLine}</div>
           </div>
         </div>
 
