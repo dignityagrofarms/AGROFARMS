@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteLayout } from "@/components/site/Layout";
@@ -234,7 +234,7 @@ td{padding:10px 12px;border-bottom:1px solid #eee}
   );
 }
 
-export function DecemberPreorderForm() {
+export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state: any) => void }) {
   const createFn = useServerFn(createPreorder);
   const submitPaymentFn = useServerFn(submitPreorderPayment);
   const getByCodeFn = useServerFn(getPreorderByCode);
@@ -264,6 +264,17 @@ export function DecemberPreorderForm() {
   const unitPrice = selectedProduct?.price ?? 0;
   const totalAmount = unitPrice * qty;
   const depositAmount = reservationType === "slot_reserved" ? (SLOT_FEE * qty) : reservationType === "outright" ? totalAmount : 0;
+
+  useEffect(() => {
+    onStateChange?.({
+      product: form.product,
+      qty,
+      zone: form.zone,
+      totalAmount,
+      depositAmount,
+      reservationType,
+    });
+  }, [form.product, qty, form.zone, totalAmount, depositAmount, reservationType, onStateChange]);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));

@@ -63,6 +63,7 @@ function OrderPage() {
   const zone: "owerri" | "outside" = town === OUTSIDE_TOWN ? "outside" : "owerri";
   const search = Route.useSearch();
   const [mode, setMode] = useState<"now" | "preorder" | "december">(search.mode || "now");
+  const [decState, setDecState] = useState<any>(null);
   const [preorderDate, setPreorderDate] = useState("");
   const [form, setForm] = useState({ name: "", phone: "", address: "", notes: "" });
   const [sent, setSent] = useState(false);
@@ -371,7 +372,7 @@ function OrderPage() {
 
               {mode === "december" ? (
                 <div className="-mx-6 sm:-mx-8">
-                  <DecemberPreorderForm />
+                  <DecemberPreorderForm onStateChange={setDecState} />
                 </div>
               ) : (
                 <form onSubmit={submit} className="space-y-6">
@@ -536,18 +537,33 @@ function OrderPage() {
         <aside className="h-max rounded-3xl bg-gradient-to-br from-[#0F3D24] to-[#1a5a3a] p-6 text-white shadow-2xl shadow-[#0F3D24]/20 ring-1 ring-white/10 sm:p-8 lg:sticky lg:top-24">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a8e6a8]">Order summary</p>
           <div className="mt-4 space-y-3 text-sm">
-            <Row label="Product" value={product.name} />
-            <Row label="Type" value={preorderLabel ?? (mode === "preorder" ? "Pre-order (pick a date)" : "Deliver now")} />
-            <Row label="Option" value={option.label} />
-            <Row label="Quantity" value={`${qty} ${product.unitLabel}`} />
-            <Row label="Subtotal" value={naira(subtotal)} />
-             {voucherDiscount > 0 && <Row label={`Discount${appliedVoucherCode ? ` (${appliedVoucherCode})` : ""}`} value={`-${naira(voucherDiscount)}`} />}
-            <Row label="Town" value={town} />
-            <Row label="Delivery" value={zone === "owerri" ? "FREE (Owerri town)" : `${naira(1000)} (outside Owerri town)`} />
+            {mode === "december" && decState ? (
+              <>
+                <Row label="Product" value={decState.product || "Select a product"} />
+                <Row label="Type" value="December Pre-order" />
+                <Row label="Quantity" value={decState.qty || "0"} />
+                <Row label="Subtotal" value={naira(decState.totalAmount || 0)} />
+                <Row label="Location" value={decState.zone || "Select an area"} />
+                {decState.reservationType === "slot_reserved" && (
+                  <Row label="Reservation Fee" value={`₦3,500 × ${decState.qty || 0}`} />
+                )}
+              </>
+            ) : (
+              <>
+                <Row label="Product" value={product.name} />
+                <Row label="Type" value={preorderLabel ?? (mode === "preorder" ? "Pre-order (pick a date)" : "Deliver now")} />
+                <Row label="Option" value={option.label} />
+                <Row label="Quantity" value={`${qty} ${product.unitLabel}`} />
+                <Row label="Subtotal" value={naira(subtotal)} />
+                 {voucherDiscount > 0 && <Row label={`Discount${appliedVoucherCode ? ` (${appliedVoucherCode})` : ""}`} value={`-${naira(voucherDiscount)}`} />}
+                <Row label="Town" value={town} />
+                <Row label="Delivery" value={zone === "owerri" ? "FREE (Owerri town)" : `${naira(1000)} (outside Owerri town)`} />
+              </>
+            )}
           </div>
           <div className="mt-5 flex items-end justify-between border-t border-white/15 pt-5">
-            <span className="text-sm uppercase tracking-wider text-[#a8e6a8]">Total</span>
-            <span className="font-display text-3xl font-semibold">{naira(total)}</span>
+            <span className="text-sm uppercase tracking-wider text-[#a8e6a8]">{mode === "december" ? "Pay Now" : "Total"}</span>
+            <span className="font-display text-3xl font-semibold">{mode === "december" && decState ? naira(decState.depositAmount || 0) : naira(total)}</span>
           </div>
           <div className="mt-6 rounded-2xl bg-white/5 p-4 text-sm ring-1 ring-white/10">
             <p className="font-semibold text-[#a8e6a8]">Prefer to call?</p>
