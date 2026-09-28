@@ -233,6 +233,106 @@ export const trackByCode = createServerFn({ method: "POST" })
     };
   });
 
+// ---- Unified tracker: searches BOTH orders and preorders by any code ----
+
+export type TrackedPreorder = {
+  type: "preorder";
+  preorderCode: string;
+  customerName: string;
+  phone: string;
+  product: string;
+  quantity: number;
+  totalAmount: number;
+  amountPaid: number;
+  balance: number;
+  reservationType: string;
+  paymentStatus: string;
+  deliveryStatus: string;
+  preferredDeliveryDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TrackedOrderResult = (TrackedOrder & { type: "order" }) | TrackedPreorder;
+
+export const trackUnified = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => trackSchema.parse(data))
+  .handler(async ({ data }): Promise<{ result: TrackedOrderResult | null }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const code = safeCode(data.trackCode);
+
+    // Try regular orders table first
+    const { data: orderRows, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .select("order_code, track_code, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
+      .or(`track_code.eq.${code},order_code.eq.${code}`)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (orderError) console.error("trackUnified orders query failed", orderError);
+
+    if (orderRows && orderRows.length > 0) {
+      const r = orderRows[0];
+      return {
+        result: {
+          type: "order",
+          orderCode: r.order_code,
+          trackCode: (r as { track_code: string | null }).track_code ?? "",
+          status: r.status as TrackedOrder["status"],
+          statusNote: r.status_note,
+          eta: r.eta,
+          items: (r.items as TrackedOrder["items"]) ?? [],
+          subtotal: r.subtotal,
+          deliveryFee: r.delivery_fee,
+          total: r.total,
+          deliveryZone: r.delivery_zone,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          paymentStatus: (r as { payment_status: TrackedOrder["paymentStatus"] }).payment_status,
+          paymentRejectionReason: (r as { payment_rejection_reason: string | null }).payment_rejection_reason,
+          cancelledAt: r.cancelled_at,
+          cancelledBy: r.cancelled_by,
+          cancelReason: r.cancel_reason,
+        },
+      };
+    }
+
+    // Try preorders table
+    const { data: preorderRow, error: preorderError } = await supabaseAdmin
+      .from("preorders")
+      .select("preorder_code, customer_name, phone, product, quantity, total_amount, amount_paid, balance, reservation_type, payment_status, delivery_status, preferred_delivery_date, notes, created_at, updated_at")
+      .eq("preorder_code", code)
+      .maybeSingle();
+
+    if (preorderError) console.error("trackUnified preorders query failed", preorderError);
+
+    if (preorderRow) {
+      return {
+        result: {
+          type: "preorder",
+          preorderCode: preorderRow.preorder_code,
+          customerName: preorderRow.customer_name,
+          phone: preorderRow.phone,
+          product: preorderRow.product,
+          quantity: preorderRow.quantity,
+          totalAmount: preorderRow.total_amount,
+          amountPaid: preorderRow.amount_paid,
+          balance: preorderRow.balance,
+          reservationType: preorderRow.reservation_type,
+          paymentStatus: preorderRow.payment_status,
+          deliveryStatus: preorderRow.delivery_status,
+          preferredDeliveryDate: preorderRow.preferred_delivery_date,
+          notes: preorderRow.notes,
+          createdAt: preorderRow.created_at,
+          updatedAt: preorderRow.updated_at,
+        },
+      };
+    }
+
+    return { result: null };
+  });
+
 // ---------- Customer cancellation ----------
 
 // Lost your code? Look it up with the phone number used on the order.

@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { SiteLayout } from "@/components/site/Layout";
 import { createPreorder, submitPreorderPayment, getPreorderByCode } from "@/lib/preorders.functions";
 import type { Preorder, PreorderPayment, ReservationType } from "@/lib/preorders.functions";
+import { trackUnified } from "@/lib/orders.functions";
 import { CheckCircle2, Download, Clock, AlertTriangle, ChevronDown, ChevronUp, Phone, Loader2 } from "lucide-react";
 
 
@@ -235,9 +236,11 @@ td{padding:10px 12px;border-bottom:1px solid #eee}
 }
 
 export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state: any) => void }) {
+  const navigate = useNavigate();
   const createFn = useServerFn(createPreorder);
   const submitPaymentFn = useServerFn(submitPreorderPayment);
   const getByCodeFn = useServerFn(getPreorderByCode);
+  const trackUnifiedFn = useServerFn(trackUnified);
 
   const [step, setStep] = useState<Step>("form");
   const [reservationType, setReservationType] = useState<ReservationType>("slot_reserved");
@@ -331,9 +334,24 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
     setLookupLoading(true);
     setLookupResult(null);
     try {
-      const result = await getByCodeFn({ data: { preorderCode: lookupCode.trim() } });
-      if (!result) { setLookupError("No order found with that code. Please check and try again."); }
-      else setLookupResult(result);
+      const code = lookupCode.trim().toUpperCase();
+      // First try preorders
+      const result = await getByCodeFn({ data: { preorderCode: code } });
+      if (result) {
+        setLookupResult(result);
+      } else {
+        // Fall back: check if it's a regular order (DAF- code)
+        const unified = await trackUnifiedFn({ data: { trackCode: code } });
+        if (unified.result?.type === "order") {
+          // Redirect to track-order page with the code pre-filled
+          navigate({ to: "/track-order", search: {} });
+          // Small delay to let navigation settle, then we can't pre-fill directly
+          // so show helpful message instead
+          setLookupError(`"${code}" is a regular order (not a December pre-order). Please use the main Track Order page to view it.`);
+        } else {
+          setLookupError("No order found with that code. Please check and try again.");
+        }
+      }
     } catch (err) {
       setLookupError(err instanceof Error ? err.message : "Lookup failed.");
     } finally {
