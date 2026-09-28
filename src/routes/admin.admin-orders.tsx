@@ -1380,70 +1380,75 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
-        <h2 className="text-xl font-semibold text-[#0F3D24]">December Pre-Orders</h2>
+      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
+        <div className="flex items-center gap-2 text-[#3F8F3F]"><Gift size={18} /><span className="text-xs font-semibold uppercase tracking-widest">December Pre-Orders</span></div>
+        <h2 className="mt-2 text-2xl font-semibold text-[#0F3D24]">Holiday Pre-Orders</h2>
+        <p className="mt-1 max-w-2xl text-sm text-[#0F3D24]/65">Manage reservations, update delivery status, and coordinate December collections.</p>
         
         {/* Pending Payments Alert */}
         {pendingQuery.data && pendingQuery.data.length > 0 && (
-          <div className="mt-4 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+          <div className="mt-6 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
             <h3 className="font-semibold text-amber-800 mb-2">Payment Approvals Needed ({pendingQuery.data.length})</h3>
             <div className="space-y-2">
               {pendingQuery.data.map(({ payment, preorder }) => (
-                <div key={payment.id} className="flex items-center justify-between rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100">
+                <div key={payment.id} className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100">
                   <div>
                     <span className="font-bold text-[#0F3D24]">{preorder.preorderCode}</span> · ₦{payment.amount.toLocaleString()}
                     <span className="block text-xs text-slate-500">Ref: {payment.paymentReference} · {preorder.customerName}</span>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-700">Approve</button>
-                    <button onClick={async () => { if(confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-200">Reject</button>
+                    <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition">Approve</button>
+                    <button onClick={async () => { if(confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-50 px-4 py-2 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition">Reject</button>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+      </div>
 
-        <div className="mt-6 flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-col gap-4">
+        <form onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }} className="flex gap-2 w-full sm:max-w-md">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, phone or code" className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] shadow-sm" />
+          <button type="submit" className="rounded-xl bg-[#0F3D24] px-6 py-3 text-sm font-semibold text-white hover:bg-[#134a2c] transition shadow-sm">Search</button>
+        </form>
+
+        <div className="flex flex-wrap gap-2">
           {[
             { id: "all", label: "All Orders" },
             { id: "slot_reserved", label: "Slot Reserved" },
-            { id: "free_reservation", label: "Free Reservation" },
+            { id: "free_reservation", label: "Free" },
             { id: "outright", label: "Paid Outrightly" },
             { id: "partially_paid", label: "Partially Paid" },
             { id: "fully_paid", label: "Fully Paid" },
-            { id: "pending", label: "Payment Pending" },
+            { id: "pending", label: "Pay Pending" },
             { id: "delivery_pending", label: "Delivery Pending" },
             { id: "delivered", label: "Delivered" },
           ].map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)} className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-wider ${filter === f.id ? "bg-[#0F3D24] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${filter === f.id ? "bg-[#0F3D24] text-white shadow-md" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}>
               {f.label}
             </button>
           ))}
         </div>
-
-        <form onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }} className="flex gap-2 mb-4">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name, phone or code" className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#3F8F3F]" />
-          <button type="submit" className="rounded-xl bg-[#0F3D24] px-4 py-2 text-sm font-semibold text-white">Search</button>
-        </form>
-
-        {query.isError && (
-          <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200 mb-4">
-            <strong className="block mb-1">Failed to load pre-orders:</strong>
-            {query.error instanceof Error ? query.error.message : "Unknown error occurred"}
-          </div>
-        )}
-
-        {query.isLoading && <p className="text-center text-sm text-[#0F3D24]/60 py-4">Loading pre-orders...</p>}
-        {query.data && (
-          <div className="space-y-4">
-            {query.data.preorders.map((o) => (
-              <PreorderRow key={o.id} preorder={o} passcode={passcode} role={query.data.role} onSaved={() => query.refetch()} />
-            ))}
-            {query.data.preorders.length === 0 && <p className="text-center text-sm text-[#0F3D24]/60">No pre-orders found.</p>}
-          </div>
-        )}
       </div>
+
+      {query.isError && (
+        <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
+          <strong className="block mb-1">Failed to load pre-orders:</strong>
+          {query.error instanceof Error ? query.error.message : "Unknown error occurred"}
+        </div>
+      )}
+
+      {query.isLoading && <p className="text-center text-sm text-[#0F3D24]/60 py-10">Loading pre-orders...</p>}
+      
+      {query.data && (
+        <div className="space-y-4">
+          {query.data.preorders.map((o) => (
+            <PreorderRow key={o.id} preorder={o} passcode={passcode} role={query.data.role} onSaved={() => query.refetch()} />
+          ))}
+          {query.data.preorders.length === 0 && <p className="text-center text-sm text-[#0F3D24]/60 py-10">No pre-orders found matching your filters.</p>}
+        </div>
+      )}
     </div>
   );
 }
