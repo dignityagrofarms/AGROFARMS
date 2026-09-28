@@ -49,13 +49,13 @@ export function Header() {
           </div>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-0.5">
           {nav.map((n) => (
             <Link
               key={n.to}
               to={n.to}
               activeOptions={{ exact: n.to === "/" }}
-              className="rounded-full px-4 py-2 text-sm font-semibold text-white/90 transition-all duration-300 hover:bg-white/10 hover:text-white"
+              className="rounded-full px-3 py-1.5 text-[13px] font-semibold text-white/90 transition-all duration-300 hover:bg-white/10 hover:text-white"
               activeProps={{ className: "!bg-[#3F8F3F] !text-white shadow-md shadow-[#3F8F3F]/30" }}
             >
               {n.label}
@@ -64,7 +64,7 @@ export function Header() {
           {isAdmin && (
             <Link
               to="/admin/admin-orders"
-              className="rounded-full px-4 py-2 text-sm font-semibold text-white/90 transition-all duration-300 hover:bg-white/10 hover:text-white"
+              className="rounded-full px-3 py-1.5 text-[13px] font-semibold text-white/90 transition-all duration-300 hover:bg-white/10 hover:text-white"
               activeProps={{ className: "!bg-[#3F8F3F] !text-white shadow-md shadow-[#3F8F3F]/30" }}
             >
               Admin Panel
@@ -75,12 +75,12 @@ export function Header() {
         <div className="flex items-center gap-2">
           <Link
             to="/order"
-            className="hidden sm:inline-flex items-center rounded-full bg-[#3F8F3F] px-5 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#4ea94e] hover:shadow-lg"
+            className="hidden sm:inline-flex items-center rounded-full bg-[#3F8F3F] px-4 py-2 text-[13px] font-semibold text-white shadow-md transition hover:bg-[#4ea94e] hover:shadow-lg xl:px-5 xl:py-2.5 xl:text-sm"
           >
             Order Now
           </Link>
           <button
-            className="lg:hidden text-white p-2"
+            className="xl:hidden text-white p-2"
             onClick={() => setOpen(!open)}
             aria-label="Menu"
           >
