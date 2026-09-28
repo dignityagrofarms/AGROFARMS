@@ -32,15 +32,22 @@ export function Header() {
   }, []);
 
   return (
-    <header
-      className={`sticky top-0 z-40 transition-all duration-500 ${
-        scrolled
-          ? "bg-[#0F3D24]/85 shadow-[0_4px_30px_rgba(0,0,0,0.1)] backdrop-blur-md border-b border-white/10 py-2"
-          : "bg-[#0F3D24] py-3"
-      }`}
-    >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-        <Link to="/" className="flex items-center gap-2">
+    <header className="sticky top-0 z-40">
+      <div className="bg-[#3F8F3F] px-4 py-2 text-center text-xs sm:text-sm font-medium text-white shadow-inner flex items-center justify-center gap-2 flex-wrap">
+        <span>🎄 <strong>December Pre-Order Sales</strong> are now open!</span>
+        <Link to="/order" search={{ mode: "december" }} className="inline-block bg-white/20 hover:bg-white/30 text-white rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold transition">
+          Learn More &rarr;
+        </Link>
+      </div>
+      <div
+        className={`transition-all duration-500 ${
+          scrolled
+            ? "bg-[#0F3D24]/85 shadow-[0_4px_30px_rgba(0,0,0,0.1)] backdrop-blur-md border-b border-white/10 py-2"
+            : "bg-[#0F3D24] py-3"
+        }`}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+          <Link to="/" className="flex items-center gap-2">
           <img src={logo} alt="Dignity Agro Farms" className="h-11 w-11 rounded-full object-cover ring-2 ring-[#3F8F3F]/60" />
           <div className="hidden sm:block leading-tight">
             <div className="font-display text-lg font-semibold text-white">Dignity</div>
@@ -122,6 +129,7 @@ export function Header() {
           </nav>
         </div>
       )}
+      </div>
     </header>
   );
 }

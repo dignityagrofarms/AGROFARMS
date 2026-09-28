@@ -55,16 +55,7 @@ const featured = [
   function Index() {
   const [selected, setSelected] = useState<Record<string, string>>({});
   return (
-    <SiteLayout>
-      {/* ANNOUNCEMENT BANNER */}
-      <div className="bg-[#3F8F3F] px-4 py-2.5 text-center text-sm font-medium text-white sm:px-6 lg:px-8 shadow-inner border-b border-[#0F3D24]/20 flex items-center justify-center gap-2 flex-wrap">
-        <span>🎄 <strong>December Pre-Order Sales</strong> are now open! Secure your live or dressed chicken for the holidays.</span>
-        <Link to="/december-preorder" className="inline-block bg-white/20 hover:bg-white/30 text-white rounded-full px-3 py-1 text-xs font-bold transition">
-          Learn More &rarr;
-        </Link>
-      </div>
-
-      {/* HERO: single static pen photo (fast load) */}
+    <SiteLayout>      {/* HERO: single static pen photo (fast load) */}
       <section className="relative isolate overflow-hidden">
         <div className="relative h-[560px] w-full sm:h-[640px] lg:h-[720px]">
           <img
