@@ -27,13 +27,13 @@ function FlyerLandingPage() {
       <div className="bg-white min-h-[calc(100vh-80px)] py-12">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
           
-          <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-[#3F8F3F]/30 bg-[#3F8F3F]/10 aspect-[4/5] max-w-lg mb-8">
+          <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-[#3F8F3F]/30 bg-[#3F8F3F]/10 max-w-lg mb-8">
             <img 
               src="/assets/december-flyer.png" 
               alt="December Pre-order Flyer" 
               fetchpriority="high"
               loading="eager"
-              className="absolute inset-0 h-full w-full object-cover object-top"
+              className="block w-full h-auto"
               onError={(e) => {
                 // Fallback text if they haven't uploaded it yet
                 const target = e.target as HTMLImageElement;
