@@ -23,7 +23,7 @@ export function receiptHtml(o: AdminOrder): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${title} ${esc(o.orderCode)} &middot; Dignity Agro Farms</title>
 <style>
-body{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;margin:0;padding:32px}
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif;color:#0F3D24;background:#fff;margin:0;padding:32px}
 .sheet{max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:28px}
 .head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
 h1{font-size:22px;margin:0;letter-spacing:2px}
@@ -87,7 +87,7 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
 <title>PAYMENT RECEIPT ${esc(o.preorderCode)} &middot; Dignity Agro Farms</title>
 <style>
 #pdf-receipt-target { margin:0;background:#fff; }
-#pdf-receipt-target .sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
+#pdf-receipt-target .sheet{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
 #pdf-receipt-target .head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
 #pdf-receipt-target h1{font-size:22px;margin:0;letter-spacing:2px}
 #pdf-receipt-target .muted{color:#0F3D2499;font-size:12px}
@@ -155,7 +155,7 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
 <title>${title} ${esc(o.preorderCode)} &middot; Dignity Agro Farms</title>
 <style>
 #pdf-receipt-target { margin:0;background:#fff; }
-#pdf-receipt-target .sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:40px;box-sizing:border-box}
+#pdf-receipt-target .sheet{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:40px;box-sizing:border-box}
 #pdf-receipt-target .head{display:flex;justify-content:space-between;border-bottom:2px solid #0F3D2411;padding-bottom:24px}
 #pdf-receipt-target h1{font-size:24px;margin:0;letter-spacing:2px;font-weight:800}
 #pdf-receipt-target .muted{color:#0F3D2499;font-size:12px}
