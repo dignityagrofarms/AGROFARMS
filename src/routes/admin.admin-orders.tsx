@@ -24,9 +24,14 @@ export const Route = createFileRoute("/admin/admin-orders")({
 async function downloadPdf(html: string, filename: string) {
   return new Promise<void>((resolve, reject) => {
     const iframe = document.createElement("iframe");
-    iframe.style.position = "absolute";
+    iframe.style.position = "fixed";
+    iframe.style.top = "0px";
+    iframe.style.left = "0px";
     iframe.style.width = "794px"; // A4 Width
-    iframe.style.left = "-9999px";
+    iframe.style.height = "1122px";
+    iframe.style.opacity = "0.01";
+    iframe.style.pointerEvents = "none";
+    iframe.style.zIndex = "-9999";
     document.body.appendChild(iframe);
     
     const win = iframe.contentWindow! as any;

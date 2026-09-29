@@ -105,7 +105,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
 </style></head><body><div class="sheet">
 <div class="head">
   <div>
-    <img src="${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
+    <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
     <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
     <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">07083476366</div>
@@ -173,7 +173,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
 </style></head><body><div class="sheet">
 <div class="head">
   <div>
-    <img src="${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
+    <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
     <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
     <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">07083476366</div>
