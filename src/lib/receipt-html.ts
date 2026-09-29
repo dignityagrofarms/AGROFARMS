@@ -86,8 +86,8 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>PAYMENT RECEIPT ${esc(o.preorderCode)} &middot; Dignity Agro Farms</title>
 <style>
-body{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;margin:0;padding:32px}
-.sheet{max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:28px}
+body{margin:0;background:#fff;}
+.sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
 .head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
 h1{font-size:22px;margin:0;letter-spacing:2px}
 .muted{color:#0F3D2499;font-size:12px}
@@ -154,8 +154,8 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${title} ${esc(o.preorderCode)} &middot; Dignity Agro Farms</title>
 <style>
-body{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;margin:0;padding:32px}
-.sheet{max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:28px}
+body{margin:0;background:#fff;}
+.sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
 .head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
 h1{font-size:22px;margin:0;letter-spacing:2px}
 .muted{color:#0F3D2499;font-size:12px}

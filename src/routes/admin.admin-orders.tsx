@@ -22,39 +22,62 @@ export const Route = createFileRoute("/admin/admin-orders")({
 });
 
 async function downloadPdf(html: string, filename: string) {
-  // @ts-ignore
-  const html2pdf = (await import("html2pdf.js")).default;
-  
-  // Render the HTML inside a full-sized hidden iframe.
-  // This completely shields it from Tailwind CSS and ensures standard styling applies perfectly.
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "absolute";
-  iframe.style.width = "794px";
-  iframe.style.height = "1122px";
-  iframe.style.left = "-9999px";
-  document.body.appendChild(iframe);
-  
-  const doc = iframe.contentWindow!.document;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  // Give the browser a moment to load the embedded logo image and apply CSS
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  try {
-    const opt = {
-      margin: 0,
-      filename: filename,
-      image: { type: "jpeg", quality: 1 },
-      html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
-      jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+  return new Promise<void>((resolve, reject) => {
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "absolute";
+    iframe.style.width = "794px"; // A4 Width
+    iframe.style.left = "-9999px";
+    document.body.appendChild(iframe);
+    
+    const win = iframe.contentWindow! as any;
+    
+    // Communication bridge
+    win.onPdfComplete = () => {
+      document.body.removeChild(iframe);
+      resolve();
     };
-    // Capture the perfectly styled iframe document
-    await html2pdf().set(opt).from(doc.documentElement).save();
-  } finally {
-    document.body.removeChild(iframe);
-  }
+    
+    win.onPdfError = (err: any) => {
+      document.body.removeChild(iframe);
+      console.error(err);
+      reject(new Error("PDF generation failed"));
+    };
+
+    // Inject the PDF engine and trigger directly into the HTML
+    const headInjection = `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>`;
+    const bodyInjection = `
+      <script>
+        window.onload = async () => {
+          try {
+            await new Promise(r => setTimeout(r, 800)); // wait for fonts/images
+            const element = document.querySelector('.sheet');
+            
+            // Execute from inside the iframe context
+            await window.html2pdf().set({
+              margin: [0.3, 0.3, 0.3, 0.3], // Add margin so edges aren't cramped
+              filename: '${filename}',
+              image: { type: 'jpeg', quality: 1 },
+              html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
+              jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            }).from(element).save();
+            
+            window.onPdfComplete();
+          } catch (e) {
+            window.onPdfError(e);
+          }
+        };
+      </script>
+    `;
+
+    const finalHtml = html
+      .replace("</head>", headInjection + "</head>")
+      .replace("</body>", bodyInjection + "</body>");
+
+    const doc = win.document;
+    doc.open();
+    doc.write(finalHtml);
+    doc.close();
+  });
 }
 
 function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (next: string) => void }) {
