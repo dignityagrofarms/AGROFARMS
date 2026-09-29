@@ -1,6 +1,7 @@
 import type { AdminOrder } from "@/lib/orders.functions";
 import type { Preorder, PreorderPayment } from "@/lib/preorders.functions";
-import logoSrc from "@/assets/logo-forwhitebg.png";
+
+const logoSrc = "/assets/logo-forwhitebg.png";
 
 const naira = (n: number) => "\u20a6" + n.toLocaleString("en-NG");
 const esc = (s: string) =>
