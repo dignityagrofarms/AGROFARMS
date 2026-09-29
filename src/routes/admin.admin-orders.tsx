@@ -1640,7 +1640,7 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
         <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-[#0F3D24]/10">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60 mb-2">Payment Installments</h4>
           <div className="space-y-2">
-            {preorder.payments.filter(p => p.confirmedByAdmin).map((p, i) => (
+            {preorder.payments.filter((p: any) => p.confirmedByAdmin).map((p: any, i: number) => (
               <div key={p.id} className="flex items-center justify-between text-sm border-b border-[#0F3D24]/5 pb-2 last:border-0 last:pb-0">
                 <div>
                   <div className="font-semibold text-[#0F3D24]">₦{p.amount.toLocaleString()}</div>
@@ -1747,7 +1747,7 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
             onClick={async () => {
               setDownloadingPdf("complete");
               try {
-                await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
+                await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter((p: any) => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
               } catch (e: any) {
                 alert("PDF Error: " + (e.message || String(e)));
               } finally {

@@ -75,6 +75,7 @@ function mapPreorder(r: Record<string, unknown>): Preorder {
     notes: r.notes as string | null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+    payments: r.preorder_payments ? (r.preorder_payments as any[]).map(p => mapPayment(p)).sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()) : undefined,
   };
 }
 
@@ -262,7 +263,7 @@ export const adminListPreorders = createServerFn({ method: "POST" })
     const role = await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q = supabaseAdmin.from("preorders").select("*");
+    let q = supabaseAdmin.from("preorders").select("*, preorder_payments(*)");
     if (data.reservationType) q = q.eq("reservation_type", data.reservationType);
     if (data.paymentStatus) q = q.eq("payment_status", data.paymentStatus);
     if (data.deliveryStatus) q = q.eq("delivery_status", data.deliveryStatus);
@@ -435,7 +436,6 @@ export const adminCorrectPreorder = createServerFn({ method: "POST" })
         customer_name: data.customerName,
         phone: data.phone,
         address: data.address,
-        notes: data.notes,
       })
       .eq("id", data.preorderId);
     if (error) throw new Error(error.message);

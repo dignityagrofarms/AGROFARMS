@@ -20,7 +20,7 @@ export const Route = createFileRoute("/order")({
     ],
     links: [{ rel: "canonical", href: "/order" }],
   }),
-  validateSearch: (search: Record<string, unknown>) => {
+  validateSearch: (search: Record<string, unknown>): { mode?: "now" | "preorder" | "december" } => {
     return {
       mode: (search.mode as "now" | "preorder" | "december") || undefined,
     };
