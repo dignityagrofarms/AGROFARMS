@@ -86,23 +86,23 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>PAYMENT RECEIPT ${esc(o.preorderCode)} &middot; Dignity Agro Farms</title>
 <style>
-body{margin:0;background:#fff;}
-.sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
-.head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
-h1{font-size:22px;margin:0;letter-spacing:2px}
-.muted{color:#0F3D2499;font-size:12px}
-.code{font-family:monospace;color:#3F8F3F;font-weight:700}
-table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
-th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0F3D2499;border-bottom:1px solid #0F3D2433;padding:6px 0}
-td{padding:6px 0;border-bottom:1px solid #0F3D2411}
-.c{text-align:center}.r{text-align:right}
-.totals{margin-top:12px;margin-left:auto;width:300px;font-size:14px}
-.totals div{display:flex;justify-content:space-between;padding:3px 0}
-.total{border-top:1px solid #0F3D2433;font-weight:700;font-size:16px;padding-top:8px}
-.stamp{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:1px;
- background:#3F8F3F22;color:#0F3D24;border:1px solid #3F8F3F66}
-footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-align:center;font-size:12px;color:#0F3D2499}
-</style></head><body><div class="sheet">
+#pdf-receipt-target { margin:0;background:#fff; }
+#pdf-receipt-target .sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
+#pdf-receipt-target .head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
+#pdf-receipt-target h1{font-size:22px;margin:0;letter-spacing:2px}
+#pdf-receipt-target .muted{color:#0F3D2499;font-size:12px}
+#pdf-receipt-target .code{font-family:monospace;color:#3F8F3F;font-weight:700}
+#pdf-receipt-target table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
+#pdf-receipt-target th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0F3D2499;border-bottom:1px solid #0F3D2433;padding:6px 0}
+#pdf-receipt-target td{padding:6px 0;border-bottom:1px solid #0F3D2411}
+#pdf-receipt-target .c{text-align:center}
+#pdf-receipt-target .r{text-align:right}
+#pdf-receipt-target .totals{margin-top:12px;margin-left:auto;width:300px;font-size:14px}
+#pdf-receipt-target .totals div{display:flex;justify-content:space-between;padding:3px 0}
+#pdf-receipt-target .total{border-top:1px solid #0F3D2433;font-weight:700;font-size:16px;padding-top:8px}
+#pdf-receipt-target .stamp{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:1px;background:#3F8F3F22;color:#0F3D24;border:1px solid #3F8F3F66}
+#pdf-receipt-target footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-align:center;font-size:12px;color:#0F3D2499}
+</style></head><body><div id="pdf-receipt-target"><div class="sheet">
 <div class="head">
   <div>
     <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
@@ -134,7 +134,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
 </div>
 <div class="muted" style="margin-top:16px">This receipt serves as proof of a single installment/payment toward the total order value.</div>
 <footer>Thank you for choosing Dignity Agro Farms. Farm fresh chicken, straight to your door.</footer>
-</div></body></html>`;
+</div></div></body></html>`;
 }
 
 /** Standalone COMPLETE receipt for a pre-order showing all installments. */
@@ -154,23 +154,23 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <title>${title} ${esc(o.preorderCode)} &middot; Dignity Agro Farms</title>
 <style>
-body{margin:0;background:#fff;}
-.sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
-.head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
-h1{font-size:22px;margin:0;letter-spacing:2px}
-.muted{color:#0F3D2499;font-size:12px}
-.code{font-family:monospace;color:#3F8F3F;font-weight:700}
-table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
-th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0F3D2499;border-bottom:1px solid #0F3D2433;padding:6px 0}
-td{padding:6px 0;border-bottom:1px solid #0F3D2411}
-.c{text-align:center}.r{text-align:right}
-.totals{margin-top:12px;margin-left:auto;width:300px;font-size:14px}
-.totals div{display:flex;justify-content:space-between;padding:3px 0}
-.total{border-top:1px solid #0F3D2433;font-weight:700;font-size:16px;padding-top:8px}
-.stamp{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:1px;
- background:${fullyPaid ? "#3F8F3F22;color:#0F3D24;border:1px solid #3F8F3F66" : "#FEF3C7;color:#92400E;border:1px solid #FCD34D"}}
-footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-align:center;font-size:12px;color:#0F3D2499}
-</style></head><body><div class="sheet">
+#pdf-receipt-target { margin:0;background:#fff; }
+#pdf-receipt-target .sheet{font-family:Arial,Helvetica,sans-serif;color:#0F3D24;background:#fff;max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:32px;box-sizing:border-box}
+#pdf-receipt-target .head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
+#pdf-receipt-target h1{font-size:22px;margin:0;letter-spacing:2px}
+#pdf-receipt-target .muted{color:#0F3D2499;font-size:12px}
+#pdf-receipt-target .code{font-family:monospace;color:#3F8F3F;font-weight:700}
+#pdf-receipt-target table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
+#pdf-receipt-target th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0F3D2499;border-bottom:1px solid #0F3D2433;padding:6px 0}
+#pdf-receipt-target td{padding:6px 0;border-bottom:1px solid #0F3D2411}
+#pdf-receipt-target .c{text-align:center}
+#pdf-receipt-target .r{text-align:right}
+#pdf-receipt-target .totals{margin-top:12px;margin-left:auto;width:300px;font-size:14px}
+#pdf-receipt-target .totals div{display:flex;justify-content:space-between;padding:3px 0}
+#pdf-receipt-target .total{border-top:1px solid #0F3D2433;font-weight:700;font-size:16px;padding-top:8px}
+#pdf-receipt-target .stamp{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:1px;background:${fullyPaid ? "#3F8F3F22;color:#0F3D24;border:1px solid #3F8F3F66" : "#FEF3C7;color:#92400E;border:1px solid #FCD34D"}}
+#pdf-receipt-target footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-align:center;font-size:12px;color:#0F3D2499}
+</style></head><body><div id="pdf-receipt-target"><div class="sheet">
 <div class="head">
   <div>
     <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
@@ -210,5 +210,5 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
   <div class="total" style="${o.balance > 0 ? "color:#92400E" : "color:#0F3D24"}"><span>Balance Outstanding</span><span>${naira(o.balance)}</span></div>
 </div>
 <footer>Thank you for choosing Dignity Agro Farms. Farm fresh chicken, straight to your door.</footer>
-</div></body></html>`;
+</div></div></body></html>`;
 }

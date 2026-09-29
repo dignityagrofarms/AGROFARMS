@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { toPng } from "html-to-image";
+import { jsPDF } from "jspdf";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2 } from "lucide-react";
@@ -22,67 +24,59 @@ export const Route = createFileRoute("/admin/admin-orders")({
 });
 
 async function downloadPdf(html: string, filename: string) {
-  return new Promise<void>((resolve, reject) => {
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.top = "0px";
-    iframe.style.left = "0px";
-    iframe.style.width = "794px"; // A4 Width
-    iframe.style.height = "1122px";
-    iframe.style.opacity = "1";
-    iframe.style.pointerEvents = "none";
-    iframe.style.zIndex = "-9999";
-    document.body.appendChild(iframe);
-    
-    const win = iframe.contentWindow! as any;
-    
-    // Communication bridge
-    win.onPdfComplete = () => {
-      document.body.removeChild(iframe);
-      resolve();
-    };
-    
-    win.onPdfError = (err: any) => {
-      document.body.removeChild(iframe);
-      console.error(err);
-      reject(new Error("PDF generation failed"));
-    };
+  const container = document.createElement("div");
+  container.style.position = "fixed";
+  container.style.top = "-9999px";
+  container.style.left = "0";
+  container.style.zIndex = "-9999";
+  
+  // Extract just the inner #pdf-receipt-target div and its styles
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  
+  // Find the style block and the target div
+  const styleBlock = temp.querySelector('style');
+  const targetDiv = temp.querySelector('#pdf-receipt-target');
+  
+  if (styleBlock) container.appendChild(styleBlock.cloneNode(true));
+  if (targetDiv) container.appendChild(targetDiv.cloneNode(true));
+  
+  document.body.appendChild(container);
 
-    // Inject the PDF engine and trigger directly into the HTML
-    const headInjection = `<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>`;
-    const bodyInjection = `
-      <script>
-        window.onload = async () => {
-          try {
-            await new Promise(r => setTimeout(r, 800)); // wait for fonts/images
-            const element = document.body;
-            
-            // Execute from inside the iframe context
-            await window.html2pdf().set({
-              margin: 0.25,
-              filename: '${filename}',
-              image: { type: 'jpeg', quality: 1 },
-              html2canvas: { scale: 2, useCORS: true, logging: true },
-              jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-            }).from(element).save();
-            
-            window.onPdfComplete();
-          } catch (e) {
-            window.onPdfError(e);
-          }
-        };
-      </script>
-    `;
+  // Give fonts and images a moment to load
+  await new Promise(r => setTimeout(r, 800));
 
-    const finalHtml = html
-      .replace("</head>", headInjection + "</head>")
-      .replace("</body>", bodyInjection + "</body>");
+  try {
+    const sheet = container.querySelector('.sheet') as HTMLElement;
+    if (!sheet) throw new Error("Sheet not found in receipt");
 
-    const doc = win.document;
-    doc.open();
-    doc.write(finalHtml);
-    doc.close();
-  });
+    const dataUrl = await toPng(sheet, { 
+      quality: 1.0,
+      pixelRatio: 2, // Crisp resolution
+      backgroundColor: '#ffffff'
+    });
+    
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "in",
+      format: "letter"
+    });
+    
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const margin = 0.3; // 0.3 inches padding on edges
+    const maxImgWidth = pdfWidth - (margin * 2);
+    
+    const imgProps = pdf.getImageProperties(dataUrl);
+    const ratio = imgProps.width / imgProps.height;
+    
+    let imgWidth = maxImgWidth;
+    let imgHeight = imgWidth / ratio;
+    
+    pdf.addImage(dataUrl, 'PNG', margin, margin, imgWidth, imgHeight);
+    pdf.save(filename);
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (next: string) => void }) {
@@ -1635,6 +1629,8 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
                     setDownloadingPdf(p.id);
                     try {
                       await downloadPdf(preorderPaymentReceiptHtml(preorder, p, i + 1), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
+                    } catch (e: any) {
+                      alert("PDF Error: " + (e.message || String(e)));
                     } finally {
                       setDownloadingPdf(null);
                     }
@@ -1730,6 +1726,8 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
               setDownloadingPdf("complete");
               try {
                 await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
+              } catch (e: any) {
+                alert("PDF Error: " + (e.message || String(e)));
               } finally {
                 setDownloadingPdf(null);
               }
