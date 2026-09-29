@@ -2,7 +2,7 @@ export function WhatsAppButton() {
   const message = encodeURIComponent("Hello Dignity Agro Farms, I'd like to place an order.");
   return (
     <a
-      href={`https://wa.me/2347083476366?text=${message}`}
+      href={`https://wa.me/2348167099492?text=${message}`}
       target="_blank"
       rel="noreferrer"
       aria-label="Chat on WhatsApp"

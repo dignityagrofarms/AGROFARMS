@@ -184,7 +184,7 @@ function OrderPage() {
 ` +
         `I have transferred ${naira(total)} to Moniepoint MFB 4006179439 (Dignity Agro Farms Limited). Please confirm and process my order.`
       );
-      window.open(`https://wa.me/2347083476366?text=${msg}`, "_blank");
+      window.open(`https://wa.me/2348167099492?text=${msg}`, "_blank");
     } catch (err) {
       setClaimError(err instanceof Error ? err.message : "Could not mark as paid.");
     } finally {
@@ -231,7 +231,7 @@ function OrderPage() {
       `💰 Amount Due: ${naira(total)}\n\n` +
       `Payment is being made now. Receipt to follow.`
     );
-    return `https://wa.me/2347083476366?text=${text}`;
+    return `https://wa.me/2348167099492?text=${text}`;
   };
 
   const sendToAdminWhatsApp = () => {

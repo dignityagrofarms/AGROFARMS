@@ -28,7 +28,7 @@ function ContactPage() {
     const text = encodeURIComponent(
       `New enquiry · Dignity Agro Farms\n\nName: ${form.name}\nPhone: ${form.phone}\nEmail: ${form.email}\nTopic: ${form.topic}\n\nMessage: ${form.message}`
     );
-    window.open(`https://wa.me/2347083476366?text=${text}`, "_blank");
+    window.open(`https://wa.me/2348167099492?text=${text}`, "_blank");
     setSent(true);
   };
 
