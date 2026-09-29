@@ -21,14 +21,27 @@ export const Route = createFileRoute("/admin/admin-orders")({
   component: AdminOrders,
 });
 
-function downloadHtml(html: string, filename: string) {
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+async function downloadPdf(html: string, filename: string) {
+  // @ts-ignore
+  const html2pdf = (await import("html2pdf.js")).default;
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  container.style.position = "absolute";
+  container.style.left = "-9999px";
+  document.body.appendChild(container);
+
+  try {
+    const opt = {
+      margin: 0.25,
+      filename: filename,
+      image: { type: "jpeg", quality: 1 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+    };
+    await html2pdf().set(opt).from(container).save();
+  } finally {
+    document.body.removeChild(container);
+  }
 }
 
 function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (next: string) => void }) {
@@ -1569,17 +1582,17 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
         <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-[#0F3D24]/10">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60 mb-2">Payment Installments</h4>
           <div className="space-y-2">
-            {preorder.payments.filter(p => p.confirmedByAdmin).map((p) => (
+            {preorder.payments.filter(p => p.confirmedByAdmin).map((p, i) => (
               <div key={p.id} className="flex items-center justify-between text-sm border-b border-[#0F3D24]/5 pb-2 last:border-0 last:pb-0">
                 <div>
                   <div className="font-semibold text-[#0F3D24]">₦{p.amount.toLocaleString()}</div>
                   <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
                 </div>
                 <button 
-                  onClick={() => downloadHtml(preorderPaymentReceiptHtml(preorder, p), `receipt_${preorder.preorderCode}_${p.amount}.html`)}
+                  onClick={() => downloadPdf(preorderPaymentReceiptHtml(preorder, p, i + 1), `receipt_${preorder.preorderCode}_${p.amount}.pdf`)}
                   className="flex items-center gap-1 rounded bg-[#F7F5F0] px-2 py-1 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10"
                 >
-                  <Download size={12} /> Receipt
+                  <Download size={12} /> Receipt PDF
                 </button>
               </div>
             ))}
@@ -1662,10 +1675,10 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
         )}
         <div className="w-full mt-2">
           <button 
-            onClick={() => downloadHtml(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.html`)}
+            onClick={() => downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`)}
             className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20"
           >
-            <FileText size={14} className="text-[#3F8F3F]" /> Download Complete Receipt
+            <FileText size={14} className="text-[#3F8F3F]" /> Download Complete Receipt PDF
           </button>
         </div>
       </div>

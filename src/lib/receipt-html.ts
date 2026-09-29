@@ -1,5 +1,6 @@
 import type { AdminOrder } from "@/lib/orders.functions";
 import type { Preorder, PreorderPayment } from "@/lib/preorders.functions";
+import logoSrc from "@/assets/logo.png";
 
 const naira = (n: number) => "\u20a6" + n.toLocaleString("en-NG");
 const esc = (s: string) =>
@@ -72,8 +73,14 @@ ${o.status === "cancelled" ? `<div class="muted" style="margin-top:8px;color:#b9
 </div></body></html>`;
 }
 
+const ordinal = (n: number) => {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
+
 /** Standalone receipt for a SINGLE payment on a pre-order. */
-export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment): string {
+export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paymentIndex: number): string {
   const dateLine = `Paid ${new Date(p.paymentDate).toLocaleString()}`;
   
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -98,6 +105,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
 </style></head><body><div class="sheet">
 <div class="head">
   <div>
+    <img src="${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
     <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
     <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">07083476366</div>
@@ -106,7 +114,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
     <h1>PAYMENT RECEIPT</h1>
     <div class="code">${esc(o.preorderCode)}</div>
     <div class="muted">${esc(dateLine)}</div>
-    <div class="stamp">PAYMENT CONFIRMED</div>
+    <div class="stamp">${ordinal(paymentIndex)} Payment</div>
   </div>
 </div>
 <div style="margin-top:18px;font-size:14px">
@@ -135,8 +143,12 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
   const title = fullyPaid ? "COMPLETE RECEIPT" : "ORDER SUMMARY";
   const dateLine = `Generated ${new Date().toLocaleString()}`;
   
-  const paymentRows = payments.map(p => 
-    `<tr><td>${new Date(p.paymentDate).toLocaleDateString()}</td><td>${esc(p.paymentReference)}</td><td class="r" style="color:#3F8F3F;font-weight:bold">${naira(p.amount)}</td></tr>`
+  const paymentRows = payments.map((p, i) => 
+    `<tr>
+      <td>${new Date(p.paymentDate).toLocaleDateString()}</td>
+      <td><span style="font-weight:600">${ordinal(i + 1)} Payment</span> <span class="muted">(${esc(p.paymentReference)})</span></td>
+      <td class="r" style="color:#3F8F3F;font-weight:bold">${naira(p.amount)}</td>
+    </tr>`
   ).join("");
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
@@ -161,6 +173,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
 </style></head><body><div class="sheet">
 <div class="head">
   <div>
+    <img src="${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
     <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
     <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">07083476366</div>
@@ -186,7 +199,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
 <div style="margin-top:32px;">
   <div class="muted" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#3F8F3F">Payment History (Installments)</div>
   ${payments.length > 0 ? `
-  <table><thead><tr><th>Date</th><th>Reference</th><th class="r">Amount Paid</th></tr></thead>
+  <table><thead><tr><th>Date</th><th>Installment</th><th class="r">Amount Paid</th></tr></thead>
   <tbody>${paymentRows}</tbody></table>
   ` : `<p class="muted" style="margin-top:8px">No confirmed payments yet.</p>`}
 </div>
