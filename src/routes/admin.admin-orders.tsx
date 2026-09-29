@@ -25,33 +25,35 @@ async function downloadPdf(html: string, filename: string) {
   // @ts-ignore
   const html2pdf = (await import("html2pdf.js")).default;
   
-  const container = document.createElement("div");
-  container.innerHTML = html;
-  container.style.position = "absolute";
-  container.style.left = "-9999px";
-  document.body.appendChild(container);
+  // Render the HTML inside a full-sized hidden iframe.
+  // This completely shields it from Tailwind CSS and ensures standard styling applies perfectly.
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "absolute";
+  iframe.style.width = "794px";
+  iframe.style.height = "1122px";
+  iframe.style.left = "-9999px";
+  document.body.appendChild(iframe);
+  
+  const doc = iframe.contentWindow!.document;
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Give the browser a moment to load the embedded logo image and apply CSS
+  await new Promise(resolve => setTimeout(resolve, 800));
 
   try {
     const opt = {
-      margin: 0.25,
+      margin: 0,
       filename: filename,
       image: { type: "jpeg", quality: 1 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true,
-        onclone: (clonedDoc: Document) => {
-          // Remove all external stylesheets (Tailwind v4) from the cloned document
-          // before html2canvas parses them. This prevents the "oklch" crash!
-          // The receipt's own inline <style> block is safely inside the container.
-          const styles = clonedDoc.querySelectorAll('head style, head link[rel="stylesheet"]');
-          styles.forEach(s => s.remove());
-        }
-      },
+      html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
       jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
     };
-    await html2pdf().set(opt).from(container).save();
+    // Capture the perfectly styled iframe document
+    await html2pdf().set(opt).from(doc.documentElement).save();
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
@@ -1489,6 +1491,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
 
 function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; passcode: string; role: string; onSaved: () => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState(preorder.deliveryStatus);
   const [customNote, setCustomNote] = useState("");
   const [editing, setEditing] = useState(false);
@@ -1600,10 +1603,19 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
                   <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
                 </div>
                 <button 
-                  onClick={() => downloadPdf(preorderPaymentReceiptHtml(preorder, p, i + 1), `receipt_${preorder.preorderCode}_${p.amount}.pdf`)}
-                  className="flex items-center gap-1 rounded bg-[#F7F5F0] px-2 py-1 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10"
+                  onClick={async () => {
+                    setDownloadingPdf(p.id);
+                    try {
+                      await downloadPdf(preorderPaymentReceiptHtml(preorder, p, i + 1), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
+                    } finally {
+                      setDownloadingPdf(null);
+                    }
+                  }}
+                  disabled={downloadingPdf === p.id}
+                  className="flex items-center gap-1 rounded bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10 disabled:opacity-50 transition-all"
                 >
-                  <Download size={12} /> Receipt PDF
+                  {downloadingPdf === p.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                  {downloadingPdf === p.id ? "Preparing PDF..." : "Receipt PDF"}
                 </button>
               </div>
             ))}
@@ -1686,10 +1698,19 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
         )}
         <div className="w-full mt-2">
           <button 
-            onClick={() => downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`)}
-            className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20"
+            onClick={async () => {
+              setDownloadingPdf("complete");
+              try {
+                await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
+              } finally {
+                setDownloadingPdf(null);
+              }
+            }}
+            disabled={downloadingPdf === "complete"}
+            className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20 disabled:opacity-50 transition-all"
           >
-            <FileText size={14} className="text-[#3F8F3F]" /> Download Complete Receipt PDF
+            {downloadingPdf === "complete" ? <Loader2 size={14} className="text-[#3F8F3F] animate-spin" /> : <FileText size={14} className="text-[#3F8F3F]" />}
+            {downloadingPdf === "complete" ? "Generating Master PDF..." : "Download Complete Receipt PDF"}
           </button>
         </div>
       </div>
