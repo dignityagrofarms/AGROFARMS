@@ -24,52 +24,56 @@ export function receiptHtml(o: AdminOrder): string {
 <title>${title} ${esc(o.orderCode)} &middot; Dignity Agro Farms</title>
 <style>
 body{font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,'Open Sans','Helvetica Neue',sans-serif;color:#0F3D24;background:#fff;margin:0;padding:32px}
-.sheet{max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:28px}
-.head{display:flex;justify-content:space-between;border-bottom:1px solid #0F3D2422;padding-bottom:16px}
-h1{font-size:22px;margin:0;letter-spacing:2px}
+.sheet{max-width:720px;margin:0 auto;border:1px solid #0F3D2422;border-radius:16px;padding:40px;box-sizing:border-box}
+.head{display:flex;justify-content:space-between;border-bottom:2px solid #0F3D2411;padding-bottom:24px}
+h1{font-size:24px;margin:0;letter-spacing:2px;font-weight:800}
 .muted{color:#0F3D2499;font-size:12px}
-.code{font-family:monospace;color:#3F8F3F;font-weight:700}
+.code{font-family:monospace;color:#3F8F3F;font-weight:700;font-size:16px;margin-top:4px}
 table{width:100%;border-collapse:collapse;margin-top:24px;font-size:14px}
-th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0F3D2499;border-bottom:1px solid #0F3D2433;padding:6px 0}
-td{padding:6px 0;border-bottom:1px solid #0F3D2411}
-.c{text-align:center}.r{text-align:right}
-.totals{margin-top:12px;margin-left:auto;width:260px;font-size:14px}
-.totals div{display:flex;justify-content:space-between;padding:3px 0}
-.total{border-top:1px solid #0F3D2433;font-weight:700;font-size:16px;padding-top:8px}
-.stamp{display:inline-block;margin-top:8px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:1px;
- background:${paid ? "#3F8F3F22;color:#0F3D24;border:1px solid #3F8F3F66" : "#FEF3C7;color:#92400E;border:1px solid #FCD34D"}}
-footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-align:center;font-size:12px;color:#0F3D2499}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#0F3D2499;border-bottom:2px solid #0F3D2422;padding:12px 4px}
+td{padding:12px 4px;border-bottom:1px solid #0F3D2411}
+.c{text-align:center}
+.r{text-align:right}
+.totals{margin-top:24px;margin-left:auto;width:320px;font-size:14px;background:#F9FAF9;padding:16px;border-radius:12px;border:1px solid #0F3D2411}
+.totals div{display:flex;justify-content:space-between;padding:4px 0}
+.total{border-top:1px solid #0F3D2422;font-weight:800;font-size:18px;padding-top:12px;margin-top:8px}
+.stamp{display:inline-block;margin-top:12px;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:1px;background:${paid ? "#E6F4EA;color:#137333;border:1px solid #CEEAD6" : "#FEF7E0;color:#B06000;border:1px solid #FEEFC3"}}
+footer{margin-top:32px;border-top:1px solid #0F3D2411;padding-top:16px;text-align:center;font-size:12px;color:#0F3D2499}
 </style></head><body><div class="sheet">
 <div class="head">
   <div>
-    <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
-    <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
+    <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
+    <div style="font-weight:800;font-size:18px;letter-spacing:-0.5px">Dignity Agro Farms Limited</div>
+    <div class="muted" style="margin-top:4px">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">08167099492</div>
   </div>
-  <div style="text-align:right">
-    <h1>${title}</h1>
+  <div style="text-align:right;padding-top:8px">
+    <h1 style="color:#0F3D24">${title}</h1>
     <div class="code">${esc(o.orderCode)}</div>
-    <div class="muted">${esc(dateLine)}</div>
+    <div class="muted" style="margin-top:4px">${esc(dateLine)}</div>
     <div class="stamp">${paid ? "PAYMENT CONFIRMED" : "AWAITING PAYMENT"}</div>
   </div>
 </div>
-<div style="margin-top:18px;font-size:14px">
-  <div class="muted" style="text-transform:uppercase;letter-spacing:1px;font-weight:700;color:#3F8F3F">Billed to</div>
-  <div style="font-weight:700">${esc(o.customerName)}</div>
-  <div>${esc(o.phone)}</div>
-  <div>${esc(o.address)}</div>
-  <div class="muted">${o.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri"}</div>
+<div style="margin-top:32px;font-size:14px;background:#F9FAF9;padding:16px;border-radius:12px;border:1px solid #0F3D2411">
+  <div class="muted" style="text-transform:uppercase;letter-spacing:1px;font-weight:800;color:#3F8F3F;margin-bottom:8px">Billed to</div>
+  <div style="font-weight:800;font-size:16px">${esc(o.customerName)}</div>
+  <div style="margin-top:4px;color:#0F3D24CC">${esc(o.phone)}</div>
+  <div style="color:#0F3D24CC">${esc(o.address)}</div>
+  <div class="muted" style="margin-top:2px">${o.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri"}</div>
 </div>
-<table><thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Unit</th><th class="r">Amount</th></tr></thead>
-<tbody>${rows}</tbody></table>
+<div style="margin-top:32px">
+  <div class="muted" style="text-transform:uppercase;letter-spacing:1px;font-weight:800;color:#0F3D24">Order Details</div>
+  <table><thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Unit Price</th><th class="r">Total Amount</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+</div>
 <div class="totals">
-  <div><span>Subtotal</span><span>${naira(o.subtotal)}</span></div>
-  <div><span>Delivery</span><span>${o.deliveryFee === 0 ? "FREE" : naira(o.deliveryFee)}</span></div>
-  <div class="total"><span>Total</span><span>${naira(o.total)}</span></div>
+  <div><span style="color:#0F3D2499;font-weight:600">Subtotal</span><span style="font-weight:800">${naira(o.subtotal)}</span></div>
+  <div style="margin-top:4px"><span style="color:#0F3D2499;font-weight:600">Delivery</span><span style="font-weight:800">${o.deliveryFee === 0 ? "FREE" : naira(o.deliveryFee)}</span></div>
+  <div class="total" style="color:#0F3D24"><span>Total Amount</span><span>${naira(o.total)}</span></div>
 </div>
-<div class="muted" style="margin-top:16px">Payment: Bank transfer · Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited</div>
-${o.status === "cancelled" ? `<div class="muted" style="margin-top:8px;color:#b91c1c">Order cancelled by ${o.cancelledBy === "customer" ? "customer" : "the farm"}${o.cancelReason ? `: ${esc(o.cancelReason)}` : ""}${o.cancelledAt ? ` on ${new Date(o.cancelledAt).toLocaleString()}` : ""}</div>` : ""}
-<footer>Thank you for choosing Dignity Agro Farms. Farm fresh chicken, straight to your door.</footer>
+<div class="muted" style="margin-top:24px;text-align:center">Payment method: Bank transfer &middot; Moniepoint MFB &middot; 4006179439 &middot; Dignity Agro Farms Limited</div>
+${o.status === "cancelled" ? `<div class="muted" style="margin-top:8px;color:#b91c1c;text-align:center;font-weight:600">Order cancelled by ${o.cancelledBy === "customer" ? "customer" : "the farm"}${o.cancelReason ? `: ${esc(o.cancelReason)}` : ""}${o.cancelledAt ? ` on ${new Date(o.cancelledAt).toLocaleString()}` : ""}</div>` : ""}
+<footer>Thank you for choosing Dignity Agro Farms.<br/>Farm fresh chicken, straight to your door.</footer>
 </div></body></html>`;
 }
 
