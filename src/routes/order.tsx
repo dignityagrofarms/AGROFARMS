@@ -314,7 +314,7 @@ function OrderPage() {
               <div className="mt-4 flex items-start gap-3 rounded-2xl bg-red-50 p-4 text-left ring-1 ring-red-200">
                 <AlertTriangle className="mt-0.5 shrink-0 text-red-600" size={18} />
                 <p className="text-xs text-red-800">
-                  <span className="font-bold">Security warning:</span> Only send payment to the account above (Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited). Do not pay any other account you may be sent. Dignity Agro Farms will never ask you to pay a different account. If in doubt, call <a href="tel:+2347083476366" className="font-semibold underline">070 8347 6366</a> before paying.
+                  <span className="font-bold">Security warning:</span> Only send payment to the account above (Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited). Do not pay any other account you may be sent. Dignity Agro Farms will never ask you to pay a different account. If in doubt, call <a href="tel:+2348167099492" className="font-semibold underline">081 6709 9492</a> before paying.
                 </p>
               </div>
 
@@ -573,7 +573,7 @@ function OrderPage() {
           </div>
           <div className="mt-6 rounded-2xl bg-white/5 p-4 text-sm ring-1 ring-white/10">
             <p className="font-semibold text-[#a8e6a8]">Prefer to call?</p>
-            <a href="tel:+2347083476366" className="mt-1 inline-flex items-center gap-2 text-white hover:text-[#a8e6a8]"><PhoneCall size={14} /> 070 8347 6366</a>
+            <a href="tel:+2348167099492" className="mt-1 inline-flex items-center gap-2 text-white hover:text-[#a8e6a8]"><PhoneCall size={14} /> 081 6709 9492</a>
             <p className="mt-3 text-white/70">Quick delivery within Owerri town. Live birds are weighed in your presence at pickup. Minimum order {naira(MIN_ORDER_SUBTOTAL)}.</p>
           </div>
           <Link to="/products" className="mt-4 block text-center text-xs font-semibold uppercase tracking-wider text-[#a8e6a8] hover:text-white">See full price list →</Link>

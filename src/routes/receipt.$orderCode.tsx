@@ -89,7 +89,7 @@ function ReceiptPage() {
             <div>
               <div className="text-lg font-semibold text-[#0F3D24]">Dignity Agro Farms Limited</div>
               <div className="text-xs text-[#0F3D24]/60">9 Oduobi Crescent, Ikenegbu, Owerri</div>
-              <div className="text-xs text-[#0F3D24]/60">07083476366</div>
+              <div className="text-xs text-[#0F3D24]/60">08167099492</div>
             </div>
           </div>
           <div className="text-right">

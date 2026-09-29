@@ -8,7 +8,7 @@ export const Route = createFileRoute("/contact")({
   head: () => ({
     meta: [
       { title: "Contact Us · Dignity Agro Farms Limited" },
-      { name: "description", content: "Call, WhatsApp or visit Dignity Agro Farms Limited. Phone 070 8347 6366, 9 Oduobi Crescent, Ikenegbu, Owerri. Ready to buy? Use our Order page." },
+      { name: "description", content: "Call, WhatsApp or visit Dignity Agro Farms Limited. Phone 081 6709 9492, 9 Oduobi Crescent, Ikenegbu, Owerri. Ready to buy? Use our Order page." },
       { property: "og:title", content: "Contact · Dignity Agro Farms" },
       { property: "og:description", content: "Reach the farm for enquiries, consultancy and support." },
       { property: "og:url", content: "/contact" },
@@ -107,7 +107,7 @@ function ContactPage() {
         </div>
 
         <aside className="space-y-4">
-          <InfoCard icon={Phone} title="Call us"><a href="tel:+2347083476366" className="hover:text-[#3F8F3F]">070 8347 6366</a></InfoCard>
+          <InfoCard icon={Phone} title="Call us"><a href="tel:+2348167099492" className="hover:text-[#3F8F3F]">081 6709 9492</a></InfoCard>
           <InfoCard icon={Mail} title="Email"><a href="mailto:hello@dignityagrofarms.com" className="hover:text-[#3F8F3F]">hello@dignityagrofarms.com</a></InfoCard>
           <InfoCard icon={MapPin} title="Farm Address">9 Oduobi Crescent, Ikenegbu</InfoCard>
           <InfoCard icon={Clock} title="Business Hours">Mon – Sat · 8:00am – 6:00pm</InfoCard>

@@ -137,7 +137,7 @@ function RootShell({ children }: { children: ReactNode }) {
     "name": "Dignity Agro Farms Limited",
     "image": "https://dignityagrofarms.com/favicon.png",
     "url": "https://dignityagrofarms.com",
-    "telephone": "+2347083476366",
+    "telephone": "+2348167099492",
     "address": {
       "@type": "PostalAddress",
       "streetAddress": "9 Oduobi Crescent",

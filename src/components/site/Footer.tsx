@@ -39,7 +39,7 @@ export function Footer() {
         <div>
           <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Contact</h4>
           <ul className="space-y-3 text-sm">
-            <li className="flex items-start gap-2"><Phone size={16} className="mt-0.5 shrink-0 text-[#a8e6a8]" /><a href="tel:+2347083476366" className="hover:text-white">070 8347 6366</a></li>
+            <li className="flex items-start gap-2"><Phone size={16} className="mt-0.5 shrink-0 text-[#a8e6a8]" /><a href="tel:+2348167099492" className="hover:text-white">081 6709 9492</a></li>
             <li className="flex items-start gap-2"><Mail size={16} className="mt-0.5 shrink-0 text-[#a8e6a8]" /><a href="mailto:hello@dignityagrofarms.com" className="hover:text-white">hello@dignityagrofarms.com</a></li>
             <li className="flex items-start gap-2"><MapPin size={16} className="mt-0.5 shrink-0 text-[#a8e6a8]" /><span>9 Oduobi Crescent, Ikenegbu</span></li>
           </ul>

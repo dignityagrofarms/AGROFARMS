@@ -86,8 +86,8 @@ const featured = [
                 <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(63,143,63,0.4)] transition-all hover:bg-[#4ea94e] hover:shadow-[0_0_25px_rgba(63,143,63,0.6)] hover:-translate-y-0.5">
                   Order Now
                 </Link>
-                <a href="tel:+2347083476366" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition-all hover:bg-white/15 hover:-translate-y-0.5">
-                  <PhoneCall size={16} /> Call 070 8347 6366
+                <a href="tel:+2348167099492" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition-all hover:bg-white/15 hover:-translate-y-0.5">
+                  <PhoneCall size={16} /> Call 081 6709 9492
                 </a>
               </div>
             </div>

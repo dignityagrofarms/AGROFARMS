@@ -98,7 +98,7 @@ function TrackOrder() {
 
         {query.data && !query.data.result && (
           <div className="mt-6 rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/5">
-            <p className="text-[#0F3D24]/70">No order found for that tracking code. Please check the code on your order confirmation, or call us on <a className="font-semibold text-[#3F8F3F]" href="tel:+2347083476366">070 8347 6366</a>.</p>
+            <p className="text-[#0F3D24]/70">No order found for that tracking code. Please check the code on your order confirmation, or call us on <a className="font-semibold text-[#3F8F3F]" href="tel:+2348167099492">081 6709 9492</a>.</p>
           </div>
         )}
 
@@ -230,7 +230,7 @@ function TrackOrder() {
           <h3 className="text-lg font-semibold">Can't find your order number?</h3>
           <p className="mt-2 text-sm text-white/80">
             Use the "Forgot your order number?" lookup above with the phone number you ordered with. Still stuck? Call us on
-            <a href="tel:+2347083476366" className="ml-1 font-semibold text-[#a8e6a8] underline">070 8347 6366</a> and we'll help right away.
+            <a href="tel:+2348167099492" className="ml-1 font-semibold text-[#a8e6a8] underline">081 6709 9492</a> and we'll help right away.
           </p>
         </div>
       </section>
@@ -337,7 +337,7 @@ function CancelBox({ order, onDone }: { order: TrackedOrder; onDone: () => void 
     return (
       <p className="mt-4 border-t border-[#0F3D24]/10 pt-4 text-xs text-[#0F3D24]/60">
         This order can no longer be cancelled online. Please call{" "}
-        <a className="font-semibold text-[#3F8F3F]" href="tel:+2347083476366">070 8347 6366</a>.
+        <a className="font-semibold text-[#3F8F3F]" href="tel:+2348167099492">081 6709 9492</a>.
       </p>
     );
   }

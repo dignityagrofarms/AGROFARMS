@@ -106,8 +106,8 @@ function ProductsPage() {
             Live broilers by the Kg, dressed chicken, fresh eggs, home delivery, bulk orders and poultry consultancy, all priced honestly, straight from the farm.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <a href="tel:+2347083476366" className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white hover:bg-[#4ea94e]">
-              <PhoneCall size={16} /> Call 070 8347 6366
+            <a href="tel:+2348167099492" className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white hover:bg-[#4ea94e]">
+              <PhoneCall size={16} /> Call 081 6709 9492
             </a>
             <Link to="/order" className="inline-flex items-center rounded-full border border-white/30 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10">
               Place an Order

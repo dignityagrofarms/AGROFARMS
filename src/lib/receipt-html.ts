@@ -44,7 +44,7 @@ footer{margin-top:28px;border-top:1px solid #0F3D2422;padding-top:12px;text-alig
   <div>
     <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
     <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
-    <div class="muted">07083476366</div>
+    <div class="muted">08167099492</div>
   </div>
   <div style="text-align:right">
     <h1>${title}</h1>
@@ -108,7 +108,7 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
     <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 48px; margin-bottom: 12px; display: block;" />
     <div style="font-weight:700;font-size:16px">Dignity Agro Farms Limited</div>
     <div class="muted">9 Oduobi Crescent, Ikenegbu, Owerri</div>
-    <div class="muted">07083476366</div>
+    <div class="muted">08167099492</div>
   </div>
   <div style="text-align:right">
     <h1>PAYMENT RECEIPT</h1>
@@ -176,7 +176,7 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
     <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
     <div style="font-weight:800;font-size:18px;letter-spacing:-0.5px">Dignity Agro Farms Limited</div>
     <div class="muted" style="margin-top:4px">9 Oduobi Crescent, Ikenegbu, Owerri</div>
-    <div class="muted">07083476366</div>
+    <div class="muted">08167099492</div>
   </div>
   <div style="text-align:right;padding-top:8px">
     <h1 style="color:#0F3D24">${title}</h1>

@@ -138,7 +138,7 @@ td{padding:10px 12px;border-bottom:1px solid #eee}
   <strong>Payment Account:</strong> Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited
 </div>
 ${preorder.reservationType === "free_reservation" ? '<div style="margin-top:12px;padding:12px 16px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e"><strong>Important:</strong> Free reservations are not guaranteed until payment is made.</div>' : ""}
-<div class="footer">Thank you for choosing Dignity Agro Farms.<br>Fresh from our farm to your table. · dignityagrofarms.com · 07083476366</div>
+<div class="footer">Thank you for choosing Dignity Agro Farms.<br>Fresh from our farm to your table. · dignityagrofarms.com · 08167099492</div>
 </body></html>`;
     w.document.write(html);
     w.document.close();
@@ -221,7 +221,7 @@ td{padding:10px 12px;border-bottom:1px solid #eee}
     <td style="text-align:right">₦${preorder.balance.toLocaleString()}</td>
   </tr>
 </table>
-<div class="footer">Thank you for choosing Dignity Agro Farms.<br>Fresh from our farm to your table. · dignityagrofarms.com · 07083476366</div>
+<div class="footer">Thank you for choosing Dignity Agro Farms.<br>Fresh from our farm to your table. · dignityagrofarms.com · 08167099492</div>
 </body></html>`;
     w.document.write(html);
     w.document.close();
@@ -648,7 +648,7 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
                     {preorder.reservationType === "free_reservation" && preorder.balance > 0 && (
                       <div className="mt-4 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200 text-sm text-amber-800">
                         <AlertTriangle size={14} className="inline mr-1" />
-                        Your free reservation is <strong>not guaranteed</strong> until payment is made. Please send {naira(preorder.totalAmount)} to <strong>4006179439</strong> (Moniepoint MFB · Dignity Agro Farms) then contact us on <a href="tel:+2347083476366" className="underline font-semibold">07083476366</a>.
+                        Your free reservation is <strong>not guaranteed</strong> until payment is made. Please send {naira(preorder.totalAmount)} to <strong>4006179439</strong> (Moniepoint MFB · Dignity Agro Farms) then contact us on <a href="tel:+2348167099492" className="underline font-semibold">08167099492</a>.
                       </div>
                     )}
 
@@ -715,8 +715,8 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
       <section className="bg-[#F7F5F0] py-10">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
           <p className="text-sm text-[#0F3D24]/70">Need help with your order? Call or WhatsApp us directly.</p>
-          <a href="tel:+2347083476366" className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-3 text-sm font-semibold text-white hover:bg-[#134a2c] transition">
-            <Phone size={15} /> 07083476366
+          <a href="tel:+2348167099492" className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-3 text-sm font-semibold text-white hover:bg-[#134a2c] transition">
+            <Phone size={15} /> 08167099492
           </a>
         </div>
       </section>

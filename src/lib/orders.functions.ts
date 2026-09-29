@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 // Normalize Nigerian phone numbers to a comparable digits-only form.
-// "07083476366", "+2347083476366", "234 708 347 6366" all become "2347083476366".
+// "08167099492", "+2348167099492", "234 708 347 6366" all become "2347083476366".
 function normalizePhone(input: string): string {
   const digits = input.replace(/\D+/g, "");
   if (digits.startsWith("234")) return digits;
@@ -413,7 +413,7 @@ export const cancelOrderByCustomer = createServerFn({ method: "POST" })
       .select("order_code")
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!row) throw new Error("This order can no longer be cancelled online. Please call 070 8347 6366.");
+    if (!row) throw new Error("This order can no longer be cancelled online. Please call 081 6709 9492.");
     return { ok: true };
   });
 

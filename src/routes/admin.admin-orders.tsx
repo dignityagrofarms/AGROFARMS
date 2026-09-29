@@ -204,7 +204,7 @@ const STATUS_MESSAGES: Record<AdminOrder["status"], (o: AdminOrder) => string> =
   delivered: (o) =>
     `Hi ${o.customerName.split(" ")[0]}, your order ${o.orderCode} has been delivered. Thank you for choosing Dignity Agro Farms. We'd love to serve you again!`,
   cancelled: (o) =>
-    `Hi ${o.customerName.split(" ")[0]}, your order ${o.orderCode} has been cancelled.${o.statusNote ? ` Reason: ${o.statusNote}` : ""} Please contact us on 07083476366 if you have questions.`,
+    `Hi ${o.customerName.split(" ")[0]}, your order ${o.orderCode} has been cancelled.${o.statusNote ? ` Reason: ${o.statusNote}` : ""} Please contact us on 08167099492 if you have questions.`,
 };
 
 function waLink(order: AdminOrder, overrides?: Partial<Pick<AdminOrder, "status" | "statusNote" | "eta">>): string {
@@ -219,7 +219,7 @@ function thankYouSms(order: AdminOrder): string {
   const first = order.customerName.split(" ")[0];
   const body =
     `Hi ${first}, your order ${order.orderCode} has been delivered. ` +
-    `Thank you for patronising Dignity Agro Farms. We hope you enjoy your farm-fresh order, and we'd love to serve you again! 070 8347 6366`;
+    `Thank you for patronising Dignity Agro Farms. We hope you enjoy your farm-fresh order, and we'd love to serve you again! 081 6709 9492`;
   return `sms:+${order.phone.replace(/\D+/g, "")}?&body=${encodeURIComponent(body)}`;
 }
 
@@ -237,7 +237,7 @@ function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", rea
   const text =
     decision === "approved"
       ? `Hi ${first}, this is Dignity Agro Farms. Your payment of ${naira(order.total)} for order ${order.orderCode} has been CONFIRMED. ✅\nCurrent status: ${STATUS_LABEL[order.status]}.${order.eta ? ` ETA: ${order.eta}.` : ""}\nTrack your order anytime on our website with your tracking code ${order.trackCode}. Thank you!`
-      : `Hi ${first}, this is Dignity Agro Farms. We could not confirm your payment of ${naira(order.total)} for order ${order.orderCode}.${reason ? ` Reason: ${reason}.` : ""}\nCurrent status: ${STATUS_LABEL[order.status]}.\nPlease send payment to 4006179439 (Moniepoint MFB · Dignity Agro Farms Limited) only, then tap "I have made payment" again. Call 07083476366 for help.`;
+      : `Hi ${first}, this is Dignity Agro Farms. We could not confirm your payment of ${naira(order.total)} for order ${order.orderCode}.${reason ? ` Reason: ${reason}.` : ""}\nCurrent status: ${STATUS_LABEL[order.status]}.\nPlease send payment to 4006179439 (Moniepoint MFB · Dignity Agro Farms Limited) only, then tap "I have made payment" again. Call 08167099492 for help.`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 
