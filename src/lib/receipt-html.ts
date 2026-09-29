@@ -1,7 +1,6 @@
 import type { AdminOrder } from "@/lib/orders.functions";
 import type { Preorder, PreorderPayment } from "@/lib/preorders.functions";
-
-const logoSrc = "/assets/logo-forwhitebg.png";
+import { base64Logo } from "./receipt-logo";
 
 const naira = (n: number) => "\u20a6" + n.toLocaleString("en-NG");
 const esc = (s: string) =>
@@ -45,7 +44,7 @@ footer{margin-top:32px;border-top:1px solid #0F3D2411;padding-top:16px;text-alig
 </style></head><body><div class="sheet">
 <div class="head">
   <div>
-    <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
+    <img src="${base64Logo}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
     <div style="font-weight:800;font-size:18px;letter-spacing:-0.5px">Dignity Agro Farms Limited</div>
     <div class="muted" style="margin-top:4px">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">08167099492</div>
@@ -112,7 +111,7 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
 </style></head><body><div id="pdf-receipt-target"><div class="sheet">
 <div class="head">
   <div>
-    <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
+    <img src="${base64Logo}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
     <div style="font-weight:800;font-size:18px;letter-spacing:-0.5px">Dignity Agro Farms Limited</div>
     <div class="muted" style="margin-top:4px">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">08167099492</div>
@@ -183,7 +182,7 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
 </style></head><body><div id="pdf-receipt-target"><div class="sheet">
 <div class="head">
   <div>
-    <img src="${window.location.origin}${logoSrc}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
+    <img src="${base64Logo}" alt="Dignity Agro Farms Logo" style="height: 54px; margin-bottom: 16px; display: block;" />
     <div style="font-weight:800;font-size:18px;letter-spacing:-0.5px">Dignity Agro Farms Limited</div>
     <div class="muted" style="margin-top:4px">9 Oduobi Crescent, Ikenegbu, Owerri</div>
     <div class="muted">08167099492</div>
