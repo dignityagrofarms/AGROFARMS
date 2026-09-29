@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
-import { receiptHtml } from "@/lib/receipt-html";
+import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 
@@ -20,6 +20,16 @@ export const Route = createFileRoute("/admin/admin-orders")({
   }),
   component: AdminOrders,
 });
+
+function downloadHtml(html: string, filename: string) {
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (next: string) => void }) {
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -1555,6 +1565,28 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
         )}
       </div>
 
+      {preorder.payments && preorder.payments.length > 0 && (
+        <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-[#0F3D24]/10">
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60 mb-2">Payment Installments</h4>
+          <div className="space-y-2">
+            {preorder.payments.filter(p => p.confirmedByAdmin).map((p) => (
+              <div key={p.id} className="flex items-center justify-between text-sm border-b border-[#0F3D24]/5 pb-2 last:border-0 last:pb-0">
+                <div>
+                  <div className="font-semibold text-[#0F3D24]">₦{p.amount.toLocaleString()}</div>
+                  <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
+                </div>
+                <button 
+                  onClick={() => downloadHtml(preorderPaymentReceiptHtml(preorder, p), `receipt_${preorder.preorderCode}_${p.amount}.html`)}
+                  className="flex items-center gap-1 rounded bg-[#F7F5F0] px-2 py-1 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10"
+                >
+                  <Download size={12} /> Receipt
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
         <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
           Delivery Status
@@ -1611,8 +1643,12 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
             const amt = prompt("Enter amount to add manually (e.g. 3500):");
             if (!amt) return;
             const ref = prompt("Enter payment reference (optional):");
-            await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || "MANUAL_ADD" } });
-            onSaved();
+            try {
+              await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || `MANUAL_ADD_${Date.now()}` } });
+              onSaved();
+            } catch (err) {
+              alert(err instanceof Error ? err.message : "Failed to add manual payment");
+            }
           }}
           className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
         >
@@ -1624,6 +1660,14 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
             <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete pre-order ${preorder.preorderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete pre-order</button>
           </>
         )}
+        <div className="w-full mt-2">
+          <button 
+            onClick={() => downloadHtml(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter(p => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.html`)}
+            className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20"
+          >
+            <FileText size={14} className="text-[#3F8F3F]" /> Download Complete Receipt
+          </button>
+        </div>
       </div>
 
       {role === "owner" && editing && (
