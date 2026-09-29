@@ -24,6 +24,7 @@ export const Route = createFileRoute("/admin/admin-orders")({
 async function downloadPdf(html: string, filename: string) {
   // @ts-ignore
   const html2pdf = (await import("html2pdf.js")).default;
+  
   const container = document.createElement("div");
   container.innerHTML = html;
   container.style.position = "absolute";
@@ -35,7 +36,17 @@ async function downloadPdf(html: string, filename: string) {
       margin: 0.25,
       filename: filename,
       image: { type: "jpeg", quality: 1 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true,
+        onclone: (clonedDoc: Document) => {
+          // Remove all external stylesheets (Tailwind v4) from the cloned document
+          // before html2canvas parses them. This prevents the "oklch" crash!
+          // The receipt's own inline <style> block is safely inside the container.
+          const styles = clonedDoc.querySelectorAll('head style, head link[rel="stylesheet"]');
+          styles.forEach(s => s.remove());
+        }
+      },
       jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
     };
     await html2pdf().set(opt).from(container).save();
