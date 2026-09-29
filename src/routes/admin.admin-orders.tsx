@@ -29,7 +29,7 @@ async function downloadPdf(html: string, filename: string) {
     iframe.style.left = "0px";
     iframe.style.width = "794px"; // A4 Width
     iframe.style.height = "1122px";
-    iframe.style.opacity = "0.01";
+    iframe.style.opacity = "1";
     iframe.style.pointerEvents = "none";
     iframe.style.zIndex = "-9999";
     document.body.appendChild(iframe);
@@ -55,14 +55,14 @@ async function downloadPdf(html: string, filename: string) {
         window.onload = async () => {
           try {
             await new Promise(r => setTimeout(r, 800)); // wait for fonts/images
-            const element = document.querySelector('.sheet');
+            const element = document.body;
             
             // Execute from inside the iframe context
             await window.html2pdf().set({
-              margin: [0.3, 0.3, 0.3, 0.3], // Add margin so edges aren't cramped
+              margin: 0.25,
               filename: '${filename}',
               image: { type: 'jpeg', quality: 1 },
-              html2canvas: { scale: 2, useCORS: true, windowWidth: 794 },
+              html2canvas: { scale: 2, useCORS: true, logging: true },
               jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
             }).from(element).save();
             
