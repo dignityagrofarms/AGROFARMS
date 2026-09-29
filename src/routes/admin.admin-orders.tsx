@@ -46,6 +46,23 @@ async function downloadPdf(html: string, filename: string) {
   // Give fonts and images a moment to load
   await new Promise(r => setTimeout(r, 800));
 
+  // html-to-image crashes when trying to parse cross-origin stylesheets (like Google Fonts)
+  // because of a bug where it calls .trim() on an undefined error result.
+  // We temporarily disable these links before rendering.
+  const crossOriginLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+    .filter(link => {
+      const href = link.getAttribute('href') || '';
+      return href.startsWith('http') && !href.startsWith(window.location.origin);
+    });
+    
+  crossOriginLinks.forEach(link => link.setAttribute('disabled', 'true'));
+  // Also temporarily change the rel attribute so html-to-image ignores it completely
+  const linkHrefs = crossOriginLinks.map(link => {
+    const href = link.getAttribute('href');
+    link.removeAttribute('href');
+    return href;
+  });
+
   try {
     const sheet = container.querySelector('.sheet') as HTMLElement;
     if (!sheet) throw new Error("Sheet not found in receipt");
@@ -76,6 +93,11 @@ async function downloadPdf(html: string, filename: string) {
     pdf.save(filename);
   } finally {
     document.body.removeChild(container);
+    // Restore cross-origin links
+    crossOriginLinks.forEach((link, i) => {
+      if (linkHrefs[i]) link.setAttribute('href', linkHrefs[i]!);
+      link.removeAttribute('disabled');
+    });
   }
 }
 
