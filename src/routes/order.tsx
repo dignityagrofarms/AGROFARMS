@@ -166,22 +166,13 @@ function OrderPage() {
       await markPaidFn({ data: { trackCode } });
       setPaymentClaimed(true);
       const msg = encodeURIComponent(
-        `💳 Payment Submitted — Dignity Agro Farms
-
-` +
-        `📦 Order ID: ${orderCode}
-` +
-        `🔍 Track Code: ${trackCode}
-` +
-        `💰 Amount: ${naira(total)}
-` +
-        `👤 Name: ${form.name}
-` +
-        `📞 Phone: ${form.phone}
-` +
-        `📍 Address: ${form.address}
-
-` +
+        `Payment Submitted — Dignity Agro Farms\n\n` +
+        `Order ID: ${orderCode}\n` +
+        `Track Code: ${trackCode}\n` +
+        `Amount: ${naira(total)}\n` +
+        `Name: ${form.name}\n` +
+        `Phone: ${form.phone}\n` +
+        `Address: ${form.address}\n\n` +
         `I have transferred ${naira(total)} to Moniepoint MFB 4006179439 (Dignity Agro Farms Limited). Please confirm and process my order.`
       );
       window.open(`https://wa.me/2348167099492?text=${msg}`, "_blank");
@@ -222,13 +213,13 @@ function OrderPage() {
     };
     const itemsText = enrichedForm.items.map(item => `- ${item.qty}x ${item.product} (${item.option})`).join("\n");
     const text = encodeURIComponent(
-      `🛒 New Website Order — Dignity Agro Farms\n\n` +
-      `📦 Order ID: ${orderCode}\n` +
-      `👤 Customer: ${enrichedForm.customerName}\n` +
-      `📞 Phone: ${enrichedForm.phone}\n` +
-      `📍 Address: ${enrichedForm.address} (${enrichedForm.deliveryZone})\n\n` +
-      `🍗 Items Ordered:\n${itemsText}\n\n` +
-      `💰 Amount Due: ${naira(total)}\n\n` +
+      `New Website Order — Dignity Agro Farms\n\n` +
+      `Order ID: ${orderCode}\n` +
+      `Customer: ${enrichedForm.customerName}\n` +
+      `Phone: ${enrichedForm.phone}\n` +
+      `Address: ${enrichedForm.address} (${enrichedForm.deliveryZone})\n\n` +
+      `Items Ordered:\n${itemsText}\n\n` +
+      `Amount Due: ${naira(total)}\n\n` +
       `Payment is being made now. Receipt to follow.`
     );
     return `https://wa.me/2348167099492?text=${text}`;

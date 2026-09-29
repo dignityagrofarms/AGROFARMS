@@ -228,7 +228,7 @@ function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", rea
   const first = order.customerName.split(" ")[0];
   const text =
     decision === "approved"
-      ? `Hi ${first}, this is Dignity Agro Farms. Your payment of ${naira(order.total)} for order ${order.orderCode} has been CONFIRMED. ✅\nCurrent status: ${STATUS_LABEL[order.status]}.${order.eta ? ` ETA: ${order.eta}.` : ""}\nTrack your order anytime on our website with your tracking code ${order.trackCode}. Thank you!`
+      ? `Hi ${first}, this is Dignity Agro Farms. Your payment of ${naira(order.total)} for order ${order.orderCode} has been CONFIRMED.\nCurrent status: ${STATUS_LABEL[order.status]}.${order.eta ? ` ETA: ${order.eta}.` : ""}\nTrack your order anytime on our website with your tracking code ${order.trackCode}. Thank you!`
       : `Hi ${first}, this is Dignity Agro Farms. We could not confirm your payment of ${naira(order.total)} for order ${order.orderCode}.${reason ? ` Reason: ${reason}.` : ""}\nCurrent status: ${STATUS_LABEL[order.status]}.\nPlease send payment to 4006179439 (Moniepoint MFB · Dignity Agro Farms Limited) only, then tap "I have made payment" again. Call 08167099492 for help.`;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
@@ -1564,7 +1564,7 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
     const first = preorder.customerName.split(" ")[0];
     let msg = `Hi ${first}, your December pre-order ${preorder.preorderCode} status update:\n`;
     if (status === "delivered") {
-      msg += "Your order has been delivered! Thank you for choosing Dignity Agro Farms. Happy Holidays! 🎄";
+      msg += "Your order has been delivered! Thank you for choosing Dignity Agro Farms. Happy Holidays!";
     } else {
       msg += "Your order is pending delivery. We will reach out when it is ready.";
     }
