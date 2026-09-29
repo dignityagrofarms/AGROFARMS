@@ -120,6 +120,7 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
     <h1 style="color:#0F3D24">PAYMENT RECEIPT</h1>
     <div class="code">${esc(o.preorderCode)}</div>
     <div class="muted" style="margin-top:4px">${esc(dateLine)}</div>
+    <div class="muted" style="margin-top:2px;font-family:monospace">Ref: ${esc(p.paymentReference)}</div>
     <div class="stamp">${ordinal(paymentIndex).toUpperCase()} PAYMENT</div>
   </div>
 </div>
@@ -139,7 +140,6 @@ export function preorderPaymentReceiptHtml(o: Preorder, p: PreorderPayment, paym
 <div class="totals">
   <div><span style="color:#0F3D2499;font-weight:600">Order Total Value</span><span style="font-weight:800">${naira(o.totalAmount)}</span></div>
   <div class="total" style="color:#137333"><span>Amount Paid</span><span>${naira(p.amount)}</span></div>
-  <div style="margin-top:4px"><span style="color:#0F3D2499;font-weight:600">Reference:</span><span style="font-family:monospace;font-weight:700">${esc(p.paymentReference)}</span></div>
 </div>
 <div class="muted" style="margin-top:24px;text-align:center">This receipt serves as proof of a single installment payment toward the total order value.</div>
 <footer>Thank you for choosing Dignity Agro Farms.<br/>Farm fresh chicken, straight to your door.</footer>
