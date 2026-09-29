@@ -73,24 +73,16 @@ async function downloadPdf(html: string, filename: string) {
       backgroundColor: '#ffffff'
     });
     
+    // Create a PDF that is exactly the size of the receipt (1 continuous page)
     const pdf = new jsPDF({
       orientation: "portrait",
-      unit: "in",
-      format: "letter"
+      unit: "px",
+      format: [sheet.offsetWidth, sheet.offsetHeight]
     });
     
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const margin = 0.3; // 0.3 inches padding on edges
-    const maxImgWidth = pdfWidth - (margin * 2);
-    
-    const imgProps = pdf.getImageProperties(dataUrl);
-    const ratio = imgProps.width / imgProps.height;
-    
-    let imgWidth = maxImgWidth;
-    let imgHeight = imgWidth / ratio;
-    
-    pdf.addImage(dataUrl, 'PNG', margin, margin, imgWidth, imgHeight);
-    pdf.save(filename);
+    // Add the image at 1x size (it will use the 2x pixel data for retina crispness)
+    pdf.addImage(dataUrl, 'PNG', 0, 0, sheet.offsetWidth, sheet.offsetHeight);
+    pdf.save(filename.toUpperCase());
   } finally {
     document.body.removeChild(container);
     // Restore cross-origin links
