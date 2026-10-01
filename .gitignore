@@ -11,6 +11,27 @@
 service-account*.json
 *credentials*.json
 
+# ── Audio / Media files ────────────────────────────────────────────────────────
+*.opus
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.aac
+
+# ── Test / scratch / downloaded files ─────────────────────────────────────────
+test-pdf.cjs
+*.test.cjs
+*.pdf
+
+# ── Internal planning & agent docs ────────────────────────────────────────────
+.lovable/plan/
+AGENTS.md
+roadmap.md
+
+# ── Temporary HTML exports ────────────────────────────────────────────────────
+complete_receipt_*.html
+
 # ── Logs ──────────────────────────────────────────────────────────────────────
 logs
 *.log
