@@ -1540,6 +1540,8 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
   const addPaymentFn = useServerFn(adminAddPreorderPayment);
   const correctFn = useServerFn(adminCorrectPreorder);
   const deleteFn = useServerFn(adminDeletePreorder);
+  const confirmPaymentFn = useServerFn(adminConfirmPreorderPayment);
+  const deletePaymentFn = useServerFn(adminDeletePreorderPayment);
   
   const mutation = useMutation({
     mutationFn: () => updateDeliveryFn({ data: { passcode, preorderId: preorder.id, deliveryStatus } }),
@@ -1632,29 +1634,56 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
         <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-[#0F3D24]/10">
           <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60 mb-2">Payment Installments</h4>
           <div className="space-y-2">
-            {preorder.payments.filter((p: any) => p.confirmedByAdmin).map((p: any, i: number) => (
-              <div key={p.id} className="flex items-center justify-between text-sm border-b border-[#0F3D24]/5 pb-2 last:border-0 last:pb-0">
+            {preorder.payments.map((p: any, i: number) => (
+              <div key={p.id} className={`flex flex-col gap-2 sm:flex-row sm:items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0 ${p.confirmedByAdmin ? "border-[#0F3D24]/5" : "border-amber-200 bg-amber-50 rounded-xl p-3"}`}>
                 <div>
-                  <div className="font-semibold text-[#0F3D24]">₦{p.amount.toLocaleString()}</div>
+                  <div className={`font-semibold ${p.confirmedByAdmin ? "text-[#0F3D24]" : "text-amber-800"}`}>₦{p.amount.toLocaleString()} {p.confirmedByAdmin ? "" : "(Pending Approval)"}</div>
                   <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
                 </div>
-                <button 
-                  onClick={async () => {
-                    setDownloadingPdf(p.id);
-                    try {
-                      await downloadPdf(preorderPaymentReceiptHtml(preorder, p, i + 1), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
-                    } catch (e: any) {
-                      alert("PDF Error: " + (e.message || String(e)));
-                    } finally {
-                      setDownloadingPdf(null);
-                    }
-                  }}
-                  disabled={downloadingPdf === p.id}
-                  className="flex items-center gap-1 rounded bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10 disabled:opacity-50 transition-all"
-                >
-                  {downloadingPdf === p.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                  {downloadingPdf === p.id ? "Preparing PDF..." : "Receipt PDF"}
-                </button>
+                {p.confirmedByAdmin ? (
+                  <button 
+                    onClick={async () => {
+                      setDownloadingPdf(p.id);
+                      try {
+                        // find the visual index of this confirmed payment among other confirmed payments
+                        const visualIndex = preorder.payments.filter((x: any) => x.confirmedByAdmin).findIndex((x: any) => x.id === p.id) + 1;
+                        await downloadPdf(preorderPaymentReceiptHtml(preorder, p, visualIndex), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
+                      } catch (e: any) {
+                        alert("PDF Error: " + (e.message || String(e)));
+                      } finally {
+                        setDownloadingPdf(null);
+                      }
+                    }}
+                    disabled={downloadingPdf === p.id}
+                    className="flex items-center gap-1 rounded bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10 disabled:opacity-50 transition-all"
+                  >
+                    {downloadingPdf === p.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    {downloadingPdf === p.id ? "Preparing PDF..." : "Receipt PDF"}
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={async () => { 
+                        await confirmPaymentFn({ data: { passcode, paymentId: p.id } }); 
+                        onSaved(); 
+                      }} 
+                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                    >
+                      Approve
+                    </button>
+                    <button 
+                      onClick={async () => { 
+                        if(confirm("Reject this payment?")) { 
+                          await deletePaymentFn({ data: { passcode, paymentId: p.id } }); 
+                          onSaved(); 
+                        } 
+                      }} 
+                      className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
