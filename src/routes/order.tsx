@@ -152,7 +152,16 @@ function OrderPage() {
       setTrackCode(res.trackCode);
       setSent(true);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Could not send order. Please try again.");
+      let msg = err instanceof Error ? err.message : "Could not send order. Please try again.";
+      if (msg.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(msg);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+            msg = parsed.map((e: any) => e.message).join(", ");
+          }
+        } catch { /* ignore parse error */ }
+      }
+      setErrorMsg(msg);
     } finally {
       setSubmitting(false);
     }
@@ -177,7 +186,16 @@ function OrderPage() {
       );
       window.open(`https://wa.me/2348167099492?text=${msg}`, "_blank");
     } catch (err) {
-      setClaimError(err instanceof Error ? err.message : "Could not mark as paid.");
+      let msg = err instanceof Error ? err.message : "Could not mark as paid.";
+      if (msg.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(msg);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+            msg = parsed.map((e: any) => e.message).join(", ");
+          }
+        } catch { /* ignore parse error */ }
+      }
+      setClaimError(msg);
     } finally {
       setClaimSubmitting(false);
     }

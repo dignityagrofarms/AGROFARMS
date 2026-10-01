@@ -307,7 +307,16 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
       setCreatedCode(preorderCode);
       setStep("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      let msg = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      if (msg.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(msg);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+            msg = parsed.map((e: any) => e.message).join(", ");
+          }
+        } catch { /* ignore parse error */ }
+      }
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -322,7 +331,16 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
       await submitPaymentFn({ data: { preorderCode: createdCode, amount: depositAmount, paymentReference: paymentRef.trim() || undefined } });
       setPaymentDone(true);
     } catch (err) {
-      setPaymentError(err instanceof Error ? err.message : "Could not submit payment. Please try again.");
+      let msg = err instanceof Error ? err.message : "Could not submit payment. Please try again.";
+      if (msg.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(msg);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+            msg = parsed.map((e: any) => e.message).join(", ");
+          }
+        } catch { /* ignore parse error */ }
+      }
+      setPaymentError(msg);
     } finally {
       setPaymentSubmitting(false);
     }
@@ -353,7 +371,16 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
         }
       }
     } catch (err) {
-      setLookupError(err instanceof Error ? err.message : "Lookup failed.");
+      let msg = err instanceof Error ? err.message : "Lookup failed.";
+      if (msg.startsWith("[")) {
+        try {
+          const parsed = JSON.parse(msg);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].message) {
+            msg = parsed.map((e: any) => e.message).join(", ");
+          }
+        } catch { /* ignore parse error */ }
+      }
+      setLookupError(msg);
     } finally {
       setLookupLoading(false);
     }

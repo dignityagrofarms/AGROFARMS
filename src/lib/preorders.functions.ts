@@ -104,7 +104,7 @@ async function checkAdminPasscode(passcode: string): Promise<string> {
 const createPreorderSchema = z.object({
   customerName: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(7).max(30),
-  email: z.string().trim().email().max(200).optional().default(""),
+  email: z.union([z.literal(""), z.string().trim().email()]).optional(),
   address: z.string().trim().min(3).max(300),
   product: z.string().trim().min(1).max(200),
   quantity: z.number().int().min(1).max(500),
