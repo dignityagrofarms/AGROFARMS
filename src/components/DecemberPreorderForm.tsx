@@ -461,17 +461,28 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">State *</label>
+                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Delivery Zone (Owerri) *</label>
                     <select required value={form.state} onChange={set("state")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white">
-                      <option value="">Select your state</option>
-                      {NIGERIAN_STATES.map((s) => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
+                      <option value="">Select an area</option>
+                      <option value="Ikenegbu">Ikenegbu</option>
+                      <option value="Aladinma">Aladinma</option>
+                      <option value="Wetheral">Wetheral</option>
+                      <option value="Amakohia">Amakohia</option>
+                      <option value="Akwakuma">Akwakuma</option>
+                      <option value="Orji">Orji</option>
+                      <option value="Irete">Irete</option>
+                      <option value="World Bank">World Bank</option>
+                      <option value="New Owerri">New Owerri</option>
+                      <option value="Egbu">Egbu</option>
+                      <option value="Naze">Naze</option>
+                      <option value="Nekede">Nekede</option>
+                      <option value="Control Post / Assumpta">Control Post / Assumpta</option>
+                      <option value="Other Owerri Area">Other Owerri Area</option>
                     </select>
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Full Delivery Address *</label>
-                    <input required value={form.address} onChange={set("address")} placeholder="Street, LGA, city" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
+                    <input required value={form.address} onChange={set("address")} placeholder="Street name and house number" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
                   </div>
                 </div>
                 <div>
