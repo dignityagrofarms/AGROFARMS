@@ -13,6 +13,14 @@ const naira = (n: number) => `₦${n.toLocaleString("en-NG")}`;
 
 const SLOT_FEE = 3500;
 
+const NIGERIAN_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue",
+  "Borno", "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu",
+  "FCT (Abuja)", "Gombe", "Imo", "Jigawa", "Kaduna", "Kano", "Katsina",
+  "Kebbi", "Kogi", "Kwara", "Lagos", "Nasarawa", "Niger", "Ogun", "Ondo",
+  "Osun", "Oyo", "Plateau", "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara",
+];
+
 const DECEMBER_PRODUCTS = [
   { label: "Live Broiler Chicken (3kg and above)", price: 12250 },
 ];
@@ -20,11 +28,11 @@ const DECEMBER_PRODUCTS = [
 const RESERVATION_OPTIONS: { type: ReservationType; title: string; amount: string; badge: string; badgeColor: string; desc: string; warning?: string }[] = [
   {
     type: "slot_reserved",
-    title: "Reserve with ₦3,500",
-    amount: "₦3,500 deposit",
+    title: "Reserve with a deposit",
+    amount: "Min. ₦3,500 deposit",
     badge: "SLOT RESERVED",
     badgeColor: "bg-amber-100 text-amber-800",
-    desc: "Pay ₦3,500 to secure your December slot. This becomes part of your total order payment and reduces your remaining balance.",
+    desc: "Pay at least ₦3,500 to secure your December slot. You can pay more to reduce your remaining balance. Your deposit always counts toward your total.",
   },
   {
     type: "free_reservation",
@@ -244,7 +252,8 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
 
   const [step, setStep] = useState<Step>("form");
   const [reservationType, setReservationType] = useState<ReservationType>("slot_reserved");
-  const [form, setForm] = useState({ name: "", phone: "", email: "", zone: "", address: "", product: "", qty: "1", notes: "", deliveryDate: "" });
+  const [customDeposit, setCustomDeposit] = useState("");
+  const [form, setForm] = useState({ name: "", phone: "", email: "", state: "", address: "", product: "", qty: "1", notes: "", deliveryDate: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
@@ -266,7 +275,11 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
   const qty = Math.max(1, parseInt(form.qty) || 1);
   const unitPrice = selectedProduct?.price ?? 0;
   const totalAmount = unitPrice * qty;
-  const depositAmount = reservationType === "slot_reserved" ? (SLOT_FEE * qty) : reservationType === "outright" ? totalAmount : 0;
+  const parsedCustomDeposit = parseInt(customDeposit.replace(/[^0-9]/g, "")) || 0;
+  const minDeposit = SLOT_FEE * qty;
+  const depositAmount = reservationType === "slot_reserved"
+    ? Math.max(minDeposit, parsedCustomDeposit)
+    : reservationType === "outright" ? totalAmount : 0;
 
   useEffect(() => {
     onStateChange?.({
@@ -294,7 +307,7 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
           customerName: form.name,
           phone: form.phone,
           email: form.email || "",
-          address: `${form.zone} - ${form.address}`,
+          address: `${form.state} - ${form.address}`,
           product: form.product,
           quantity: qty,
           unitPrice,
@@ -448,28 +461,17 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Delivery Zone (Owerri) *</label>
-                    <select required value={form.zone} onChange={set("zone")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white">
-                      <option value="">Select an area</option>
-                      <option value="Ikenegbu">Ikenegbu</option>
-                      <option value="Aladinma">Aladinma</option>
-                      <option value="Wetheral">Wetheral</option>
-                      <option value="Amakohia">Amakohia</option>
-                      <option value="Akwakuma">Akwakuma</option>
-                      <option value="Orji">Orji</option>
-                      <option value="Irete">Irete</option>
-                      <option value="World Bank">World Bank</option>
-                      <option value="New Owerri">New Owerri</option>
-                      <option value="Egbu">Egbu</option>
-                      <option value="Naze">Naze</option>
-                      <option value="Nekede">Nekede</option>
-                      <option value="Control Post / Assumpta">Control Post / Assumpta</option>
-                      <option value="Other Owerri Area">Other Owerri Area</option>
+                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">State *</label>
+                    <select required value={form.state} onChange={set("state")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white">
+                      <option value="">Select your state</option>
+                      {NIGERIAN_STATES.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Full Delivery Address *</label>
-                    <input required value={form.address} onChange={set("address")} placeholder="Street name and house number" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
+                    <input required value={form.address} onChange={set("address")} placeholder="Street, LGA, city" className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
                   </div>
                 </div>
                 <div>
@@ -506,8 +508,11 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
                     <div className="flex justify-between font-semibold text-[#0F3D24] border-t border-[#0F3D24]/10 pt-2"><span>Total Order Amount</span><span>{naira(totalAmount)}</span></div>
                     {reservationType === "slot_reserved" && (
                       <>
-                        <div className="flex justify-between text-amber-700"><span>Deposit to pay now</span><span>{naira(SLOT_FEE)}</span></div>
-                        <div className="flex justify-between text-[#0F3D24]/60"><span>Remaining balance after deposit</span><span>{naira(totalAmount - SLOT_FEE)}</span></div>
+                        <div className="flex justify-between text-amber-700 font-medium">
+                          <span>Deposit to pay now</span>
+                          <span>{naira(depositAmount)}{depositAmount > minDeposit ? ` (extra ₦${(depositAmount - minDeposit).toLocaleString("en-NG")} credited)` : ""}</span>
+                        </div>
+                        <div className="flex justify-between text-[#0F3D24]/60"><span>Remaining balance after deposit</span><span>{naira(totalAmount - depositAmount)}</span></div>
                       </>
                     )}
                     {reservationType === "outright" && (
@@ -517,6 +522,32 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
                       <div className="flex justify-between text-sky-700"><span>Amount to pay now</span><span>₦0 (pay later)</span></div>
                     )}
                   </div>
+                </div>
+              )}
+
+              {reservationType === "slot_reserved" && selectedProduct && (
+                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                  <label className="mb-1.5 block text-sm font-semibold text-amber-800">
+                    Pay more than the minimum? (Optional)
+                  </label>
+                  <p className="mb-3 text-xs text-amber-700">
+                    The minimum deposit is {naira(minDeposit)}. You can pay more to reduce your remaining balance. Leave blank to pay exactly {naira(minDeposit)}.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-amber-800">₦</span>
+                    <input
+                      type="number"
+                      min={minDeposit}
+                      max={totalAmount}
+                      placeholder={`${minDeposit} (minimum)`}
+                      value={customDeposit}
+                      onChange={(e) => setCustomDeposit(e.target.value)}
+                      className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+                  {parsedCustomDeposit > 0 && parsedCustomDeposit < minDeposit && (
+                    <p className="mt-2 text-xs font-medium text-red-600">Amount must be at least {naira(minDeposit)}. We will use {naira(minDeposit)}.</p>
+                  )}
                 </div>
               )}
 
