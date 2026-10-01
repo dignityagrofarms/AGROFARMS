@@ -206,6 +206,9 @@ const trackSchema = z.object({
 export type TrackedOrder = {
   orderCode: string;
   trackCode: string;
+  customerName: string;
+  phone: string;
+  address: string;
   status: "received" | "preparing" | "out_for_delivery" | "delivered" | "cancelled";
   statusNote: string | null;
   eta: string | null;
@@ -231,7 +234,7 @@ export const trackByCode = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
-      .select("order_code, track_code, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
+      .select("order_code, track_code, customer_name, phone, address, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
       .or(`track_code.eq.${code},order_code.eq.${code}`)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -244,7 +247,10 @@ export const trackByCode = createServerFn({ method: "POST" })
     return {
       orders: (rows ?? []).map((r) => ({
         orderCode: r.order_code,
-        trackCode: (r as { track_code: string | null }).track_code ?? "",
+        trackCode: (r as any).track_code ?? "",
+        customerName: (r as any).customer_name ?? "",
+        phone: (r as any).phone ?? "",
+        address: (r as any).address ?? "",
         status: r.status as TrackedOrder["status"],
         statusNote: r.status_note,
         eta: r.eta,
@@ -255,8 +261,8 @@ export const trackByCode = createServerFn({ method: "POST" })
         deliveryZone: r.delivery_zone,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
-        paymentStatus: (r as { payment_status: TrackedOrder["paymentStatus"] }).payment_status,
-        paymentRejectionReason: (r as { payment_rejection_reason: string | null }).payment_rejection_reason,
+        paymentStatus: (r as any).payment_status,
+        paymentRejectionReason: (r as any).payment_rejection_reason,
         cancelledAt: r.cancelled_at,
         cancelledBy: r.cancelled_by,
         cancelReason: r.cancel_reason,
@@ -296,7 +302,7 @@ export const trackUnified = createServerFn({ method: "POST" })
     // Try regular orders table first
     const { data: orderRows, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("order_code, track_code, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
+      .select("order_code, track_code, customer_name, phone, address, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
       .or(`track_code.eq.${code},order_code.eq.${code}`)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -309,7 +315,10 @@ export const trackUnified = createServerFn({ method: "POST" })
         result: {
           type: "order",
           orderCode: r.order_code,
-          trackCode: (r as { track_code: string | null }).track_code ?? "",
+          trackCode: (r as any).track_code ?? "",
+          customerName: (r as any).customer_name ?? "",
+          phone: (r as any).phone ?? "",
+          address: (r as any).address ?? "",
           status: r.status as TrackedOrder["status"],
           statusNote: r.status_note,
           eta: r.eta,
@@ -320,8 +329,8 @@ export const trackUnified = createServerFn({ method: "POST" })
           deliveryZone: r.delivery_zone,
           createdAt: r.created_at,
           updatedAt: r.updated_at,
-          paymentStatus: (r as { payment_status: TrackedOrder["paymentStatus"] }).payment_status,
-          paymentRejectionReason: (r as { payment_rejection_reason: string | null }).payment_rejection_reason,
+          paymentStatus: (r as any).payment_status,
+          paymentRejectionReason: (r as any).payment_rejection_reason,
           cancelledAt: r.cancelled_at,
           cancelledBy: r.cancelled_by,
           cancelReason: r.cancel_reason,

@@ -46,11 +46,25 @@ function TrackOrder() {
     refetchInterval: 15000,
   });
 
+  const [phoneMode, setPhoneMode] = useState(false);
+  const recoverFn = useServerFn(recoverCodesByPhone);
+  const phoneMutation = useMutation({
+    mutationFn: (p: string) => recoverFn({ data: { phone: p } }),
+  });
+
   const handleTrack = (e: React.FormEvent) => {
     e.preventDefault();
     const p = codeInput.trim().toUpperCase();
     if (!p) return;
-    setActiveCode(p);
+    // If it looks like a phone number (digits only, or starts with 0/+), do phone lookup
+    const isPhone = /^[0-9+\s]{7,}$/.test(codeInput.trim());
+    if (isPhone) {
+      setPhoneMode(true);
+      phoneMutation.mutate(codeInput.trim());
+    } else {
+      setPhoneMode(false);
+      setActiveCode(p);
+    }
   };
 
   return (
@@ -59,7 +73,7 @@ function TrackOrder() {
         <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
           <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#a8e6a8]">Order Tracking</span>
           <h1 className="mt-3 text-4xl font-semibold sm:text-5xl">Track Your Order</h1>
-          <p className="mt-4 text-white/80">Enter your order number (it doubles as your tracking code and receipt number), for example DAF-12345. Status refreshes every 15 seconds.</p>
+          <p className="mt-4 text-white/80">Enter your order number (e.g. DAF-12345 or DEC-12345), or simply type your <strong>phone number</strong> to find your orders. Status refreshes automatically every 15 seconds.</p>
         </div>
       </section>
 
@@ -69,8 +83,8 @@ function TrackOrder() {
             value={codeInput}
             onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
             type="text"
-            placeholder="e.g. DAF-12345"
-            className="flex-1 rounded-full border border-[#0F3D24]/15 bg-white px-5 py-3 text-sm uppercase tracking-wider outline-none ring-[#3F8F3F] focus:ring-2"
+          placeholder="Order number (DAF-12345) or phone number"
+            className="flex-1 rounded-full border border-[#0F3D24]/15 bg-white px-5 py-3 text-sm tracking-wider outline-none ring-[#3F8F3F] focus:ring-2"
           />
           <button className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white hover:bg-[#4ea94e]">
             <PackageSearch size={16} /> Track Order
@@ -79,7 +93,36 @@ function TrackOrder() {
 
         <RecoverBox onPick={(c: string) => { setCodeInput(c); setActiveCode(c); }} />
 
-        {activeCode && (
+        {phoneMode && (
+          <div className="mt-4 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
+            {phoneMutation.isPending && <p className="text-sm text-[#0F3D24]/70">Searching for your orders…</p>}
+            {phoneMutation.data && (
+              phoneMutation.data.codes.length === 0 ? (
+                <p className="text-sm text-[#0F3D24]/70">No orders found for that phone number. Please check the number or call us on <a className="font-semibold text-[#3F8F3F]" href="tel:+2348167099492">081 6709 9492</a>.</p>
+              ) : (
+                <>
+                  <p className="text-sm font-semibold text-[#0F3D24]">Orders found for your number — tap one to track it:</p>
+                  <ul className="mt-3 space-y-2">
+                    {phoneMutation.data.codes.map((c) => (
+                      <li key={c.code}>
+                        <button
+                          onClick={() => { setPhoneMode(false); setCodeInput(c.code); setActiveCode(c.code); }}
+                          className="flex w-full flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#F7F5F0] px-4 py-3 text-left text-sm ring-1 ring-[#0F3D24]/10 hover:ring-[#3F8F3F]/40"
+                        >
+                          <span className="font-mono font-semibold text-[#3F8F3F]">{c.code}</span>
+                          <span suppressHydrationWarning className="text-xs text-[#0F3D24]/60">{new Date(c.createdAt).toLocaleDateString()} · {naira(c.total)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )
+            )}
+            {phoneMutation.isError && <p className="mt-2 text-xs text-red-600">{(phoneMutation.error as Error).message}</p>}
+          </div>
+        )}
+
+        {activeCode && !phoneMode && (
           <div className="mt-6 flex items-center justify-between text-sm text-[#0F3D24]/70">
             <span>
               {query.isFetching ? "Refreshing…" : query.data ? (query.data.result ? "Order found" : "") : ""}
@@ -116,7 +159,7 @@ function TrackOrder() {
                       <div>
                         <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Order</div>
                         <div className="font-mono text-2xl font-semibold">{order.orderCode}</div>
-                    <div className="mt-1 font-mono text-xs text-[#0F3D24]/60">Tracking / receipt no: {order.orderCode}</div>
+                        <div className="mt-1 font-mono text-xs text-[#0F3D24]/60">Tracking / receipt no: {order.orderCode}</div>
                         <div suppressHydrationWarning className="mt-1 text-xs text-[#0F3D24]/60">Placed {new Date(order.createdAt).toLocaleString()}</div>
                       </div>
                       <div className="text-right">
@@ -124,6 +167,16 @@ function TrackOrder() {
                         <div className="text-xl font-semibold">{naira(order.total)}</div>
                       </div>
                     </div>
+
+                    {/* Customer details card */}
+                    {order.customerName && (
+                      <div className="mt-4 rounded-2xl bg-[#F7F5F0] p-4 text-sm ring-1 ring-[#0F3D24]/8">
+                        <div className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/50 mb-2">Order placed by</div>
+                        <div className="font-semibold text-[#0F3D24]">{order.customerName}</div>
+                        {order.phone && <div className="mt-0.5 text-[#0F3D24]/70">{order.phone}</div>}
+                        {order.address && <div className="mt-0.5 text-xs text-[#0F3D24]/60">{order.address}</div>}
+                      </div>
+                    )}
 
                     <PaymentBadge status={order.paymentStatus} reason={order.paymentRejectionReason} />
 
@@ -211,12 +264,12 @@ function TrackOrder() {
                       <CancelBox order={order} onDone={() => query.refetch()} />
                     )}
 
-                    <div className="mt-4 flex justify-end border-t border-[#0F3D24]/10 pt-4">
+                    <div className="mt-4 flex justify-end border-t border-[#0F3D24]/10 pt-4 gap-3">
                       <Link
                         to="/receipt/$orderCode"
                         params={{ orderCode: order.orderCode }}
                         search={{ code: order.trackCode }}
-                        className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${paid ? "bg-[#0F3D24] text-white hover:bg-[#134a2c]" : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#F7F5F0]"}`}
+                        className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition ${paid ? "bg-[#0F3D24] text-white hover:bg-[#134a2c]" : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#F7F5F0]"}`}
                       >
                         <FileText size={16} /> {paid ? "Download receipt" : "Generate invoice"}
                       </Link>
@@ -469,6 +522,15 @@ function PreorderResult({ preorder }: { preorder: TrackedPreorder }) {
           </span>
         )}
       </div>
+
+      {/* Customer details card */}
+      {preorder.customerName && (
+        <div className="mt-4 rounded-2xl bg-[#F7F5F0] p-4 text-sm ring-1 ring-[#0F3D24]/8">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/50 mb-2">Order placed by</div>
+          <div className="font-semibold text-[#0F3D24]">{preorder.customerName}</div>
+          {preorder.phone && <div className="mt-0.5 text-[#0F3D24]/70">{preorder.phone}</div>}
+        </div>
+      )}
 
       {/* Order details */}
       <div className="mt-6 rounded-2xl bg-[#F7F5F0] p-4 text-sm space-y-2">
