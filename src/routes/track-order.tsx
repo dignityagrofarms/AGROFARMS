@@ -600,6 +600,19 @@ function PreorderResult({ preorder }: { preorder: TrackedPreorder }) {
         </div>
       )}
 
+      {preorder.amountPaid > 0 && (
+        <div className="mt-4 flex justify-end border-t border-[#0F3D24]/10 pt-4 gap-3">
+          <Link
+            to="/receipt/$orderCode"
+            params={{ orderCode: preorder.preorderCode }}
+            search={{ code: preorder.preorderCode }}
+            className={`inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition bg-[#0F3D24] text-white hover:bg-[#134a2c]`}
+          >
+            <FileText size={16} /> Download {preorder.paymentStatus === "fully_paid" ? "receipt" : "summary"}
+          </Link>
+        </div>
+      )}
+
       <p suppressHydrationWarning className="mt-4 text-right text-[10px] uppercase tracking-widest text-[#0F3D24]/40">
         Last updated {new Date(preorder.updatedAt).toLocaleTimeString()}
       </p>

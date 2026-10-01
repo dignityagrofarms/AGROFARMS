@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { toPng } from "html-to-image";
-import { jsPDF } from "jspdf";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2 } from "lucide-react";
@@ -12,6 +10,7 @@ import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
+import { downloadPdf } from "@/lib/pdf";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({

@@ -277,6 +277,7 @@ export type TrackedPreorder = {
   preorderCode: string;
   customerName: string;
   phone: string;
+  address: string;
   product: string;
   quantity: number;
   totalAmount: number;
@@ -341,7 +342,7 @@ export const trackUnified = createServerFn({ method: "POST" })
     // Try preorders table
     const { data: preorderRow, error: preorderError } = await supabaseAdmin
       .from("preorders")
-      .select("preorder_code, customer_name, phone, product, quantity, total_amount, amount_paid, balance, reservation_type, payment_status, delivery_status, preferred_delivery_date, notes, created_at, updated_at")
+      .select("preorder_code, customer_name, phone, address, product, quantity, total_amount, amount_paid, balance, reservation_type, payment_status, delivery_status, preferred_delivery_date, notes, created_at, updated_at")
       .eq("preorder_code", code)
       .maybeSingle();
 
@@ -354,6 +355,7 @@ export const trackUnified = createServerFn({ method: "POST" })
           preorderCode: preorderRow.preorder_code,
           customerName: preorderRow.customer_name,
           phone: preorderRow.phone,
+          address: preorderRow.address,
           product: preorderRow.product,
           quantity: preorderRow.quantity,
           totalAmount: preorderRow.total_amount,
@@ -867,7 +869,7 @@ export type ReceiptOrder = AdminOrder;
 
 export const getOrderReceipt = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => receiptSchema.parse(data))
-  .handler(async ({ data }): Promise<{ order: ReceiptOrder }> => {
+  .handler(async ({ data }): Promise<{ type: "order"; order: ReceiptOrder } | { type: "preorder"; preorder: any; payments: any[] }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: r, error } = await supabaseAdmin
       .from("orders")
@@ -876,8 +878,52 @@ export const getOrderReceipt = createServerFn({ method: "POST" })
       .or(`track_code.eq.${safeCode(data.trackCode)},order_code.eq.${safeCode(data.trackCode)}`)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!r) throw new Error("No order found for that tracking code.");
+    if (!r) {
+      // Try preorders
+      const { data: preorder, error: preErr } = await supabaseAdmin
+        .from("preorders")
+        .select(`*, preorder_payments(*)`)
+        .eq("preorder_code", safeCode(data.orderCode))
+        .maybeSingle();
+      if (preErr) throw new Error(preErr.message);
+      if (!preorder) throw new Error("No order found for that tracking code.");
+      
+      return {
+        type: "preorder",
+        preorder: {
+          id: preorder.id,
+          preorderCode: preorder.preorder_code,
+          customerName: preorder.customer_name,
+          phone: preorder.phone,
+          address: preorder.address,
+          product: preorder.product,
+          quantity: preorder.quantity,
+          unitPrice: preorder.unit_price,
+          totalAmount: preorder.total_amount,
+          amountPaid: preorder.amount_paid,
+          balance: preorder.balance,
+          reservationType: preorder.reservation_type,
+          paymentStatus: preorder.payment_status,
+          deliveryStatus: preorder.delivery_status,
+          preferredDeliveryDate: preorder.preferred_delivery_date,
+          notes: preorder.notes,
+          createdAt: preorder.created_at,
+          updatedAt: preorder.updated_at,
+        },
+        payments: (preorder.preorder_payments || [])
+          .filter((p: any) => p.confirmed_by_admin)
+          .map((p: any) => ({
+            id: p.id,
+            amount: p.amount,
+            paymentDate: p.payment_date,
+            paymentReference: p.payment_reference,
+            confirmedByAdmin: p.confirmed_by_admin
+          })).sort((a: any, b: any) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime())
+      };
+    }
+    
     return {
+      type: "order",
       order: {
         id: r.id,
         orderCode: r.order_code,

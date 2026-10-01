@@ -61,7 +61,12 @@ function ReceiptPage() {
     );
   }
 
-  const o = query.data.order;
+  const result = query.data;
+  if (result.type === "preorder") {
+    return <PreorderReceipt preorder={result.preorder} payments={result.payments} />;
+  }
+
+  const o = result.order;
   const paid = o.paymentStatus === "approved";
   const docTitle = paid ? "RECEIPT" : "INVOICE";
   const dateLine = paid && o.paymentApprovedAt
@@ -180,5 +185,130 @@ function Shell({ children }: { children: React.ReactNode }) {
     <main className="min-h-screen bg-[#F7F5F0] py-10">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">{children}</div>
     </main>
+  );
+}
+
+function PreorderReceipt({ preorder: o, payments }: { preorder: any; payments: any[] }) {
+  const fullyPaid = o.paymentStatus === "fully_paid";
+  const docTitle = fullyPaid ? "COMPLETE RECEIPT" : "ORDER SUMMARY";
+  const dateLine = `Generated ${new Date().toLocaleString()}`;
+
+  return (
+    <Shell>
+      <style>{`@media print{.no-print{display:none!important}body{background:#fff}.print-sheet{box-shadow:none!important;margin:0!important;padding:0!important;}}`}</style>
+
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
+        <a href="/track-order" className="text-sm font-semibold text-[#3F8F3F] hover:underline">&larr; Back to tracking</a>
+        <button
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c]"
+        >
+          <Printer size={16} /> Download / Print {fullyPaid ? "receipt" : "summary"}
+        </button>
+      </div>
+
+      <div className="print-sheet rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-10">
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#0F3D24]/10 pb-6">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="Dignity Agro Farms logo" className="h-14 w-14 rounded-full object-cover" />
+            <div>
+              <div className="text-lg font-semibold text-[#0F3D24]">Dignity Agro Farms Limited</div>
+              <div className="text-xs text-[#0F3D24]/60">9 Oduobi Crescent, Ikenegbu, Owerri</div>
+              <div className="text-xs text-[#0F3D24]/60">08167099492</div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-semibold tracking-wide text-[#0F3D24]">{docTitle}</div>
+            <div className="font-mono text-sm font-semibold text-[#3F8F3F]">{o.preorderCode}</div>
+            <div suppressHydrationWarning className="text-xs text-[#0F3D24]/60">{dateLine}</div>
+            <div className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-widest ${fullyPaid ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-200" : "bg-amber-100 text-amber-800 ring-1 ring-amber-200"}`}>
+              {fullyPaid ? "FULLY PAID" : "PARTIALLY PAID"}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl bg-[#F7F5F0] p-5 ring-1 ring-[#0F3D24]/10">
+          <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F] mb-3">Billed to</div>
+          <div className="text-base font-semibold text-[#0F3D24]">{o.customerName}</div>
+          <div className="text-sm text-[#0F3D24]/70 mt-1">{o.phone}</div>
+          <div className="text-sm text-[#0F3D24]/70">{o.address}</div>
+        </div>
+
+        <div className="mt-8">
+          <div className="text-xs font-semibold uppercase tracking-widest text-[#0F3D24] mb-3">Order Details</div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#0F3D24]/15 text-left text-xs uppercase tracking-widest text-[#0F3D24]/60">
+                <th className="py-2">Item</th>
+                <th className="py-2 text-center">Qty</th>
+                <th className="py-2 text-right">Unit Price</th>
+                <th className="py-2 text-right">Total Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-[#0F3D24]/5">
+                <td className="py-3 font-semibold text-[#0F3D24]">{o.product} (Pre-order)</td>
+                <td className="py-3 text-center text-[#0F3D24]/70">{o.quantity}</td>
+                <td className="py-3 text-right text-[#0F3D24]/70">{naira(o.unitPrice)}</td>
+                <td className="py-3 text-right font-semibold text-[#0F3D24]">{naira(o.totalAmount)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-8">
+          <div className="text-xs font-semibold uppercase tracking-widest text-[#0F3D24] mb-3">Payment Installment History</div>
+          {payments.length > 0 ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#0F3D24]/15 text-left text-xs uppercase tracking-widest text-[#0F3D24]/60">
+                  <th className="py-2">Date</th>
+                  <th className="py-2">Installment</th>
+                  <th className="py-2 text-right">Amount Paid</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p, i) => (
+                  <tr key={p.id} className="border-b border-[#0F3D24]/5">
+                    <td className="py-3 text-[#0F3D24]/70">{new Date(p.paymentDate).toLocaleDateString()}</td>
+                    <td className="py-3 font-medium text-[#0F3D24]">
+                      {i + 1}{["st", "nd", "rd"][((i + 1 + 90) % 100 - 10) % 10 - 1] || "th"} Payment <span className="text-[#0F3D24]/50 font-normal">({p.paymentReference})</span>
+                    </td>
+                    <td className="py-3 text-right font-semibold text-[#3F8F3F]">{naira(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">
+              No confirmed payments yet. Please add a payment to see history.
+            </div>
+          )}
+        </div>
+
+        <div className="mt-8 ml-auto w-full max-w-sm rounded-xl bg-[#F7F5F0] p-5 ring-1 ring-[#0F3D24]/10 text-sm">
+          <div className="flex justify-between items-center py-1">
+            <span className="font-semibold text-[#0F3D24]/70">Order Total Value</span>
+            <span className="font-bold text-lg text-[#0F3D24]">{naira(o.totalAmount)}</span>
+          </div>
+          <div className="flex justify-between items-center py-1">
+            <span className="font-semibold text-[#3F8F3F]">Total Amount Paid</span>
+            <span className="font-bold text-lg text-[#3F8F3F]">{naira(o.amountPaid)}</span>
+          </div>
+          <div className={`mt-2 flex justify-between items-center border-t border-[#0F3D24]/15 pt-3 ${o.balance > 0 ? "text-amber-700" : "text-emerald-700"}`}>
+            <span className="font-bold">Balance Outstanding</span>
+            <span className="font-bold text-xl">{naira(o.balance)}</span>
+          </div>
+        </div>
+
+        <div className="mt-8 text-center text-xs text-[#0F3D24]/60">
+          This summary does not serve as proof of full payment unless all installments are confirmed and fully paid.
+        </div>
+
+        <p className="mt-8 border-t border-[#0F3D24]/10 pt-4 text-center text-xs text-[#0F3D24]/60">
+          Thank you for choosing Dignity Agro Farms. Farm fresh chicken, straight to your door.
+        </p>
+      </div>
+    </Shell>
   );
 }
