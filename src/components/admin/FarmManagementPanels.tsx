@@ -93,11 +93,13 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     queryFn: () => listOrdersFn({ data: { passcode } }),
     enabled: Boolean(passcode),
     staleTime: 30000,
+    placeholderData: (previousData) => previousData,
   });
 
   const batchesQuery = useQuery({
     queryKey: ["farm-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode } }),
+    placeholderData: (previousData) => previousData,
   });
 
   const financialsQuery = useQuery({
@@ -109,6 +111,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const reportQuery = useQuery({
@@ -118,6 +121,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         ? null
         : getBatchReportFn({ data: { passcode, batchId: selectedBatchId } }),
     enabled: selectedBatchId !== "all",
+    placeholderData: (previousData) => previousData,
   });
 
   // Batch Form State
@@ -1254,6 +1258,7 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
   const leadsQuery = useQuery({
     queryKey: ["crm-leads", passcode],
     queryFn: () => listLeadsFn({ data: { passcode } }),
+    placeholderData: (previousData) => previousData,
   });
 
   const [leadForm, setLeadForm] = useState({
@@ -1742,6 +1747,7 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
   const batchesQuery = useQuery({
     queryKey: ["farm-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode } }),
+    placeholderData: (previousData) => previousData,
   });
 
   const activitiesQuery = useQuery({
@@ -1753,6 +1759,7 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
+    placeholderData: (previousData) => previousData,
   });
 
   const [actForm, setActForm] = useState({

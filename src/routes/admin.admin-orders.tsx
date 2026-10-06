@@ -166,7 +166,7 @@ function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", rea
 }
 
 function AdminOrders() {
-  const [passcode, setPasscode] = useState<string | null>(null);
+  const [passcode, setPasscode] = useState<string | null>(() => (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null));
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
@@ -190,7 +190,8 @@ function AdminOrders() {
     queryFn: () => listFn({ data: { passcode: passcode!, ...applied } }),
     enabled: !!passcode,
     refetchInterval: 20000,
-    retry: false,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   const signOut = () => {
@@ -296,12 +297,15 @@ function AdminOrders() {
 
   useEffect(() => {
     if (query.error && passcode) {
-      setAuthError((query.error as Error).message);
-      localStorage.removeItem(STORAGE_KEY);
-      setPasscode(null);
-      qc.removeQueries({ queryKey: ["admin-orders"] });
+      const errMsg = (query.error as Error).message || "";
+      if (errMsg.includes("UNAUTHORIZED") || errMsg.includes("Invalid passcode") || errMsg.includes("Invalid credential")) {
+        setAuthError(errMsg);
+        localStorage.removeItem(STORAGE_KEY);
+        setPasscode(null);
+        qc.removeQueries({ queryKey: ["admin-orders"] });
+      }
     }
-  }, [query.error, passcode]);
+  }, [query.error, passcode, qc]);
 
 
 
@@ -524,7 +528,8 @@ function ClientCrmPanel({ passcode }: { passcode: string }) {
   const query = useQuery({
     queryKey: ["admin-clients", passcode, appliedSearch],
     queryFn: () => listFn({ data: { passcode, search: appliedSearch || null } }),
-    retry: false,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
   const clients = query.data?.clients ?? [];
 
@@ -652,7 +657,12 @@ function VoucherPanel({ passcode }: { passcode: string }) {
   const deleteFn = useServerFn(adminDeleteVoucher);
   const queryClient = useQueryClient();
 
-  const query = useQuery({ queryKey: ["admin-vouchers", passcode], queryFn: () => listFn({ data: { passcode } }), retry: false });
+  const query = useQuery({
+    queryKey: ["admin-vouchers", passcode],
+    queryFn: () => listFn({ data: { passcode } }),
+    retry: 1,
+    placeholderData: (previousData) => previousData,
+  });
 
   const createMutation = useMutation({
     mutationFn: () => createFn({
@@ -1660,6 +1670,8 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
       return listFn({ data });
     },
     refetchInterval: 15000,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   const confirmPaymentFn = useServerFn(adminConfirmPreorderPayment);
@@ -1672,6 +1684,8 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
     queryKey: ["admin-preorders-pending-payments", passcode],
     queryFn: () => pendingPaymentsFn({ data: { passcode } }),
     refetchInterval: 15000,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   return (

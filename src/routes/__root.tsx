@@ -35,48 +35,35 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: any; reset: () => void }) {
-  console.error(error);
+  console.error("Root Error Boundary caught error:", error);
   const router = useRouter();
+
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
-
-    // Auto-recovery for hydration mismatches and transient crashes
-    if (typeof window !== "undefined") {
-      const errorKey = "daf_error_recovery_time";
-      const lastError = sessionStorage.getItem(errorKey);
-      const now = Date.now();
-      
-      // Only auto-reload if we haven't done so in the last 5 seconds to prevent infinite reload loops
-      if (!lastError || now - parseInt(lastError, 10) > 5000) {
-        sessionStorage.setItem(errorKey, now.toString());
-        console.warn("Auto-reloading page to recover from crash...");
-        window.location.reload();
-      }
-    }
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          This page didn't load
+    <div className="flex min-h-screen items-center justify-center bg-[#F7F5F0] px-4">
+      <div className="max-w-md rounded-3xl bg-white p-8 text-center shadow-lg ring-1 ring-[#0F3D24]/10">
+        <h1 className="text-xl font-bold tracking-tight text-[#0F3D24]">
+          Temporary Loading Issue
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+        <p className="mt-2 text-sm text-[#0F3D24]/70">
+          Something went wrong while loading this view. You can retry safely without losing your session.
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button
             onClick={() => {
-              router.invalidate();
+              void router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center justify-center rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#134a2c]"
           >
-            Try again
+            Retry loading
           </button>
           <a
             href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            className="inline-flex items-center justify-center rounded-full border border-[#0F3D24]/15 bg-white px-5 py-2.5 text-sm font-semibold text-[#0F3D24] transition hover:bg-[#0F3D24]/5"
           >
             Go home
           </a>

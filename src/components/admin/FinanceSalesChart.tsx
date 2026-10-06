@@ -39,6 +39,8 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
     queryKey: ["admin-orders-chart", passcode],
     queryFn: () => listOrdersFn({ data: { passcode } }),
     enabled: Boolean(passcode),
+    staleTime: 30000,
+    placeholderData: (previousData) => previousData,
   });
 
   const orders: AdminOrder[] = ordersQuery.data?.orders || [];

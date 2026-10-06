@@ -44,6 +44,8 @@ function TrackOrder() {
     queryFn: () => trackFn({ data: { trackCode: activeCode! } }),
     enabled: !!activeCode,
     refetchInterval: 15000,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   });
 
   const [phoneMode, setPhoneMode] = useState(false);
