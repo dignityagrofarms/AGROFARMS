@@ -50,9 +50,9 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
     return orders.filter((o) => o.status !== "cancelled");
   }, [orders]);
 
-  // Income items from farm financials
+  // Income items from farm financials (excluding Store Orders to prevent double-counting with store sales)
   const incomeFinancials = useMemo(() => {
-    return financials.filter((f) => f.type === "income");
+    return financials.filter((f) => f.type === "income" && f.category !== "Store Order");
   }, [financials]);
 
   // Extract all available years dynamically from records
