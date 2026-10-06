@@ -29,6 +29,13 @@ interface FinanceSalesChartProps {
 const formatNaira = (val: number) =>
   "₦" + val.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
+function formatLocalDateStr(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartProps) {
   const [timeframe, setTimeframe] = useState<TimeFrame>("7d");
   const [selectedYear, setSelectedYear] = useState<number | "current">("current");
@@ -144,20 +151,23 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
     }
 
     if (timeframe === "7d") {
-      // 7 Daily buckets
+      // 7 Daily buckets (Formatted in local timezone)
       const data: { label: string; dateStr: string; totalSales: number; storeSales: number; farmIncome: number; orderCount: number }[] = [];
       
       for (let i = 6; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0];
+        const dateStr = formatLocalDateStr(d);
         const label = i === 0 ? "Today" : d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
-        const dayOrders = validOrders.filter((o) => o.createdAt.startsWith(dateStr));
+        const dayOrders = validOrders.filter((o) => {
+          const oDateStr = formatLocalDateStr(new Date(o.createdAt));
+          return oDateStr === dateStr;
+        });
         const storeSales = dayOrders.reduce((sum, o) => sum + (o.total || 0), 0);
 
         const dayIncome = incomeFinancials.filter((f) => {
-          const finDate = (f.transactionDate || f.createdAt).split("T")[0];
-          return finDate === dateStr;
+          const finDateStr = formatLocalDateStr(new Date(f.transactionDate || f.createdAt));
+          return finDateStr === dateStr;
         });
         const farmIncome = dayIncome.reduce((sum, f) => sum + (f.amount || 0), 0);
 
@@ -174,20 +184,23 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
     }
 
     if (timeframe === "1m") {
-      // Last 30 days
+      // Last 30 days (Formatted in local timezone)
       const data: { label: string; dateStr: string; totalSales: number; storeSales: number; farmIncome: number; orderCount: number }[] = [];
       
       for (let i = 29; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0];
+        const dateStr = formatLocalDateStr(d);
         const label = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-        const dayOrders = validOrders.filter((o) => o.createdAt.startsWith(dateStr));
+        const dayOrders = validOrders.filter((o) => {
+          const oDateStr = formatLocalDateStr(new Date(o.createdAt));
+          return oDateStr === dateStr;
+        });
         const storeSales = dayOrders.reduce((sum, o) => sum + (o.total || 0), 0);
 
         const dayIncome = incomeFinancials.filter((f) => {
-          const finDate = (f.transactionDate || f.createdAt).split("T")[0];
-          return finDate === dateStr;
+          const finDateStr = formatLocalDateStr(new Date(f.transactionDate || f.createdAt));
+          return finDateStr === dateStr;
         });
         const farmIncome = dayIncome.reduce((sum, f) => sum + (f.amount || 0), 0);
 
