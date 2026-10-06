@@ -447,9 +447,6 @@ function OrderPage() {
                         />
                         <div className="flex-1 min-w-0">
                           <div className="truncate font-semibold text-xs sm:text-sm">{p.name}</div>
-                          <div className="text-[11px] font-normal text-[#0F3D24]/60">
-                            From ₦{lowestPrice.toLocaleString("en-NG")} / {p.unitLabel}
-                          </div>
                         </div>
                       </button>
                     );

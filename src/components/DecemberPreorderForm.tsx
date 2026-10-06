@@ -53,6 +53,14 @@ const RESERVATION_OPTIONS: { type: ReservationType; title: string; amount: strin
   },
 ];
 
+const DECEMBER_DELIVERY_DATES = Array.from({ length: 25 }, (_, i) => {
+  const day = String(i + 1).padStart(2, "0");
+  return {
+    value: `2026-12-${day}`,
+    label: `Dec ${i + 1}, 2026`,
+  };
+});
+
 type Step = "form" | "success" | "payment_submitted" | "lookup";
 
 function StatusBadge({ status }: { status: string }) {
@@ -144,6 +152,9 @@ td{padding:10px 12px;border-bottom:1px solid #eee}
 </table>
 <div style="margin-top:24px;padding:12px 16px;background:#f0fdf4;border-radius:8px;font-size:12px">
   <strong>Payment Account:</strong> Moniepoint MFB · 4006179439 · Dignity Agro Farms Limited
+</div>
+<div style="margin-top:10px;padding:12px 16px;background:#fefce8;border:1px solid #fef08a;border-radius:8px;font-size:12px;color:#854d0e">
+  ⏱ <strong>Processing Notice:</strong> Orders typically take up to <strong>3 to 5 hours</strong> for confirmation, preparation, and delivery.
 </div>
 ${preorder.reservationType === "free_reservation" ? '<div style="margin-top:12px;padding:12px 16px;background:#fef3c7;border-radius:8px;font-size:12px;color:#92400e"><strong>Important:</strong> Free reservations are not guaranteed until payment is made.</div>' : ""}
 <div class="footer">Thank you for choosing Dignity Agro Farms.<br>Fresh from our farm to your table. · dignityagrofarms.com · 08167099492</div>
@@ -499,8 +510,19 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
                     <input required type="number" min="1" max="500" value={form.qty} onChange={set("qty")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]" />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Preferred delivery date (Dec only)</label>
-                    <input type="date" min="2026-12-01" max="2026-12-31" value={form.deliveryDate} onChange={set("deliveryDate")} className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white" />
+                    <label className="mb-1.5 block text-sm font-medium text-[#0F3D24]">Preferred delivery date (Dec 1st – 25th) *</label>
+                    <select
+                      value={form.deliveryDate}
+                      onChange={set("deliveryDate")}
+                      className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] bg-white font-medium text-[#0F3D24]"
+                    >
+                      <option value="">Select Date (Dec 1st – 25th)</option>
+                      {DECEMBER_DELIVERY_DATES.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
                 <div>

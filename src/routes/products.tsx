@@ -160,11 +160,6 @@ function ProductsPage() {
                     className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  
-                  {/* Price Tag Badge */}
-                  <span className="absolute bottom-4 left-4 rounded-full bg-[#0F3D24]/90 px-3.5 py-1 text-xs font-bold text-[#a8e6a8] shadow-md backdrop-blur-md">
-                    From {naira(lowestPrice)} / {product.unitLabel}
-                  </span>
                 </div>
 
                 {/* Content */}

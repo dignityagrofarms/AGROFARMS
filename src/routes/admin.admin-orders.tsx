@@ -1788,6 +1788,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         <div className="flex flex-wrap gap-2">
           {[
             { id: "all", label: "All Orders" },
+            { id: "awaiting_approval", label: "Awaiting Payment Approval" },
             { id: "slot_reserved", label: "Slot Reserved" },
             { id: "free_reservation", label: "Free" },
             { id: "outright", label: "Paid Outrightly" },
@@ -1796,11 +1797,30 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
             { id: "pending", label: "Pay Pending" },
             { id: "delivery_pending", label: "Delivery Pending" },
             { id: "delivered", label: "Delivered" },
-          ].map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)} className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${filter === f.id ? "bg-[#0F3D24] text-white shadow-md" : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"}`}>
-              {f.label}
-            </button>
-          ))}
+          ].map((f) => {
+            const count =
+              f.id === "all"
+                ? query.data?.preorders.length || 0
+                : f.id === "awaiting_approval"
+                ? (query.data?.preorders || []).filter(
+                    (o: any) => o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted"
+                  ).length
+                : 0;
+
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                  filter === f.id
+                    ? "bg-[#0F3D24] text-white shadow-md"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {f.label} {count > 0 && <span className="ml-1 text-[10px] opacity-80">({count})</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1815,10 +1835,33 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
       
       {query.data && (
         <div className="space-y-4">
-          {query.data.preorders.map((o) => (
-            <PreorderRow key={o.id} preorder={o} passcode={passcode} role={query.data.role} batches={batchesQuery.data || []} onSaved={() => query.refetch()} />
-          ))}
-          {query.data.preorders.length === 0 && <p className="text-center text-sm text-[#0F3D24]/60 py-10">No pre-orders found matching your filters.</p>}
+          {(() => {
+            const list = query.data.preorders.filter((o: any) => {
+              if (filter === "awaiting_approval") {
+                return o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted";
+              }
+              return true;
+            });
+            return (
+              <>
+                {list.map((o: any) => (
+                  <PreorderRow
+                    key={o.id}
+                    preorder={o}
+                    passcode={passcode}
+                    role={query.data.role}
+                    batches={batchesQuery.data || []}
+                    onSaved={() => query.refetch()}
+                  />
+                ))}
+                {list.length === 0 && (
+                  <p className="text-center text-sm text-[#0F3D24]/60 py-10">
+                    No pre-orders found matching your filters.
+                  </p>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>

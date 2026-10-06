@@ -164,7 +164,11 @@ function ReceiptPage() {
           </div>
         )}
 
-        <p className="mt-8 border-t border-[#0F3D24]/10 pt-4 text-center text-xs text-[#0F3D24]/60">
+        <div className="mt-4 rounded-2xl bg-amber-50/80 p-3.5 text-xs text-amber-900 ring-1 ring-amber-200/60">
+          ⏱ <strong>Processing Notice:</strong> Orders typically take up to <strong>3 to 5 hours</strong> for confirmation, preparation, and delivery.
+        </div>
+
+        <p className="mt-6 border-t border-[#0F3D24]/10 pt-4 text-center text-xs text-[#0F3D24]/60">
           Thank you for choosing Dignity Agro Farms. Farm fresh chicken, straight to your door.
         </p>
       </div>
