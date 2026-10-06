@@ -33,6 +33,7 @@ import {
   UserCheck,
   ShieldAlert,
 } from "lucide-react";
+import { FinanceSalesChart } from "./FinanceSalesChart";
 import {
   adminListBatches,
   adminCreateBatch,
@@ -351,6 +352,9 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
           </span>
         </div>
       </div>
+
+      {/* Interactive Sales & Revenue Line Chart */}
+      <FinanceSalesChart passcode={passcode} financials={financials} />
 
       {/* Batch Detailed Financial Report (If a batch is selected) */}
       {selectedBatchId !== "all" && reportQuery.data && (

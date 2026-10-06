@@ -12,6 +12,7 @@ import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
+import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -443,7 +444,7 @@ function AdminOrders() {
                 All orders
               </FilterBtn>
             </div>
-          <div className="space-y-4">
+          <div className="mt-4">
             {(() => {
               const all = scoped;
               const filtered =
@@ -452,10 +453,14 @@ function AdminOrders() {
                 : filter === "cancelled_admin" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy !== "customer")
                 : filter === "not_completed" ? all.filter(isNotCompleted)
                 : all;
-              if (filtered.length === 0) return <p className="text-center text-[#0F3D24]/60">No orders to show.</p>;
-              return filtered.map((order) => (
-              <OrderRow key={order.id} order={order} passcode={passcode} role={role} onSaved={() => query.refetch()} />
-              ));
+              return (
+                <OrganizedOrdersList
+                  orders={filtered}
+                  passcode={passcode}
+                  role={role}
+                  onSaved={() => query.refetch()}
+                />
+              );
             })()}
           </div>
              </>
@@ -1061,7 +1066,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function OrderRow({ order, passcode, role, onSaved }: { order: AdminOrder; passcode: string; role: AdminRole; onSaved: () => void }) {
+export function OrderRow({ order, passcode, role, onSaved }: { order: AdminOrder; passcode: string; role: AdminRole; onSaved: () => void }) {
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.statusNote ?? "");
   const [eta, setEta] = useState(order.eta ?? "");
