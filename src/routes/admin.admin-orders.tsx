@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -1369,6 +1369,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export function OrderRow({ order, passcode, role, batches, onSaved }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void }) {
+  const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.statusNote ?? "");
   const [eta, setEta] = useState(order.eta ?? "");
@@ -1420,14 +1421,12 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
   const dirty = status !== order.status || (note ?? "") !== (order.statusNote ?? "") || (eta ?? "") !== (order.eta ?? "");
 
   // Save the pending edits and immediately open WhatsApp with the NEW status message.
-  // window.open must be called synchronously in the click handler to avoid popup blocking.
   const saveAndNotify = () => {
     window.open(
       waLink(order, { status, statusNote: note || null, eta: eta || null }),
       "_blank",
       "noopener,noreferrer",
     );
-    // Delivered orders also get a plain SMS thank-you to the customer's phone.
     if (status === "delivered") {
       window.location.href = thankYouSms({ ...order, status });
     }
@@ -1435,11 +1434,18 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
   };
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1.5">
+    <div className="rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/10 transition-all overflow-hidden">
+      {/* Clickable Card Summary Header */}
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={`w-full text-left p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 transition-colors ${
+          expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
+        }`}
+      >
+        <div className="min-w-0 space-y-1.5 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-lg font-bold text-[#0F3D24]">{order.orderCode}</span>
+            <span className="font-mono text-base sm:text-lg font-extrabold text-[#0F3D24]">{order.orderCode}</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24]/10 px-2.5 py-0.5 text-xs font-bold text-[#0F3D24]">
               🛒 Store Order
             </span>
@@ -1452,23 +1458,56 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
                 Unassigned Batch
               </span>
             )}
+            {/* Status Pill Badge */}
+            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+              order.status === "delivered" ? "bg-emerald-100 text-emerald-800" :
+              order.status === "cancelled" ? "bg-red-100 text-red-800" :
+              order.status === "preparing" ? "bg-blue-100 text-blue-800" :
+              "bg-amber-100 text-amber-800"
+            }`}>
+              {order.status.replace("_", " ")}
+            </span>
           </div>
 
           <div className="text-sm">
-            <span className="font-semibold text-[#0F3D24]">{order.customerName}</span> · <a className="text-[#3F8F3F] font-semibold hover:underline" href={`tel:${order.phone}`}>{order.phone}</a>
+            <span className="font-semibold text-[#0F3D24]">{order.customerName}</span> ·{" "}
+            <a
+              className="text-[#3F8F3F] font-semibold hover:underline"
+              href={`tel:${order.phone}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {order.phone}
+            </a>
           </div>
-          <div className="text-sm text-[#0F3D24]/70">{order.address} · {order.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri"}</div>
-          {order.notes && <div className="text-xs italic text-[#0F3D24]/60">"{order.notes}"</div>}
+          <div className="text-xs text-[#0F3D24]/70 truncate max-w-md">
+            {order.address} · {order.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri"}
+          </div>
+        </div>
 
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-widest text-[#0F3D24]/60">Total</div>
+            <div className="text-base sm:text-lg font-bold text-[#0F3D24]">{naira(order.total)}</div>
+            <div className="text-[11px] text-[#0F3D24]/60">{new Date(order.createdAt).toLocaleDateString()}</div>
+          </div>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0F3D24]/70 ring-1 ring-[#0F3D24]/10">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded Operational Content Body */}
+      {expanded && (
+        <div className="p-5 sm:p-6 space-y-4">
           {/* Move to Batch Dropdown Control */}
           {batches && batches.length > 0 && role !== "staff" && (
-            <div className="pt-1 flex items-center gap-2 text-xs">
-              <span className="font-semibold text-[#0F3D24]/70">Move to Batch:</span>
+            <div className="flex items-center gap-2 text-xs bg-[#F7F5F0] p-3 rounded-2xl ring-1 ring-[#0F3D24]/10">
+              <span className="font-bold text-[#0F3D24]">Move to Batch:</span>
               <select
                 value={order.batchId || ""}
                 onChange={(e) => assignBatchMut.mutate(e.target.value || null)}
                 disabled={assignBatchMut.isPending}
-                className="rounded-lg border border-[#0F3D24]/20 bg-white px-2.5 py-1 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                className="rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
               >
                 <option value="">Unassigned</option>
                 {batches.map((b) => (
@@ -1480,150 +1519,150 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
               {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
             </div>
           )}
+
           {order.status === "cancelled" && (
-            <div className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-2xl bg-red-50 p-3 text-xs font-semibold text-red-700 ring-1 ring-red-200 w-full">
               <Ban size={14} />
               {order.cancelledBy === "customer" ? "Cancelled by customer" : "Cancelled by farm"}
               {order.cancelReason ? `: ${order.cancelReason}` : ""}
               {order.cancelledAt ? ` · ${new Date(order.cancelledAt).toLocaleString()}` : ""}
             </div>
           )}
+
           {isNotCompleted(order) && (
-            <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+            <div className="inline-flex items-center gap-2 rounded-2xl bg-amber-100 p-3 text-xs font-semibold text-amber-800 ring-1 ring-amber-200 w-full">
               <AlertTriangle size={14} /> Not completed: no payment for over 24h
             </div>
           )}
-        </div>
-        <div className="text-right">
-          <div className="text-xs uppercase tracking-widest text-[#0F3D24]/60">Total</div>
-          <div className="text-lg font-semibold">{naira(order.total)}</div>
-          <div className="text-xs text-[#0F3D24]/60">{new Date(order.createdAt).toLocaleString()}</div>
-        </div>
-      </div>
 
-      <PaymentSection
-        order={order}
-        onApprove={() => decideAndNotify("approved")}
-        onReject={() => decideAndNotify("rejected", rejectReason)}
-        showReject={showReject}
-        setShowReject={setShowReject}
-        rejectReason={rejectReason}
-        setRejectReason={setRejectReason}
-        pending={paymentMutation.isPending}
-        error={paymentMutation.error instanceof Error ? paymentMutation.error.message : null}
-      />
+          {order.notes && (
+            <div className="text-xs italic text-[#0F3D24]/70 bg-amber-50/50 p-3 rounded-2xl ring-1 ring-amber-200/50">
+              Note: "{order.notes}"
+            </div>
+          )}
 
-      <div className="mt-4 rounded-2xl bg-[#F7F5F0] p-3 text-sm">
-        {order.items.map((it, i) => (
-          <div key={i} className="flex justify-between">
-            <span>{it.product} · {it.option} × {it.qty}</span>
-            <span className="text-[#0F3D24]/70">{naira(it.unitPrice * it.qty)}</span>
+          <PaymentSection
+            order={order}
+            onApprove={() => decideAndNotify("approved")}
+            onReject={() => decideAndNotify("rejected", rejectReason)}
+            showReject={showReject}
+            setShowReject={setShowReject}
+            rejectReason={rejectReason}
+            setRejectReason={setRejectReason}
+            pending={paymentMutation.isPending}
+            error={paymentMutation.error instanceof Error ? paymentMutation.error.message : null}
+          />
+
+          <div className="rounded-2xl bg-[#F7F5F0] p-4 text-sm space-y-2">
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">Items Breakdown</h4>
+            {order.items.map((it, i) => (
+              <div key={i} className="flex justify-between items-center text-xs sm:text-sm">
+                <span className="font-semibold text-[#0F3D24]">{it.product} · {it.option} × {it.qty}</span>
+                <span className="text-[#0F3D24]/80 font-mono">{naira(it.unitPrice * it.qty)}</span>
+              </div>
+            ))}
+            <div className="pt-2 border-t border-[#0F3D24]/10 flex justify-between text-xs text-[#0F3D24]/70">
+              <span>Delivery Fee</span>
+              <span className="font-semibold">{order.deliveryFee === 0 ? "FREE" : naira(order.deliveryFee)}</span>
+            </div>
           </div>
-        ))}
-        <div className="mt-1 flex justify-between text-xs text-[#0F3D24]/60">
-          <span>Delivery</span>
-          <span>{order.deliveryFee === 0 ? "FREE" : naira(order.deliveryFee)}</span>
-        </div>
-      </div>
 
-      <OrderTimeline order={order} />
+          <OrderTimeline order={order} />
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
-          Status
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as AdminOrder["status"])}
-            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
-          >
-            {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-        </label>
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
-          ETA (optional)
-          <input
-            value={eta}
-            onChange={(e) => setEta(e.target.value)}
-            placeholder="e.g. Today, before 6PM"
-            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]"
-          />
-        </label>
-        <div className="flex items-end">
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={!dirty || mutation.isPending}
-            className="w-full rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50 sm:w-auto"
-          >
-            {mutation.isPending ? "Saving…" : "Save"}
-          </button>
-        </div>
-        <label className="sm:col-span-3 text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
-          Note to customer (optional)
-          <input
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="e.g. Rider just left the farm"
-            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]"
-          />
-        </label>
-      </div>
+          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+              Status
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as AdminOrder["status"])}
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+              >
+                {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+              ETA (optional)
+              <input
+                value={eta}
+                onChange={(e) => setEta(e.target.value)}
+                placeholder="e.g. Today, before 6PM"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+              />
+            </label>
+            <div className="flex items-end">
+              <button
+                onClick={() => mutation.mutate()}
+                disabled={!dirty || mutation.isPending}
+                className="w-full rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50 sm:w-auto"
+              >
+                {mutation.isPending ? "Saving…" : "Save Status"}
+              </button>
+            </div>
+            <label className="sm:col-span-3 text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+              Note to customer (optional)
+              <input
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Rider just left the farm"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+              />
+            </label>
+          </div>
 
-      {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
-      {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
+          {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
+          {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
-        <button
-          onClick={saveAndNotify}
-          disabled={mutation.isPending}
-          className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
-        >
-          <MessageCircle size={16} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
-        </button>
-        <a
-          href={waLink(order)}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs font-semibold text-[#0F3D24]/60 underline hover:text-[#0F3D24]"
-        >
-          Resend saved status only
-        </a>
-        {order.status === "delivered" && (
-          <a
-            href={thankYouSms(order)}
-            className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]"
-          >
-            <MessageCircle size={14} /> Send thank you SMS
-          </a>
-        )}
-        <Link
-          to="/receipt/$orderCode"
-          params={{ orderCode: order.orderCode }}
-          search={{ code: order.trackCode }}
-          target="_blank"
-          className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
-        >
-          <FileText size={14} /> {order.paymentStatus === "approved" ? "Receipt" : "Invoice"}
-        </Link>
-        {role === "owner" && (
-          <>
-            <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
-            <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete order ${order.orderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete order</button>
-          </>
-        )}
-        {dirty && (
-          <span className="text-xs text-[#0F3D24]/60">
-            One tap: saves the new status and opens WhatsApp with the message.
-          </span>
-        )}
-      </div>
-      {role === "owner" && editing && (
-        <div className="mt-4 grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
-          {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+          <div className="flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
+            <button
+              onClick={saveAndNotify}
+              disabled={mutation.isPending}
+              className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
+            >
+              <MessageCircle size={15} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
+            </button>
+            <a
+              href={waLink(order)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[#0F3D24]/60 underline hover:text-[#0F3D24]"
+            >
+              Resend status
+            </a>
+            {order.status === "delivered" && (
+              <a
+                href={thankYouSms(order)}
+                className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]"
+              >
+                <MessageCircle size={14} /> Send thank you SMS
+              </a>
+            )}
+            <Link
+              to="/receipt/$orderCode"
+              params={{ orderCode: order.orderCode }}
+              search={{ code: order.trackCode }}
+              target="_blank"
+              className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+            >
+              <FileText size={14} /> {order.paymentStatus === "approved" ? "Receipt" : "Invoice"}
+            </Link>
+            {role === "owner" && (
+              <>
+                <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
+                <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete order ${order.orderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete order</button>
+              </>
+            )}
+          </div>
+
+          {role === "owner" && editing && (
+            <div className="grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
+              {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1931,11 +1970,19 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
   };
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 transition-all">
-      <button type="button" onClick={() => setExpanded(e => !e)} className="w-full text-left flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1.5">
+    <div className="rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/10 transition-all overflow-hidden">
+      {/* Collapsed Header Button */}
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={`w-full text-left p-4 sm:p-5 flex flex-col gap-3 transition-colors ${
+          expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
+        }`}
+      >
+        {/* Top Row: Code, Badges & Chevron */}
+        <div className="flex flex-wrap items-center justify-between gap-2 w-full">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-lg font-extrabold text-[#3F8F3F]">{preorder.preorderCode}</span>
+            <span className="font-mono text-base sm:text-lg font-extrabold text-[#3F8F3F]">{preorder.preorderCode}</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900 ring-1 ring-amber-300">
               🎄 December Pre-Order
             </span>
@@ -1949,22 +1996,62 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
               </span>
             )}
           </div>
-
-          <div className="text-sm">
-            <span className="font-semibold text-[#0F3D24]">{preorder.customerName}</span> · <span className="text-[#3F8F3F]" onClick={(e) => e.stopPropagation()}><a href={`tel:${preorder.phone}`}>{preorder.phone}</a></span>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0F3D24]/70 ring-1 ring-[#0F3D24]/10 ml-auto">
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </div>
-          <div className="text-sm text-[#0F3D24]/70">{preorder.address}</div>
-          {preorder.notes && <div className="text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
+        </div>
 
+        {/* Second Row: Customer Details */}
+        <div className="space-y-0.5">
+          <div className="text-sm">
+            <span className="font-bold text-[#0F3D24]">{preorder.customerName}</span> ·{" "}
+            <a
+              href={`tel:${preorder.phone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-[#3F8F3F] font-semibold hover:underline"
+            >
+              {preorder.phone}
+            </a>
+          </div>
+          <div className="text-xs text-[#0F3D24]/70 truncate max-w-md">{preorder.address}</div>
+          {preorder.notes && <div className="text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
+        </div>
+
+        {/* Third Row: Financial & Reservation Summary Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#0F3D24]/5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+              {preorder.reservationType.replace("_", " ")}
+            </span>
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              preorder.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" :
+              preorder.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" :
+              "bg-slate-100 text-slate-600"
+            }`}>
+              {preorder.paymentStatus.replace("_", " ")}
+            </span>
+          </div>
+
+          <div className="text-xs flex items-center gap-3 font-medium">
+            <span className="text-[#0F3D24]">Total: <strong>₦{preorder.totalAmount.toLocaleString()}</strong></span>
+            <span className="text-[#3F8F3F]">Paid: <strong>₦{preorder.amountPaid.toLocaleString()}</strong></span>
+            <span className="text-red-600">Bal: <strong>₦{preorder.balance.toLocaleString()}</strong></span>
+          </div>
+        </div>
+      </button>
+
+      {/* Expanded Operational Section Body */}
+      {expanded && (
+        <div className="p-5 sm:p-6 space-y-4">
           {/* Move to Batch Dropdown Control */}
           {batches && batches.length > 0 && role !== "staff" && (
-            <div className="pt-1 flex items-center gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
-              <span className="font-semibold text-[#0F3D24]/70">Move to Batch:</span>
+            <div className="flex items-center gap-2 text-xs bg-[#F7F5F0] p-3 rounded-2xl ring-1 ring-[#0F3D24]/10">
+              <span className="font-bold text-[#0F3D24]">Move to Batch:</span>
               <select
                 value={preorder.batchId || ""}
                 onChange={(e) => assignBatchMut.mutate(e.target.value || null)}
                 disabled={assignBatchMut.isPending}
-                className="rounded-lg border border-[#0F3D24]/20 bg-white px-2.5 py-1 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                className="rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
               >
                 <option value="">Unassigned</option>
                 {batches.map((b) => (
@@ -1976,51 +2063,23 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
               {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
             </div>
           )}
-          
-          <div className="mt-3 flex gap-2">
-            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">
-              {preorder.reservationType.replace("_", " ")}
-            </span>
-            <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest ${
-              preorder.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" :
-              preorder.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" :
-              "bg-slate-100 text-slate-600"
-            }`}>
-              {preorder.paymentStatus.replace("_", " ")}
-            </span>
-          </div>
-        </div>
-        
-        <div className="text-right">
-          <div className="text-xs uppercase tracking-widest text-[#0F3D24]/60">Total Amount</div>
-          <div className="text-lg font-semibold text-[#0F3D24]">₦{preorder.totalAmount.toLocaleString()}</div>
-          <div className="mt-1 text-xs text-[#0F3D24]/70">
-            Paid: <span className="font-semibold text-[#3F8F3F]">₦{preorder.amountPaid.toLocaleString()}</span>
-          </div>
-          <div className="text-xs text-[#0F3D24]/70">
-            Balance: <span className="font-semibold text-red-600">₦{preorder.balance.toLocaleString()}</span>
-          </div>
-        </div>
-      </button>
 
-      {expanded && (
-        <div className="mt-4 pt-2 border-t border-transparent">
-          <div className="mt-2 rounded-2xl bg-[#F7F5F0] p-3 text-sm">
-        <div className="flex justify-between">
-          <span className="font-semibold text-[#0F3D24]">{preorder.product} × {preorder.quantity}</span>
-        </div>
-        {preorder.preferredDeliveryDate && (
-          <div className="mt-1 flex justify-between text-xs text-[#0F3D24]/60">
-            <span>Preferred Date</span>
-            <span className="font-semibold">{new Date(preorder.preferredDeliveryDate).toLocaleDateString()}</span>
+          <div className="rounded-2xl bg-[#F7F5F0] p-4 text-sm space-y-1">
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-[#0F3D24]">{preorder.product} × {preorder.quantity}</span>
+            </div>
+            {preorder.preferredDeliveryDate && (
+              <div className="flex justify-between text-xs text-[#0F3D24]/70 pt-1 border-t border-[#0F3D24]/5">
+                <span>Preferred Delivery Date</span>
+                <span className="font-semibold text-[#0F3D24]">{new Date(preorder.preferredDeliveryDate).toLocaleDateString()}</span>
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {preorder.payments && preorder.payments.length > 0 && (
-        <div className="mt-4 rounded-2xl bg-white p-3 ring-1 ring-[#0F3D24]/10">
-          <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60 mb-2">Payment Installments</h4>
-          <div className="space-y-2">
+          {preorder.payments && preorder.payments.length > 0 && (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-[#0F3D24]/10 space-y-3">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">Payment Installments</h4>
+              <div className="space-y-2">
             {preorder.payments.map((p: any, i: number) => (
               <div key={p.id} className={`flex flex-col gap-2 sm:flex-row sm:items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0 ${p.confirmedByAdmin ? "border-[#0F3D24]/5" : "border-amber-200 bg-amber-50 rounded-xl p-3"}`}>
                 <div>

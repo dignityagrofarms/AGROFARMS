@@ -192,7 +192,7 @@ export function OrganizedOrdersList({ orders, passcode, role, batches, onSaved }
             </span>
           </div>
           <p className="mt-0.5 text-xs text-[#0F3D24]/60">
-            Grouped by Today, Yesterday, Last Week, and Month filters for easy mobile tracking.
+            Grouped by Today, Yesterday, Last Week, and Month filters. Tap any order row to expand items, timeline, and actions.
           </p>
         </div>
 
