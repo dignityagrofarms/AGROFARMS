@@ -538,6 +538,8 @@ export type AdminOrder = TrackedOrder & {
   paymentApprovedAt: string | null;
   discountAmount: number;
   voucherCode: string | null;
+  batchId?: string | null;
+  batchName?: string | null;
 };
 
 export const adminListOrders = createServerFn({ method: "POST" })
@@ -569,6 +571,12 @@ export const adminListOrders = createServerFn({ method: "POST" })
     }
     const { data: rows, error } = await q.order("created_at", { ascending: false }).limit(1000);
     if (error) throw new Error(error.message);
+
+    // Fetch batch names mapping
+    const { data: batchRows } = await supabaseAdmin.from("farm_batches").select("id, batch_name");
+    const batchMap = new Map<string, string>();
+    (batchRows ?? []).forEach((b) => batchMap.set(b.id, b.batch_name));
+
     return {
       orders: (rows ?? []).map((r) => ({
         id: r.id,
@@ -597,9 +605,30 @@ export const adminListOrders = createServerFn({ method: "POST" })
         cancelledAt: r.cancelled_at,
         cancelledBy: r.cancelled_by,
         cancelReason: r.cancel_reason,
+        batchId: (r as any).batch_id ?? null,
+        batchName: (r as any).batch_id ? batchMap.get((r as any).batch_id) ?? null : null,
       })),
       role,
     };
+  });
+
+const adminAssignOrderBatchSchema = z.object({
+  passcode: z.string().min(1).max(200),
+  id: z.string().uuid(),
+  batchId: z.string().uuid().optional().nullable(),
+});
+
+export const adminAssignOrderBatch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => adminAssignOrderBatchSchema.parse(data))
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("orders")
+      .update({ batch_id: data.batchId || null, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 const adminUpdateSchema = z.object({

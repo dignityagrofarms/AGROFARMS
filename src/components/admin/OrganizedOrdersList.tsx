@@ -16,12 +16,14 @@ import {
   Minimize2,
 } from "lucide-react";
 import type { AdminOrder, AdminRole } from "@/lib/orders.functions";
+import type { FarmBatch } from "@/lib/farm.functions";
 import { OrderRow } from "@/routes/admin.admin-orders";
 
 interface OrganizedOrdersListProps {
   orders: AdminOrder[];
   passcode: string;
   role: AdminRole;
+  batches?: FarmBatch[];
   onSaved: () => void;
 }
 
@@ -40,7 +42,7 @@ interface SectionGroup {
   defaultExpanded: boolean;
 }
 
-export function OrganizedOrdersList({ orders, passcode, role, onSaved }: OrganizedOrdersListProps) {
+export function OrganizedOrdersList({ orders, passcode, role, batches, onSaved }: OrganizedOrdersListProps) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -371,6 +373,7 @@ export function OrganizedOrdersList({ orders, passcode, role, onSaved }: Organiz
                         order={order}
                         passcode={passcode}
                         role={role}
+                        batches={batches}
                         onSaved={onSaved}
                       />
                     ))

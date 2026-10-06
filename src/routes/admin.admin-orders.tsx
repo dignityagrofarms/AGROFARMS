@@ -8,8 +8,9 @@ import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
-import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
-import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
+import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
+import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
+import { adminListBatches, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
@@ -194,6 +195,14 @@ function AdminOrders() {
     placeholderData: (previousData) => previousData,
   });
 
+  const listBatchesFn = useServerFn(adminListBatches);
+  const batchesQuery = useQuery({
+    queryKey: ["farm-batches", passcode],
+    queryFn: () => listBatchesFn({ data: { passcode: passcode! } }),
+    enabled: !!passcode,
+    placeholderData: (previousData) => previousData,
+  });
+
   const signOut = () => {
     if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
     setPasscode(null);
@@ -276,7 +285,6 @@ function AdminOrders() {
 
   const applyFilters = () => {
     setApplied({ from, to, status: statusFilter, paymentStatus: payFilter, zone: zoneFilter, search: search.trim() });
-    setFilter("all");
   };
 
   const setRange = (days: number | "month") => {
@@ -286,7 +294,6 @@ function AdminOrders() {
     setFrom(iso(start));
     setTo(iso(now));
     setApplied({ from: iso(start), to: iso(now), status: statusFilter, paymentStatus: payFilter, zone: zoneFilter, search: search.trim() });
-    setFilter("all");
   };
 
   const resetFilters = () => {
@@ -441,7 +448,11 @@ function AdminOrders() {
               onApply={applyFilters} onReset={resetFilters} onQuickRange={setRange}
             />
             <div className="mb-4 flex flex-wrap gap-2">
-              <FilterBtn active={filter === "awaiting"} onClick={() => setFilter("awaiting")} count={scoped.filter(o => o.paymentStatus === "submitted").length}>
+              <FilterBtn
+                active={filter === "awaiting"}
+                onClick={() => setFilter("awaiting")}
+                count={scoped.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")).length}
+              >
                 Awaiting payment approval
               </FilterBtn>
               <FilterBtn active={filter === "cancelled_customer"} onClick={() => setFilter("cancelled_customer")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy === "customer").length}>
@@ -461,7 +472,7 @@ function AdminOrders() {
             {(() => {
               const all = scoped;
               const filtered =
-                filter === "awaiting" ? all.filter((o) => o.paymentStatus === "submitted")
+                filter === "awaiting" ? all.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved"))
                 : filter === "cancelled_customer" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy === "customer")
                 : filter === "cancelled_admin" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy !== "customer")
                 : filter === "not_completed" ? all.filter(isNotCompleted)
@@ -471,6 +482,7 @@ function AdminOrders() {
                   orders={filtered}
                   passcode={passcode}
                   role={role}
+                  batches={batchesQuery.data || []}
                   onSaved={() => query.refetch()}
                 />
               );
@@ -1355,7 +1367,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OrderRow({ order, passcode, role, onSaved }: { order: AdminOrder; passcode: string; role: AdminRole; onSaved: () => void }) {
+export function OrderRow({ order, passcode, role, batches, onSaved }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void }) {
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.statusNote ?? "");
   const [eta, setEta] = useState(order.eta ?? "");
@@ -1370,6 +1382,13 @@ export function OrderRow({ order, passcode, role, onSaved }: { order: AdminOrder
   const decideFn = useServerFn(adminDecidePayment);
   const correctFn = useServerFn(adminCorrectOrder);
   const deleteFn = useServerFn(adminDeleteOrder);
+  const assignOrderBatchFn = useServerFn(adminAssignOrderBatch);
+
+  const assignBatchMut = useMutation({
+    mutationFn: (batchId: string | null) => assignOrderBatchFn({ data: { passcode, id: order.id, batchId } }),
+    onSuccess: () => onSaved(),
+  });
+
   const mutation = useMutation({
     mutationFn: () =>
       updateFn({
@@ -1417,13 +1436,49 @@ export function OrderRow({ order, passcode, role, onSaved }: { order: AdminOrder
   return (
     <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="font-mono text-lg font-semibold">{order.orderCode}</div>
-          <div className="mt-1 text-sm">
-            <span className="font-semibold">{order.customerName}</span> · <a className="text-[#3F8F3F]" href={`tel:${order.phone}`}>{order.phone}</a>
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-lg font-bold text-[#0F3D24]">{order.orderCode}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24]/10 px-2.5 py-0.5 text-xs font-bold text-[#0F3D24]">
+              🛒 Store Order
+            </span>
+            {order.batchName ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                <Layers size={12} /> {order.batchName}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
+                Unassigned Batch
+              </span>
+            )}
           </div>
-          <div className="mt-1 text-sm text-[#0F3D24]/70">{order.address} · {order.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri"}</div>
-          {order.notes && <div className="mt-2 text-xs italic text-[#0F3D24]/60">"{order.notes}"</div>}
+
+          <div className="text-sm">
+            <span className="font-semibold text-[#0F3D24]">{order.customerName}</span> · <a className="text-[#3F8F3F] font-semibold hover:underline" href={`tel:${order.phone}`}>{order.phone}</a>
+          </div>
+          <div className="text-sm text-[#0F3D24]/70">{order.address} · {order.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri"}</div>
+          {order.notes && <div className="text-xs italic text-[#0F3D24]/60">"{order.notes}"</div>}
+
+          {/* Move to Batch Dropdown Control */}
+          {batches && batches.length > 0 && role !== "staff" && (
+            <div className="pt-1 flex items-center gap-2 text-xs">
+              <span className="font-semibold text-[#0F3D24]/70">Move to Batch:</span>
+              <select
+                value={order.batchId || ""}
+                onChange={(e) => assignBatchMut.mutate(e.target.value || null)}
+                disabled={assignBatchMut.isPending}
+                className="rounded-lg border border-[#0F3D24]/20 bg-white px-2.5 py-1 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+              >
+                <option value="">Unassigned</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.batchName} ({b.batchType})
+                  </option>
+                ))}
+              </select>
+              {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
+            </div>
+          )}
           {order.status === "cancelled" && (
             <div className="mt-2 inline-flex flex-wrap items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700 ring-1 ring-red-200">
               <Ban size={14} />
@@ -1653,7 +1708,14 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   const [appliedSearch, setAppliedSearch] = useState("");
 
   const listFn = useServerFn(adminListPreorders);
+  const listBatchesFn = useServerFn(adminListBatches);
   const qc = useQueryClient();
+
+  const batchesQuery = useQuery({
+    queryKey: ["farm-batches", passcode],
+    queryFn: () => listBatchesFn({ data: { passcode } }),
+    placeholderData: (previousData) => previousData,
+  });
 
   const query = useQuery({
     queryKey: ["admin-preorders", passcode, filter, appliedSearch],
@@ -1754,7 +1816,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
       {query.data && (
         <div className="space-y-4">
           {query.data.preorders.map((o) => (
-            <PreorderRow key={o.id} preorder={o} passcode={passcode} role={query.data.role} onSaved={() => query.refetch()} />
+            <PreorderRow key={o.id} preorder={o} passcode={passcode} role={query.data.role} batches={batchesQuery.data || []} onSaved={() => query.refetch()} />
           ))}
           {query.data.preorders.length === 0 && <p className="text-center text-sm text-[#0F3D24]/60 py-10">No pre-orders found matching your filters.</p>}
         </div>
@@ -1763,7 +1825,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   );
 }
 
-function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; passcode: string; role: string; onSaved: () => void }) {
+function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder: any; passcode: string; role: string; batches?: FarmBatch[]; onSaved: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState(preorder.deliveryStatus);
@@ -1780,7 +1842,13 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
   const deleteFn = useServerFn(adminDeletePreorder);
   const confirmPaymentFn = useServerFn(adminConfirmPreorderPayment);
   const deletePaymentFn = useServerFn(adminDeletePreorderPayment);
-  
+  const assignPreorderBatchFn = useServerFn(adminAssignPreorderBatch);
+
+  const assignBatchMut = useMutation({
+    mutationFn: (batchId: string | null) => assignPreorderBatchFn({ data: { passcode, id: preorder.id, batchId } }),
+    onSuccess: () => onSaved(),
+  });
+
   const mutation = useMutation({
     mutationFn: () => updateDeliveryFn({ data: { passcode, preorderId: preorder.id, deliveryStatus } }),
     onSuccess: () => onSaved(),
@@ -1820,13 +1888,49 @@ function PreorderRow({ preorder, passcode, role, onSaved }: { preorder: any; pas
   return (
     <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 transition-all">
       <button type="button" onClick={() => setExpanded(e => !e)} className="w-full text-left flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="font-mono text-lg font-semibold text-[#3F8F3F]">{preorder.preorderCode}</div>
-          <div className="mt-1 text-sm">
+        <div className="min-w-0 space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-lg font-extrabold text-[#3F8F3F]">{preorder.preorderCode}</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900 ring-1 ring-amber-300">
+              🎄 December Pre-Order
+            </span>
+            {preorder.batchName ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                <Layers size={12} /> {preorder.batchName}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] text-gray-500">
+                Unassigned Batch
+              </span>
+            )}
+          </div>
+
+          <div className="text-sm">
             <span className="font-semibold text-[#0F3D24]">{preorder.customerName}</span> · <span className="text-[#3F8F3F]" onClick={(e) => e.stopPropagation()}><a href={`tel:${preorder.phone}`}>{preorder.phone}</a></span>
           </div>
-          <div className="mt-1 text-sm text-[#0F3D24]/70">{preorder.address}</div>
-          {preorder.notes && <div className="mt-2 text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
+          <div className="text-sm text-[#0F3D24]/70">{preorder.address}</div>
+          {preorder.notes && <div className="text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
+
+          {/* Move to Batch Dropdown Control */}
+          {batches && batches.length > 0 && role !== "staff" && (
+            <div className="pt-1 flex items-center gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
+              <span className="font-semibold text-[#0F3D24]/70">Move to Batch:</span>
+              <select
+                value={preorder.batchId || ""}
+                onChange={(e) => assignBatchMut.mutate(e.target.value || null)}
+                disabled={assignBatchMut.isPending}
+                className="rounded-lg border border-[#0F3D24]/20 bg-white px-2.5 py-1 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+              >
+                <option value="">Unassigned</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.batchName} ({b.batchType})
+                  </option>
+                ))}
+              </select>
+              {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
+            </div>
+          )}
           
           <div className="mt-3 flex gap-2">
             <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-slate-600">

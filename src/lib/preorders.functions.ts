@@ -38,6 +38,8 @@ export type Preorder = {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  batchId?: string | null;
+  batchName?: string | null;
   payments?: PreorderPayment[];
 };
 
@@ -54,7 +56,8 @@ function makePaymentRef(): string {
   return `DAF-${ts}-${rand}`;
 }
 
-function mapPreorder(r: Record<string, unknown>): Preorder {
+function mapPreorder(r: Record<string, unknown>, batchMap?: Map<string, string>): Preorder {
+  const bId = (r.batch_id as string) ?? null;
   return {
     id: r.id as string,
     preorderCode: r.preorder_code as string,
@@ -75,6 +78,8 @@ function mapPreorder(r: Record<string, unknown>): Preorder {
     notes: r.notes as string | null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
+    batchId: bId,
+    batchName: bId && batchMap ? batchMap.get(bId) ?? null : null,
     payments: r.preorder_payments ? (r.preorder_payments as any[]).map(p => mapPayment(p)).sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()) : undefined,
   };
 }
@@ -273,7 +278,31 @@ export const adminListPreorders = createServerFn({ method: "POST" })
     }
     const { data: rows, error } = await q.order("created_at", { ascending: false }).limit(1000);
     if (error) throw new Error(error.message);
-    return { preorders: (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>)), role };
+
+    const { data: batchRows } = await supabaseAdmin.from("farm_batches").select("id, batch_name");
+    const batchMap = new Map<string, string>();
+    (batchRows ?? []).forEach((b) => batchMap.set(b.id, b.batch_name));
+
+    return { preorders: (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>, batchMap)), role };
+  });
+
+const adminAssignPreorderBatchSchema = z.object({
+  passcode: z.string().min(1).max(200),
+  id: z.string().uuid(),
+  batchId: z.string().uuid().optional().nullable(),
+});
+
+export const adminAssignPreorderBatch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => adminAssignPreorderBatchSchema.parse(data))
+  .handler(async ({ data }) => {
+    await checkAdminPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("preorders")
+      .update({ batch_id: data.batchId || null, updated_at: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 // ─── Admin: get single pre-order with payments ────────────────────────────────

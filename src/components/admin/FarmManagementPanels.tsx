@@ -33,9 +33,11 @@ import {
   UserCheck,
   ShieldAlert,
   Download,
+  Gift,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
+import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
 import {
   adminListBatches,
   adminCreateBatch,
@@ -77,6 +79,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const listOrdersFn = useServerFn(adminListOrders);
+  const listPreordersFn = useServerFn(adminListPreorders);
   const listBatchesFn = useServerFn(adminListBatches);
   const createBatchFn = useServerFn(adminCreateBatch);
   const updateBatchFn = useServerFn(adminUpdateBatch);
@@ -91,6 +94,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const ordersQuery = useQuery({
     queryKey: ["admin-orders-financials", passcode],
     queryFn: () => listOrdersFn({ data: { passcode } }),
+    enabled: Boolean(passcode),
+    staleTime: 30000,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const preordersQuery = useQuery({
+    queryKey: ["admin-preorders-financials", passcode],
+    queryFn: () => listPreordersFn({ data: { passcode } }),
     enabled: Boolean(passcode),
     staleTime: 30000,
     placeholderData: (previousData) => previousData,
@@ -272,17 +283,20 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const batches = batchesQuery.data || [];
   const rawFinancials = financialsQuery.data || [];
   const orders = ordersQuery.data?.orders || [];
+  const preorders = preordersQuery.data?.preorders || [];
 
   // Convert non-cancelled store orders to financial income records
   const storeOrderTransactions = useMemo(() => {
-    // If a specific batch is selected, only show store orders if batch overview is selected or match
-    if (selectedBatchId !== "all") return [];
     return orders
-      .filter((o) => o.status !== "cancelled")
+      .filter((o) => {
+        if (o.status === "cancelled") return false;
+        if (selectedBatchId === "all") return true;
+        return o.batchId === selectedBatchId;
+      })
       .map((o) => ({
         id: `order_${o.id}`,
-        batchId: null,
-        batchName: "Store Sales",
+        batchId: o.batchId || null,
+        batchName: o.batchName || "Store Sales",
         type: "income" as const,
         category: "Store Order",
         amount: o.total || 0,
@@ -292,22 +306,50 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         referenceNo: o.orderCode,
         createdAt: o.createdAt,
         isOrder: true,
+        isDecemberPreorder: false,
       }));
   }, [orders, selectedBatchId]);
 
-  // Combine store orders + manual farm financials
+  // Convert December pre-orders to financial income records
+  const decemberPreorderTransactions = useMemo(() => {
+    return preorders
+      .filter((p) => {
+        if (selectedBatchId === "all") return true;
+        return p.batchId === selectedBatchId;
+      })
+      .map((p) => ({
+        id: `preorder_${p.id}`,
+        batchId: p.batchId || null,
+        batchName: p.batchName || "December Pre-Orders",
+        type: "income" as const,
+        category: "December Pre-Order",
+        amount: p.amountPaid || p.totalAmount || 0,
+        description: `December Pre-Order #${p.preorderCode} (${p.customerName})`,
+        paymentMethod: "Bank Transfer",
+        transactionDate: p.createdAt.split("T")[0],
+        referenceNo: p.preorderCode,
+        createdAt: p.createdAt,
+        isOrder: true,
+        isDecemberPreorder: true,
+      }));
+  }, [preorders, selectedBatchId]);
+
+  // Combine store orders + December pre-orders + manual farm financials
   const allFinancials = useMemo(() => {
-    const combined = [...storeOrderTransactions, ...rawFinancials];
+    const combined = [...storeOrderTransactions, ...decemberPreorderTransactions, ...rawFinancials];
     return combined.sort(
       (a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
     );
-  }, [storeOrderTransactions, rawFinancials]);
+  }, [storeOrderTransactions, decemberPreorderTransactions, rawFinancials]);
 
   // Metrics calculation
   const totalStoreIncome = useMemo(() => {
-    if (selectedBatchId !== "all") return 0;
     return storeOrderTransactions.reduce((sum, t) => sum + t.amount, 0);
-  }, [storeOrderTransactions, selectedBatchId]);
+  }, [storeOrderTransactions]);
+
+  const totalPreorderIncome = useMemo(() => {
+    return decemberPreorderTransactions.reduce((sum, t) => sum + t.amount, 0);
+  }, [decemberPreorderTransactions]);
 
   const totalManualIncome = useMemo(() => {
     return rawFinancials
@@ -315,7 +357,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
       .reduce((sum, f) => sum + f.amount, 0);
   }, [rawFinancials]);
 
-  const totalIncome = totalStoreIncome + totalManualIncome;
+  const totalIncome = totalStoreIncome + totalPreorderIncome + totalManualIncome;
 
   const totalExpense = useMemo(() => {
     return rawFinancials
@@ -690,9 +732,13 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                       {f.type === "income" ? "+" : "-"}{formatNaira(f.amount)}
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      {"isOrder" in f && f.isOrder ? (
-                        <span className="rounded-full bg-[#3F8F3F]/10 px-2 py-0.5 text-[10px] font-semibold text-[#0F3D24]">
-                          Store Order
+                      {"isDecemberPreorder" in f && f.isDecemberPreorder ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900 ring-1 ring-amber-300">
+                          <Gift size={11} className="text-amber-700" /> 🎄 December Pre-Order
+                        </span>
+                      ) : "isOrder" in f && f.isOrder ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24]/10 px-2.5 py-1 text-[10px] font-bold text-[#0F3D24]">
+                          🛒 Store Order
                         </span>
                       ) : (
                         <div className="flex items-center justify-center gap-1">
