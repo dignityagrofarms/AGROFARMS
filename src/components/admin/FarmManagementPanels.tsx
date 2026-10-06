@@ -528,7 +528,9 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
             </div>
           </div>
           <p className="mt-3 text-2xl font-bold text-[#0F3D24]">{formatNaira(totalIncome)}</p>
-          <span className="mt-1 block text-xs text-[#0F3D24]/60">Sales & Inflows</span>
+          <span className="mt-1 block text-xs text-[#0F3D24]/70">
+            Store: <strong>{formatNaira(totalStoreIncome)}</strong> • Pre-Orders/Farm: <strong>{formatNaira(totalPreorderIncome + totalManualIncome)}</strong>
+          </span>
         </div>
 
         <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
@@ -553,7 +555,11 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
             {formatNaira(netProfit)}
           </p>
           <span className="mt-1 block text-xs text-[#0F3D24]/60">
-            {totalExpense > 0 ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%` : "0% ROI"}
+            {totalExpense > 0 
+              ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%` 
+              : netProfit > 0 
+              ? "100% Margin (No Expenses)" 
+              : "0% ROI"}
           </span>
         </div>
 
