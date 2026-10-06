@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { CheckCircle2, PhoneCall, ShoppingBag, Copy, AlertTriangle, MessageCircle, CalendarClock, Truck } from "lucide-react";
+import { CheckCircle2, PhoneCall, ShoppingBag, Copy, AlertTriangle, MessageCircle, CalendarClock, Truck, Clock } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { createOrder, markPaymentSubmitted, MIN_ORDER_SUBTOTAL, validateVoucher } from "@/lib/orders.functions";
 import { PRODUCTS } from "@/lib/products";

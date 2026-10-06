@@ -285,12 +285,11 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
     onStateChange?.({
       product: form.product,
       qty,
-      zone: form.zone,
       totalAmount,
       depositAmount,
       reservationType,
     });
-  }, [form.product, qty, form.zone, totalAmount, depositAmount, reservationType, onStateChange]);
+  }, [form.product, qty, totalAmount, depositAmount, reservationType, onStateChange]);
 
   const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));

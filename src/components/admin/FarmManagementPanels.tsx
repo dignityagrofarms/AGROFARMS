@@ -809,9 +809,9 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
   });
 
   const saveLeadMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (editingLead) {
-        return updateLeadFn({
+        await updateLeadFn({
           data: {
             passcode,
             id: editingLead.id,
@@ -828,7 +828,7 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
           },
         });
       } else {
-        return createLeadFn({
+        await createLeadFn({
           data: {
             passcode,
             fullName: leadForm.fullName,

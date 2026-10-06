@@ -14,6 +14,12 @@ export type Database = {
   }
   public: {
     Tables: {
+      [key: string]: {
+        Row: any
+        Insert: any
+        Update: any
+        Relationships: any[]
+      }
       admin_access: {
         Row: {
           active: boolean
