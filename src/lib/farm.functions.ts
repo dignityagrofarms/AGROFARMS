@@ -591,6 +591,53 @@ export const adminDeleteLead = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
   });
 
+const batchImportLeadItemSchema = z.object({
+  fullName: z.string().min(1),
+  phone: z.string().min(3),
+  email: z.string().optional().nullable(),
+  location: z.string().optional().nullable(),
+  leadSource: z.string().default("CSV/Excel Import"),
+  interestedIn: z.string().optional().nullable(),
+  status: z.enum(["New Lead", "Contacted", "Interested / Negotiating", "Converted to Customer", "Lost / Inactive"]).default("New Lead"),
+  estimatedValue: z.number().default(0),
+  notes: z.string().optional().nullable(),
+  followUpDate: z.string().optional().nullable(),
+});
+
+export const adminBatchImportLeads = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      leads: z.array(batchImportLeadItemSchema),
+    }).parse(data)
+  )
+  .handler(async ({ data }): Promise<{ importedCount: number }> => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (!data.leads || data.leads.length === 0) {
+      return { importedCount: 0 };
+    }
+
+    const rows = data.leads.map((item) => ({
+      full_name: item.fullName,
+      phone: item.phone,
+      email: item.email || null,
+      location: item.location || null,
+      lead_source: item.leadSource || "Batch Import",
+      interested_in: item.interestedIn || null,
+      status: item.status || "New Lead",
+      estimated_value: item.estimatedValue || 0,
+      notes: item.notes || null,
+      follow_up_date: item.followUpDate || null,
+    }));
+
+    const { error } = await supabaseAdmin.from("crm_leads").insert(rows);
+
+    if (error) throw new Error(error.message);
+    return { importedCount: rows.length };
+  });
+
 // ─── Farm Activities Server Functions ────────────────────────────────────────
 
 export const adminListActivities = createServerFn({ method: "POST" })

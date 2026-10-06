@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -14,6 +14,7 @@ import { adminListBatches, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
+import { ReminderModal } from "@/components/admin/ReminderModal";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -1878,6 +1879,7 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
   const [phone, setPhone] = useState(preorder.phone);
   const [address, setAddress] = useState(preorder.address);
   const [notes, setNotes] = useState(preorder.notes ?? "");
+  const [showReminderModal, setShowReminderModal] = useState(false);
 
   const updateDeliveryFn = useServerFn(adminUpdatePreorderDelivery);
   const addPaymentFn = useServerFn(adminAddPreorderPayment);
@@ -2118,6 +2120,13 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
         >
           <MessageCircle size={16} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
         </button>
+        <button
+          type="button"
+          onClick={() => setShowReminderModal(true)}
+          className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition"
+        >
+          <MessageSquare size={16} /> Send SMS / Payment Reminder
+        </button>
         <a
           href={getWaLink()}
           target="_blank"
@@ -2180,6 +2189,20 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
         </div>
       )}
         </div>
+      )}
+      {showReminderModal && (
+        <ReminderModal
+          isOpen={showReminderModal}
+          onClose={() => setShowReminderModal(false)}
+          targetType="preorder"
+          recipientName={preorder.customerName}
+          recipientPhone={preorder.phone}
+          orderCode={preorder.preorderCode}
+          totalAmount={preorder.totalAmount}
+          amountPaid={preorder.amountPaid}
+          balance={preorder.balance}
+          notes={preorder.notes}
+        />
       )}
     </div>
   );

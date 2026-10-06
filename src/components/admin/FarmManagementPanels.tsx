@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
 import { ExportReportModal } from "./ExportReportModal";
+import { LeadImportModal } from "./LeadImportModal";
+import { ReminderModal } from "./ReminderModal";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
 import {
@@ -1332,6 +1334,8 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 export function LeadCrmPanel({ passcode }: { passcode: string }) {
   const queryClient = useQueryClient();
   const [showLeadModal, setShowLeadModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [reminderTarget, setReminderTarget] = useState<{ name: string; phone: string } | null>(null);
   const [editingLead, setEditingLead] = useState<CrmLead | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -1504,17 +1508,27 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setEditingLead(null);
-            resetLeadForm();
-            setShowLeadModal(true);
-          }}
-          className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
-        >
-          <UserPlus size={16} />
-          Record New Customer Lead
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-2 rounded-full border border-[#3F8F3F] bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#3F8F3F]/20 transition"
+            title="Import multiple leads from a CSV or Excel spreadsheet"
+          >
+            <FileText size={16} className="text-[#3F8F3F]" />
+            Import CSV / Excel Batch
+          </button>
+          <button
+            onClick={() => {
+              setEditingLead(null);
+              resetLeadForm();
+              setShowLeadModal(true);
+            }}
+            className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
+          >
+            <UserPlus size={16} />
+            Record New Customer Lead
+          </button>
+        </div>
       </div>
 
       {feedback && (
@@ -1647,14 +1661,14 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
 
               {/* Action Buttons */}
               <div className="mt-5 flex items-center justify-between border-t border-[#0F3D24]/10 pt-3">
-                <a
-                  href={`https://wa.me/${lead.phone.replace(/\D+/g, "")}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition"
+                <button
+                  type="button"
+                  onClick={() => setReminderTarget({ name: lead.fullName, phone: lead.phone })}
+                  className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition"
+                  title="Send SMS or WhatsApp reminder to lead"
                 >
-                  <MessageSquare size={14} /> WhatsApp
-                </a>
+                  <MessageSquare size={14} className="text-emerald-600" /> Send SMS / Reminder
+                </button>
 
                 <div className="flex items-center gap-2">
                   <button
@@ -1813,6 +1827,25 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import CSV/Excel Modal */}
+      <LeadImportModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        passcode={passcode}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["crm-leads"] })}
+      />
+
+      {/* SMS / WhatsApp Reminder Modal */}
+      {reminderTarget && (
+        <ReminderModal
+          isOpen={Boolean(reminderTarget)}
+          onClose={() => setReminderTarget(null)}
+          targetType="lead"
+          recipientName={reminderTarget.name}
+          recipientPhone={reminderTarget.phone}
+        />
       )}
     </div>
   );
