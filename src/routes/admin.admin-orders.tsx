@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2 } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -11,6 +11,7 @@ import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } 
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { downloadPdf } from "@/lib/pdf";
+import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -178,7 +179,7 @@ function AdminOrders() {
   const [search, setSearch] = useState("");
   const [reasonFilter, setReasonFilter] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "clients" | "vouchers" | "flyers" | "december">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const listFn = useServerFn(adminListOrders);
   const qc = useQueryClient();
@@ -359,8 +360,11 @@ function AdminOrders() {
         {passcode && (
           <div className="mb-6 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-[#0F3D24]/10 pb-3" style={{ scrollbarWidth: "none" }} role="tablist" aria-label="Admin sections">
             {query.data?.role && <span className="inline-flex shrink-0 items-center rounded-full bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24]">Signed in as {query.data.role}</span>}
-            <div className="shrink-0"><AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders and reports</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Client CRM</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders & reports</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "financials"} onClick={() => setActiveTab("financials")} icon={<TrendingUp size={15} />}>Batches & Financials</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "activities"} onClick={() => setActiveTab("activities")} icon={<Activity size={15} />}>Daily Activities & Mortality</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Order Clients</AdminTab></div>
+            <div className="shrink-0"><AdminTab active={activeTab === "leads"} onClick={() => setActiveTab("leads")} icon={<UserPlus size={15} />}>Customer Leads CRM</AdminTab></div>
             <div className="shrink-0"><AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab></div>
             <div className="shrink-0"><AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab></div>
             <div className="shrink-0"><AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<Gift size={15} />}>December Pre-Orders</AdminTab></div>
@@ -455,15 +459,21 @@ function AdminOrders() {
             })()}
           </div>
              </>
-             ) : activeTab === "clients" ? (
-               <ClientCrmPanel passcode={passcode} />
+             ) : activeTab === "financials" ? (
+                <BatchFinancialsPanel passcode={passcode} />
+              ) : activeTab === "activities" ? (
+                <DailyActivitiesPanel passcode={passcode} />
+              ) : activeTab === "clients" ? (
+                <ClientCrmPanel passcode={passcode} />
+              ) : activeTab === "leads" ? (
+                <LeadCrmPanel passcode={passcode} />
               ) : activeTab === "vouchers" ? (
-               <VoucherPanel passcode={passcode} />
+                <VoucherPanel passcode={passcode} />
               ) : activeTab === "december" ? (
-               <DecemberPreorderPanel passcode={passcode} />
+                <DecemberPreorderPanel passcode={passcode} />
               ) : (
                 <SocialProofPanel orders={allOrders} />
-             )}
+              )}
           </>
           );
           })()

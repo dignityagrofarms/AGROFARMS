@@ -480,7 +480,7 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
   throw new Error("Invalid login details.");
 }
 
-async function checkOwner(value: string) {
+export async function checkOwner(value: string) {
   const role = await checkPasscode(value);
   if (role !== "owner") throw new Error("Owner access is required for this action.");
   return role;
