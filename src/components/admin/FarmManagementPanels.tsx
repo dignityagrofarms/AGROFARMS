@@ -36,6 +36,7 @@ import {
   Gift,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
+import { ExportReportModal } from "./ExportReportModal";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
 import {
@@ -89,6 +90,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const updateFinancialFn = useServerFn(adminUpdateFinancial);
   const deleteFinancialFn = useServerFn(adminDeleteFinancial);
   const getBatchReportFn = useServerFn(adminGetBatchReport);
+  const listActivitiesFn = useServerFn(adminListActivities);
 
   // Queries
   const ordersQuery = useQuery({
@@ -125,6 +127,18 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     placeholderData: (previousData) => previousData,
   });
 
+  const activitiesQuery = useQuery({
+    queryKey: ["farm-activities-report", passcode, selectedBatchId],
+    queryFn: () =>
+      listActivitiesFn({
+        data: {
+          passcode,
+          batchId: selectedBatchId === "all" ? null : selectedBatchId,
+        },
+      }),
+    placeholderData: (previousData) => previousData,
+  });
+
   const reportQuery = useQuery({
     queryKey: ["batch-report", passcode, selectedBatchId],
     queryFn: () =>
@@ -134,6 +148,8 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     enabled: selectedBatchId !== "all",
     placeholderData: (previousData) => previousData,
   });
+
+  const [showExportModal, setShowExportModal] = useState<boolean>(false);
 
   // Batch Form State
   const [batchForm, setBatchForm] = useState({
@@ -455,12 +471,12 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
             Register Income / Expense
           </button>
           <button
-            onClick={handleExportCSV}
+            onClick={() => setShowExportModal(true)}
             className="flex items-center gap-2 rounded-full border border-[#3F8F3F] bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#3F8F3F]/20 transition"
-            title="Export full batch financial report as CSV"
+            title="Export custom farm report in PDF, Excel, or CSV format"
           >
             <Download size={16} className="text-[#3F8F3F]" />
-            Export Report
+            Export Custom Report
           </button>
         </div>
       </div>
@@ -1287,6 +1303,26 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           </div>
         </div>
       )}
+
+      {/* Modal: Export Custom Report */}
+      <ExportReportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        batches={batches}
+        selectedBatchId={selectedBatchId}
+        financials={allFinancials}
+        activities={activitiesQuery.data || []}
+        totalIncome={totalIncome}
+        totalExpense={totalExpense}
+        netProfit={netProfit}
+        roiText={
+          totalExpense > 0
+            ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%`
+            : netProfit > 0
+            ? "100% Margin (No Expenses)"
+            : "0% ROI"
+        }
+      />
     </div>
   );
 }
