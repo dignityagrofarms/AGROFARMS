@@ -333,6 +333,42 @@ export const adminDeleteFinancial = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
   });
 
+const updateFinancialSchema = baseAuthSchema.extend({
+  id: z.string().uuid(),
+  batchId: z.string().uuid().optional().nullable(),
+  type: z.enum(["expense", "income"]),
+  category: z.string().trim().min(1).max(100),
+  amount: z.number().min(0),
+  description: z.string().trim().min(1).max(500),
+  paymentMethod: z.string().trim().min(1).max(100).default("Bank Transfer"),
+  transactionDate: z.string().trim().min(1),
+  referenceNo: z.string().trim().max(100).optional().nullable(),
+});
+
+export const adminUpdateFinancial = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => updateFinancialSchema.parse(data))
+  .handler(async ({ data }): Promise<{ id: string }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("farm_financials")
+      .update({
+        batch_id: data.batchId || null,
+        type: data.type,
+        category: data.category,
+        amount: data.amount,
+        description: data.description,
+        payment_method: data.paymentMethod,
+        transaction_date: data.transactionDate,
+        reference_no: data.referenceNo || null,
+      })
+      .eq("id", data.id);
+
+    if (error) throw new Error(error.message);
+    return { id: data.id };
+  });
+
 export const adminGetBatchReport = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ passcode: z.string(), batchId: z.string().uuid() }).parse(data))
   .handler(async ({ data }): Promise<BatchReport | null> => {

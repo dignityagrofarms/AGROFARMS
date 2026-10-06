@@ -14,12 +14,7 @@ import {
 import {
   TrendingUp,
   Calendar,
-  DollarSign,
-  ShoppingBag,
-  Award,
-  Sparkles,
   Clock,
-  ArrowUpRight,
 } from "lucide-react";
 import { adminListOrders, type AdminOrder } from "@/lib/orders.functions";
 import type { FarmFinancial } from "@/lib/farm.functions";
@@ -36,6 +31,7 @@ const formatNaira = (val: number) =>
 
 export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartProps) {
   const [timeframe, setTimeframe] = useState<TimeFrame>("7d");
+  const [selectedYear, setSelectedYear] = useState<number | "current">("current");
   const listOrdersFn = useServerFn(adminListOrders);
 
   // Fetch all orders for complete revenue tracking
@@ -57,9 +53,59 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
     return financials.filter((f) => f.type === "income");
   }, [financials]);
 
-  // Aggregate sales data based on timeframe
+  // Extract all available years dynamically from records
+  const availableYears = useMemo(() => {
+    const yearsSet = new Set<number>();
+    const currentYear = new Date().getFullYear();
+    yearsSet.add(currentYear);
+
+    validOrders.forEach((o) => {
+      const y = new Date(o.createdAt).getFullYear();
+      if (!isNaN(y)) yearsSet.add(y);
+    });
+
+    incomeFinancials.forEach((f) => {
+      const y = new Date(f.transactionDate || f.createdAt).getFullYear();
+      if (!isNaN(y)) yearsSet.add(y);
+    });
+
+    return Array.from(yearsSet).sort((a, b) => b - a);
+  }, [validOrders, incomeFinancials]);
+
+  // Aggregate sales data based on timeframe or selected custom year
   const chartData = useMemo(() => {
     const now = new Date();
+
+    // If user selected a custom past year (e.g. 2025, 2024, 2023)
+    if (typeof selectedYear === "number") {
+      const data: { label: string; monthKey: string; totalSales: number; storeSales: number; farmIncome: number; orderCount: number }[] = [];
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+      for (let m = 0; m < 12; m++) {
+        const label = `${monthNames[m]} '${String(selectedYear).slice(2)}`;
+        const monthOrders = validOrders.filter((o) => {
+          const d = new Date(o.createdAt);
+          return d.getFullYear() === selectedYear && d.getMonth() === m;
+        });
+        const storeSales = monthOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+        const monthIncome = incomeFinancials.filter((f) => {
+          const d = new Date(f.transactionDate || f.createdAt);
+          return d.getFullYear() === selectedYear && d.getMonth() === m;
+        });
+        const farmIncome = monthIncome.reduce((sum, f) => sum + (f.amount || 0), 0);
+
+        data.push({
+          label,
+          monthKey: `${selectedYear}-${String(m + 1).padStart(2, "0")}`,
+          storeSales,
+          farmIncome,
+          totalSales: storeSales + farmIncome,
+          orderCount: monthOrders.length,
+        });
+      }
+      return data;
+    }
 
     if (timeframe === "24h") {
       // 24 Hourly buckets
@@ -71,14 +117,12 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
         const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000 - 1);
         const label = hourStart.toLocaleTimeString("en-US", { hour: "numeric", hour12: true });
 
-        // Store orders in this hour
         const hourOrders = validOrders.filter((o) => {
           const t = new Date(o.createdAt).getTime();
           return t >= hourStart.getTime() && t <= hourEnd.getTime();
         });
         const storeSales = hourOrders.reduce((sum, o) => sum + (o.total || 0), 0);
 
-        // Farm income in this hour
         const hourIncome = incomeFinancials.filter((f) => {
           const t = new Date(f.transactionDate || f.createdAt).getTime();
           return t >= hourStart.getTime() && t <= hourEnd.getTime();
@@ -224,7 +268,7 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
       });
     }
     return data;
-  }, [timeframe, validOrders, incomeFinancials]);
+  }, [timeframe, selectedYear, validOrders, incomeFinancials]);
 
   // Aggregate metrics
   const totalPeriodSales = useMemo(() => {
@@ -300,33 +344,63 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
             </span>
           </div>
           <p className="mt-0.5 text-xs text-[#0F3D24]/60">
-            Track day-by-day and month-by-month sales trajectory to easily identify your peak sales periods.
+            Track day-by-day and multi-year sales trajectory to easily identify your peak sales periods.
           </p>
         </div>
 
-        {/* Timeframe Selector Pills */}
-        <div className="flex items-center gap-1 rounded-2xl bg-[#F7F5F0] p-1.5 text-xs font-medium border border-[#0F3D24]/10">
-          {(
-            [
-              { key: "24h", label: "24 Hours" },
-              { key: "7d", label: "Last 7 Days" },
-              { key: "1m", label: "Last Month" },
-              { key: "6m", label: "Last 6 Months" },
-              { key: "1y", label: "Last Year" },
-            ] as const
-          ).map((item) => (
-            <button
-              key={item.key}
-              onClick={() => setTimeframe(item.key)}
-              className={`rounded-xl px-3 py-1.5 transition ${
-                timeframe === item.key
-                  ? "bg-[#0F3D24] font-semibold text-white shadow-sm"
-                  : "text-[#0F3D24]/70 hover:bg-white hover:text-[#0F3D24]"
-              }`}
+        {/* Timeframe Selector & Dynamic Year Selector */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 rounded-2xl bg-[#F7F5F0] p-1.5 text-xs font-medium border border-[#0F3D24]/10">
+            {(
+              [
+                { key: "24h", label: "24 Hours" },
+                { key: "7d", label: "Last 7 Days" },
+                { key: "1m", label: "Last Month" },
+                { key: "6m", label: "Last 6 Months" },
+                { key: "1y", label: "Last Year" },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.key}
+                onClick={() => {
+                  setTimeframe(item.key);
+                  setSelectedYear("current");
+                }}
+                className={`rounded-xl px-3 py-1.5 transition ${
+                  timeframe === item.key && selectedYear === "current"
+                    ? "bg-[#0F3D24] font-semibold text-white shadow-sm"
+                    : "text-[#0F3D24]/70 hover:bg-white hover:text-[#0F3D24]"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Year Dropdown Selector */}
+          <div className="flex items-center gap-1.5 rounded-2xl bg-[#F7F5F0] px-3 py-2 border border-[#0F3D24]/10 text-xs font-semibold text-[#0F3D24]">
+            <Calendar size={14} className="text-[#3F8F3F]" />
+            <span>Year:</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "current") {
+                  setSelectedYear("current");
+                } else {
+                  setSelectedYear(Number(val));
+                }
+              }}
+              className="bg-transparent font-bold outline-none cursor-pointer"
             >
-              {item.label}
-            </button>
-          ))}
+              <option value="current">Recent View</option>
+              {availableYears.map((y) => (
+                <option key={y} value={y}>
+                  Year {y}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -338,7 +412,7 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
             <span className="text-lg font-extrabold text-[#0F3D24]">{formatNaira(totalPeriodSales)}</span>
           </div>
           <span className="text-[10px] text-[#0F3D24]/60 block mt-0.5">
-            {timeframe === "24h" ? "Past 24 hours" : timeframe === "7d" ? "Past 7 days" : timeframe === "1m" ? "Past 30 days" : timeframe === "6m" ? "Past 6 months" : "Past 12 months"}
+            {typeof selectedYear === "number" ? `Full Year ${selectedYear}` : timeframe === "24h" ? "Past 24 hours" : timeframe === "7d" ? "Past 7 days" : timeframe === "1m" ? "Past 30 days" : timeframe === "6m" ? "Past 6 months" : "Past 12 months"}
           </span>
         </div>
 
@@ -360,7 +434,7 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
             <span className="text-lg font-extrabold text-[#0F3D24]">{formatNaira(averageSales)}</span>
           </div>
           <span className="text-[10px] text-[#0F3D24]/60 block mt-0.5">
-            {timeframe === "24h" ? "Per hour avg" : timeframe === "7d" || timeframe === "1m" ? "Per day avg" : "Per month avg"}
+            {typeof selectedYear === "number" || timeframe === "6m" || timeframe === "1y" ? "Per month avg" : timeframe === "24h" ? "Per hour avg" : "Per day avg"}
           </span>
         </div>
 

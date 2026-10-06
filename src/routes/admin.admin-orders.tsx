@@ -8,7 +8,7 @@ import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
-import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
+import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
@@ -643,18 +643,23 @@ function ClientDetails({ client }: { client: ClientRecord }) {
 
 function VoucherPanel({ passcode }: { passcode: string }) {
   const [form, setForm] = useState({ code: "", displayName: "", discountType: "percent" as AdminVoucher["discountType"], discountValue: "", recipientName: "", recipientPhone: "", note: "", expiresAt: "", maxUses: "" });
+  const [editingVoucher, setEditingVoucher] = useState<AdminVoucher | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const listFn = useServerFn(adminListVouchers);
   const createFn = useServerFn(adminCreateVoucher);
   const toggleFn = useServerFn(adminToggleVoucher);
+  const updateFn = useServerFn(adminUpdateVoucher);
+  const deleteFn = useServerFn(adminDeleteVoucher);
   const queryClient = useQueryClient();
+
   const query = useQuery({ queryKey: ["admin-vouchers", passcode], queryFn: () => listFn({ data: { passcode } }), retry: false });
+
   const createMutation = useMutation({
     mutationFn: () => createFn({
       data: {
         passcode,
         code: form.code.trim() || null,
-         displayName: form.displayName.trim() || null,
+        displayName: form.displayName.trim() || null,
         discountType: form.discountType,
         discountValue: Number(form.discountValue),
         recipientName: form.recipientName.trim() || null,
@@ -666,23 +671,68 @@ function VoucherPanel({ passcode }: { passcode: string }) {
     }),
     onSuccess: (result) => {
       setMessage(`Voucher ${result.voucher.code} created.`);
-       setForm({ code: "", displayName: "", discountType: "percent", discountValue: "", recipientName: "", recipientPhone: "", note: "", expiresAt: "", maxUses: "" });
+      setForm({ code: "", displayName: "", discountType: "percent", discountValue: "", recipientName: "", recipientPhone: "", note: "", expiresAt: "", maxUses: "" });
       void queryClient.invalidateQueries({ queryKey: ["admin-vouchers", passcode] });
     },
     onError: (error: Error) => setMessage(error.message),
   });
+
+  const updateMutation = useMutation({
+    mutationFn: (v: AdminVoucher) => updateFn({
+      data: {
+        passcode,
+        id: v.id,
+        displayName: v.displayName || null,
+        discountType: v.discountType,
+        discountValue: v.discountValue,
+        recipientName: v.recipientName || null,
+        recipientPhone: v.recipientPhone || null,
+        note: v.note || null,
+        expiresAt: v.expiresAt || null,
+        maxUses: v.maxUses || null,
+        active: v.active,
+      },
+    }),
+    onSuccess: (result) => {
+      setMessage(`Voucher ${result.voucher.code} updated.`);
+      setEditingVoucher(null);
+      void queryClient.invalidateQueries({ queryKey: ["admin-vouchers", passcode] });
+    },
+    onError: (error: Error) => setMessage(error.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteFn({ data: { passcode, id } }),
+    onSuccess: () => {
+      setMessage("Voucher deleted.");
+      void queryClient.invalidateQueries({ queryKey: ["admin-vouchers", passcode] });
+    },
+    onError: (error: Error) => setMessage(error.message),
+  });
+
   const toggleMutation = useMutation({
     mutationFn: (voucher: AdminVoucher) => toggleFn({ data: { passcode, id: voucher.id, active: !voucher.active } }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-vouchers", passcode] }),
     onError: (error: Error) => setMessage(error.message),
   });
+
   const vouchers = query.data?.vouchers ?? [];
   const inputClass = "mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3F8F3F]";
   const canCreate = Number(form.discountValue) > 0 && (form.discountType !== "percent" || Number(form.discountValue) <= 100) && !createMutation.isPending;
 
   return (
     <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
-      <div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#3F8F3F]/10 text-[#3F8F3F]"><TicketPercent size={20} /></div><div><div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Discount vouchers</div><h2 className="mt-1 text-2xl font-semibold text-[#0F3D24]">Create and manage offers</h2><p className="mt-1 text-sm text-[#0F3D24]/65">Generate a code for a customer, set its limits, and switch it off when the offer ends.</p></div></div>
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#3F8F3F]/10 text-[#3F8F3F]">
+          <TicketPercent size={20} />
+        </div>
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Discount vouchers</div>
+          <h2 className="mt-1 text-2xl font-semibold text-[#0F3D24]">Create and manage offers</h2>
+          <p className="mt-1 text-sm text-[#0F3D24]/65">Generate a code for a customer, set its limits, edit existing ones, or delete outdated vouchers.</p>
+        </div>
+      </div>
+
       <div className="mt-6 rounded-2xl bg-[#F7F5F0] p-5 ring-1 ring-[#0F3D24]/10">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Voucher name (optional)<input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="e.g. New customer offer" className={inputClass} /></label>
@@ -695,11 +745,226 @@ function VoucherPanel({ passcode }: { passcode: string }) {
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Maximum uses<input type="number" min={1} value={form.maxUses} onChange={(event) => setForm({ ...form, maxUses: event.target.value })} placeholder="Unlimited" className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Internal note<input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Optional" className={inputClass} /></label>
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" disabled={!canCreate} onClick={() => createMutation.mutate()} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50"><TicketPercent size={15} /> {createMutation.isPending ? "Creating..." : "Create voucher"}</button>{message && <span className="text-sm font-semibold text-[#0F3D24]/75">{message}</span>}</div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button type="button" disabled={!canCreate} onClick={() => createMutation.mutate()} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50">
+            <TicketPercent size={15} /> {createMutation.isPending ? "Creating..." : "Create voucher"}
+          </button>
+          {message && <span className="text-sm font-semibold text-[#0F3D24]/75">{message}</span>}
+        </div>
       </div>
 
-      {query.isLoading ? <p className="py-10 text-center text-sm text-[#0F3D24]/60">Loading vouchers...</p> : query.error ? <p className="py-10 text-center text-sm text-red-600">{query.error instanceof Error ? query.error.message : "Could not load vouchers."}</p> : vouchers.length === 0 ? <p className="py-10 text-center text-sm text-[#0F3D24]/60">No vouchers created yet.</p> : (
-        <div className="mt-6 overflow-x-auto rounded-2xl ring-1 ring-[#0F3D24]/10"><table className="w-full min-w-[920px] text-left text-sm"><thead className="bg-[#F7F5F0] text-[10px] uppercase tracking-widest text-[#0F3D24]/60"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Offer</th><th className="px-4 py-3">Recipient</th><th className="px-4 py-3">Uses</th><th className="px-4 py-3">Expiry</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Action</th></tr></thead><tbody className="divide-y divide-[#0F3D24]/10">{vouchers.map((voucher) => <tr key={voucher.id}><td className="px-4 py-4"><div className="flex items-center gap-2 font-mono font-semibold text-[#3F8F3F]">{voucher.code}<button type="button" title="Copy voucher code" aria-label={`Copy ${voucher.code}`} onClick={() => void navigator.clipboard.writeText(voucher.code)} className="text-[#0F3D24]/50 hover:text-[#3F8F3F]"><Copy size={14} /></button></div>{voucher.note && <div className="mt-1 text-xs text-[#0F3D24]/55">{voucher.note}</div>}</td><td className="px-4 py-4 font-semibold text-[#0F3D24]">{voucher.discountType === "percent" ? `${voucher.discountValue}% off` : `${naira(voucher.discountValue)} off`}</td><td className="px-4 py-4 text-[#0F3D24]/70">{voucher.recipientName || "Any customer"}{voucher.recipientPhone && <span className="block text-xs">{voucher.recipientPhone}</span>}</td><td className="px-4 py-4 text-[#0F3D24]/70">{voucher.usesCount}{voucher.maxUses ? ` / ${voucher.maxUses}` : " / unlimited"}</td><td className="px-4 py-4 text-[#0F3D24]/70">{voucher.expiresAt ? new Date(voucher.expiresAt).toLocaleDateString() : "No expiry"}</td><td className="px-4 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${voucher.active ? "bg-[#3F8F3F]/10 text-[#0F3D24]" : "bg-[#F7F5F0] text-[#0F3D24]/55"}`}>{voucher.active ? "Active" : "Inactive"}</span></td><td className="px-4 py-4"><button type="button" disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate(voucher)} className="rounded-full bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white">{voucher.active ? "Deactivate" : "Activate"}</button></td></tr>)}</tbody></table></div>
+      {query.isLoading ? (
+        <p className="py-10 text-center text-sm text-[#0F3D24]/60">Loading vouchers...</p>
+      ) : query.error ? (
+        <p className="py-10 text-center text-sm text-red-600">{query.error instanceof Error ? query.error.message : "Could not load vouchers."}</p>
+      ) : vouchers.length === 0 ? (
+        <p className="py-10 text-center text-sm text-[#0F3D24]/60">No vouchers created yet.</p>
+      ) : (
+        <div className="mt-6 overflow-x-auto rounded-2xl ring-1 ring-[#0F3D24]/10">
+          <table className="w-full min-w-[920px] text-left text-sm">
+            <thead className="bg-[#F7F5F0] text-[10px] uppercase tracking-widest text-[#0F3D24]/60">
+              <tr>
+                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">Offer</th>
+                <th className="px-4 py-3">Recipient</th>
+                <th className="px-4 py-3">Uses</th>
+                <th className="px-4 py-3">Expiry</th>
+                <th className="px-4 py-3">State</th>
+                <th className="px-4 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#0F3D24]/10">
+              {vouchers.map((voucher) => (
+                <tr key={voucher.id}>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center gap-2 font-mono font-semibold text-[#3F8F3F]">
+                      {voucher.code}
+                      <button type="button" title="Copy voucher code" aria-label={`Copy ${voucher.code}`} onClick={() => void navigator.clipboard.writeText(voucher.code)} className="text-[#0F3D24]/50 hover:text-[#3F8F3F]">
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                    {voucher.displayName && <div className="text-xs font-semibold text-[#0F3D24]">{voucher.displayName}</div>}
+                    {voucher.note && <div className="mt-1 text-xs text-[#0F3D24]/55">{voucher.note}</div>}
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-[#0F3D24]">
+                    {voucher.discountType === "percent" ? `${voucher.discountValue}% off` : `${naira(voucher.discountValue)} off`}
+                  </td>
+                  <td className="px-4 py-4 text-[#0F3D24]/70">
+                    {voucher.recipientName || "Any customer"}
+                    {voucher.recipientPhone && <span className="block text-xs">{voucher.recipientPhone}</span>}
+                  </td>
+                  <td className="px-4 py-4 text-[#0F3D24]/70">
+                    {voucher.usesCount}{voucher.maxUses ? ` / ${voucher.maxUses}` : " / unlimited"}
+                  </td>
+                  <td className="px-4 py-4 text-[#0F3D24]/70">
+                    {voucher.expiresAt ? new Date(voucher.expiresAt).toLocaleDateString() : "No expiry"}
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${voucher.active ? "bg-[#3F8F3F]/10 text-[#0F3D24]" : "bg-[#F7F5F0] text-[#0F3D24]/55"}`}>
+                      {voucher.active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        disabled={toggleMutation.isPending}
+                        onClick={() => toggleMutation.mutate(voucher)}
+                        className="rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
+                      >
+                        {voucher.active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingVoucher(voucher)}
+                        className="p-1.5 rounded-full text-[#3F8F3F] hover:bg-[#3F8F3F]/10 transition"
+                        title="Edit voucher"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm(`Delete voucher ${voucher.code}?`)) deleteMutation.mutate(voucher.id);
+                        }}
+                        className="p-1.5 rounded-full text-rose-600 hover:bg-rose-50 transition"
+                        title="Delete voucher"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Edit Voucher Modal */}
+      {editingVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-lg font-bold text-[#0F3D24]">Edit Voucher: {editingVoucher.code}</h3>
+              <button onClick={() => setEditingVoucher(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Voucher Name
+                <input
+                  value={editingVoucher.displayName || ""}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, displayName: e.target.value })}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Discount Type
+                <select
+                  value={editingVoucher.discountType}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, discountType: e.target.value as any })}
+                  className={inputClass}
+                >
+                  <option value="percent">Percentage (%)</option>
+                  <option value="fixed">Fixed Amount (₦)</option>
+                </select>
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Discount Value
+                <input
+                  type="number"
+                  value={editingVoucher.discountValue}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, discountValue: Number(e.target.value) })}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Expires On
+                <input
+                  type="date"
+                  value={editingVoucher.expiresAt || ""}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, expiresAt: e.target.value })}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Recipient Name
+                <input
+                  value={editingVoucher.recipientName || ""}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, recipientName: e.target.value })}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Recipient Phone
+                <input
+                  value={editingVoucher.recipientPhone || ""}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, recipientPhone: e.target.value })}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Max Uses
+                <input
+                  type="number"
+                  value={editingVoucher.maxUses || ""}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, maxUses: e.target.value ? Number(e.target.value) : null })}
+                  className={inputClass}
+                />
+              </label>
+
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Status
+                <select
+                  value={editingVoucher.active ? "true" : "false"}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, active: e.target.value === "true" })}
+                  className={inputClass}
+                >
+                  <option value="true">Active</option>
+                  <option value="false">Inactive</option>
+                </select>
+              </label>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Internal Note
+                <input
+                  value={editingVoucher.note || ""}
+                  onChange={(e) => setEditingVoucher({ ...editingVoucher, note: e.target.value })}
+                  className={inputClass}
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t">
+              <button
+                type="button"
+                onClick={() => setEditingVoucher(null)}
+                className="rounded-full bg-gray-100 px-5 py-2 text-xs font-semibold text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={updateMutation.isPending}
+                onClick={() => updateMutation.mutate(editingVoucher)}
+                className="rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-semibold text-white disabled:opacity-50 hover:bg-[#134a2c]"
+              >
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

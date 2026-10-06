@@ -430,7 +430,7 @@ export const cancelOrderByCustomer = createServerFn({ method: "POST" })
 
 // ---------- Admin ----------
 
-export type AdminRole = "owner" | "staff";
+export type AdminRole = "owner" | "manager" | "staff";
 
 type AdminCredential = { username: string; passcode: string };
 
@@ -854,6 +854,55 @@ export const adminToggleVoucher = createServerFn({ method: "POST" })
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("discount_vouchers").update({ active: data.active }).eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+const updateVoucherSchema = adminVoucherBase.extend({
+  id: z.string().uuid(),
+  code: z.string().trim().max(40).optional().nullable(),
+  displayName: z.string().trim().max(100).optional().nullable(),
+  discountType: z.enum(["percent", "fixed"]),
+  discountValue: z.number().min(0),
+  recipientName: z.string().trim().max(100).optional().nullable(),
+  recipientPhone: z.string().trim().max(40).optional().nullable(),
+  note: z.string().trim().max(500).optional().nullable(),
+  expiresAt: z.string().trim().optional().nullable(),
+  maxUses: z.number().int().min(1).optional().nullable(),
+  active: z.boolean().default(true),
+});
+
+export const adminUpdateVoucher = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => updateVoucherSchema.parse(data))
+  .handler(async ({ data }): Promise<{ voucher: AdminVoucher }> => {
+    await checkPasscode(data.passcode);
+    if (data.discountType === "percent" && data.discountValue > 100) throw new Error("Percentage discount cannot exceed 100%.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const updateObj: Record<string, any> = {
+      discount_type: data.discountType,
+      discount_value: data.discountValue,
+      display_name: data.displayName || null,
+      recipient_name: data.recipientName || null,
+      recipient_phone: data.recipientPhone ? normalizePhone(data.recipientPhone) : null,
+      note: data.note || null,
+      expires_at: data.expiresAt ? new Date(`${data.expiresAt}T23:59:59.999Z`).toISOString() : null,
+      max_uses: data.maxUses ?? null,
+      active: data.active,
+    };
+    if (data.code) updateObj.code = normalizeVoucherCode(data.code);
+    const { data: row, error } = await supabaseAdmin.from("discount_vouchers").update(updateObj as never).eq("id", data.id).select("*").single();
+    if (error) throw new Error(error.message);
+    return { voucher: mapVoucher(row as Record<string, unknown>) };
+  });
+
+const deleteVoucherSchema = adminVoucherBase.extend({ id: z.string().uuid() });
+
+export const adminDeleteVoucher = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => deleteVoucherSchema.parse(data))
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("discount_vouchers").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

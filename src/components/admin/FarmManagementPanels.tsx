@@ -35,7 +35,7 @@ import {
   Download,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
-import { adminListOrders, type AdminOrder } from "@/lib/orders.functions";
+import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import {
   adminListBatches,
   adminCreateBatch,
@@ -43,6 +43,7 @@ import {
   adminDeleteBatch,
   adminListFinancials,
   adminCreateFinancial,
+  adminUpdateFinancial,
   adminDeleteFinancial,
   adminGetBatchReport,
   adminListLeads,
@@ -64,11 +65,13 @@ const formatNaira = (val: number) =>
 
 // ─── 1. BATCHES & FINANCIALS PANEL ───────────────────────────────────────────
 
-export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
+export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: string; role?: AdminRole }) {
   const queryClient = useQueryClient();
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showFinancialModal, setShowFinancialModal] = useState(false);
+  const [editingBatch, setEditingBatch] = useState<FarmBatch | null>(null);
+  const [editingFinancial, setEditingFinancial] = useState<FarmFinancial | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -76,9 +79,11 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
   const listOrdersFn = useServerFn(adminListOrders);
   const listBatchesFn = useServerFn(adminListBatches);
   const createBatchFn = useServerFn(adminCreateBatch);
+  const updateBatchFn = useServerFn(adminUpdateBatch);
   const deleteBatchFn = useServerFn(adminDeleteBatch);
   const listFinancialsFn = useServerFn(adminListFinancials);
   const createFinancialFn = useServerFn(adminCreateFinancial);
+  const updateFinancialFn = useServerFn(adminUpdateFinancial);
   const deleteFinancialFn = useServerFn(adminDeleteFinancial);
   const getBatchReportFn = useServerFn(adminGetBatchReport);
 
@@ -166,6 +171,31 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
     onError: (e: Error) => setFeedback("Error: " + e.message),
   });
 
+  const updateBatchMut = useMutation({
+    mutationFn: (b: FarmBatch) =>
+      updateBatchFn({
+        data: {
+          passcode,
+          id: b.id,
+          batchName: b.batchName,
+          batchType: b.batchType,
+          initialHeadcount: b.initialHeadcount,
+          currentHeadcount: b.currentHeadcount,
+          status: b.status,
+          startDate: b.startDate,
+          targetHarvestDate: b.targetHarvestDate || null,
+          notes: b.notes || null,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+      setEditingBatch(null);
+      setFeedback("Batch updated successfully.");
+    },
+    onError: (e: Error) => setFeedback("Error updating batch: " + e.message),
+  });
+
   const createFinancialMut = useMutation({
     mutationFn: () =>
       createFinancialFn({
@@ -198,6 +228,31 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
       setFeedback("Transaction registered successfully.");
     },
     onError: (e: Error) => setFeedback("Error: " + e.message),
+  });
+
+  const updateFinancialMut = useMutation({
+    mutationFn: (f: FarmFinancial) =>
+      updateFinancialFn({
+        data: {
+          passcode,
+          id: f.id,
+          batchId: f.batchId || null,
+          type: f.type,
+          category: f.category,
+          amount: Number(f.amount),
+          description: f.description,
+          paymentMethod: f.paymentMethod,
+          transactionDate: f.transactionDate,
+          referenceNo: f.referenceNo || null,
+        },
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farm-financials"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+      setEditingFinancial(null);
+      setFeedback("Financial record updated successfully.");
+    },
+    onError: (e: Error) => setFeedback("Error updating financial record: " + e.message),
   });
 
   const deleteFinMut = useMutation({
@@ -375,7 +430,7 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
 
       {/* Batch Selector Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#F7F5F0] p-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Filter size={18} className="text-[#0F3D24]/70" />
           <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">Select Batch:</span>
           <select
@@ -390,6 +445,19 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
               </option>
             ))}
           </select>
+          {selectedBatchId !== "all" && role !== "staff" && (
+            <button
+              onClick={() => {
+                const target = batches.find((b) => b.id === selectedBatchId);
+                if (target) setEditingBatch({ ...target });
+              }}
+              className="flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] hover:bg-[#0F3D24]/5 transition"
+              title="Edit Batch Name & Details"
+            >
+              <Pencil size={14} className="text-[#3F8F3F]" />
+              Edit Batch
+            </button>
+          )}
         </div>
 
         {selectedBatchId !== "all" && reportQuery.data && (
@@ -623,15 +691,28 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
                           Store Order
                         </span>
                       ) : (
-                        <button
-                          onClick={() => {
-                            if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
-                          }}
-                          className="text-rose-600 hover:text-rose-800 transition p-1"
-                          title="Delete record"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          {role !== "staff" && (
+                            <button
+                              onClick={() => setEditingFinancial(f as FarmFinancial)}
+                              className="text-[#3F8F3F] hover:text-[#0F3D24] transition p-1"
+                              title="Edit financial record"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                          {role !== "staff" && (
+                            <button
+                              onClick={() => {
+                                if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
+                              }}
+                              className="text-rose-600 hover:text-rose-800 transition p-1"
+                              title="Delete record"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -881,6 +962,270 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
                 className={`rounded-full px-6 py-2 text-xs font-semibold text-white disabled:opacity-50 ${finForm.type === "income" ? "bg-emerald-700 hover:bg-emerald-800" : "bg-rose-700 hover:bg-rose-800"}`}
               >
                 {createFinancialMut.isPending ? "Saving..." : `Record ${finForm.type === "income" ? "Income" : "Expense"}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Batch */}
+      {editingBatch && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-lg font-bold text-[#0F3D24]">Edit Farm Batch</h3>
+              <button onClick={() => setEditingBatch(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-[#0F3D24]">Batch Name *</label>
+                <input
+                  type="text"
+                  value={editingBatch.batchName}
+                  onChange={(e) => setEditingBatch({ ...editingBatch, batchName: e.target.value })}
+                  className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Batch Type</label>
+                  <select
+                    value={editingBatch.batchType}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, batchType: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  >
+                    <option value="Broiler">Broiler Chicken</option>
+                    <option value="Layer">Layers (Eggs)</option>
+                    <option value="Turkey">Turkeys</option>
+                    <option value="Fish">Fish / Aquaculture</option>
+                    <option value="Other">Other Livestock</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Status</label>
+                  <select
+                    value={editingBatch.status}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, status: e.target.value as any })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  >
+                    <option value="active">Active</option>
+                    <option value="harvested">Harvested / Completed</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Initial Headcount</label>
+                  <input
+                    type="number"
+                    value={editingBatch.initialHeadcount}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, initialHeadcount: Number(e.target.value) })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Current Live Headcount</label>
+                  <input
+                    type="number"
+                    value={editingBatch.currentHeadcount}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, currentHeadcount: Number(e.target.value) })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Start Date</label>
+                  <input
+                    type="date"
+                    value={editingBatch.startDate}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, startDate: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Target Harvest Date</label>
+                  <input
+                    type="date"
+                    value={editingBatch.targetHarvestDate || ""}
+                    onChange={(e) => setEditingBatch({ ...editingBatch, targetHarvestDate: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0F3D24]">Notes</label>
+                <textarea
+                  value={editingBatch.notes || ""}
+                  onChange={(e) => setEditingBatch({ ...editingBatch, notes: e.target.value })}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setEditingBatch(null)}
+                className="rounded-full bg-gray-100 px-5 py-2 text-xs font-semibold text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!editingBatch.batchName.trim() || updateBatchMut.isPending}
+                onClick={() => updateBatchMut.mutate(editingBatch)}
+                className="rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {updateBatchMut.isPending ? "Updating..." : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Financial Record */}
+      {editingFinancial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-lg font-bold text-[#0F3D24]">Edit Financial Record</h3>
+              <button onClick={() => setEditingFinancial(null)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 p-1 text-center font-bold text-xs">
+                <button
+                  onClick={() => setEditingFinancial({ ...editingFinancial, type: "expense" })}
+                  className={`rounded-xl py-2 transition ${editingFinancial.type === "expense" ? "bg-rose-600 text-white shadow-xs" : "text-gray-600"}`}
+                >
+                  Expense (Money Out)
+                </button>
+                <button
+                  onClick={() => setEditingFinancial({ ...editingFinancial, type: "income" })}
+                  className={`rounded-xl py-2 transition ${editingFinancial.type === "income" ? "bg-emerald-600 text-white shadow-xs" : "text-gray-600"}`}
+                >
+                  Income (Money In)
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0F3D24]">Assign to Batch</label>
+                <select
+                  value={editingFinancial.batchId || ""}
+                  onChange={(e) => setEditingFinancial({ ...editingFinancial, batchId: e.target.value || undefined })}
+                  className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                >
+                  <option value="">General Farm Expense / Income</option>
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.batchName} ({b.batchType})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Category</label>
+                  <select
+                    value={editingFinancial.category}
+                    onChange={(e) => setEditingFinancial({ ...editingFinancial, category: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  >
+                    {editingFinancial.type === "expense" ? (
+                      <>
+                        <option value="Feed">Feed & Nutrition</option>
+                        <option value="Medication/Vaccine">Medication & Vaccines</option>
+                        <option value="Day-Old Chicks">Day-Old Chicks / Stock Purchase</option>
+                        <option value="Logistics/Transport">Logistics & Transportation</option>
+                        <option value="Labor/Salaries">Labor & Staff Salaries</option>
+                        <option value="Utilities">Utilities & Electricity</option>
+                        <option value="Equipment">Farm Equipment & Repairs</option>
+                        <option value="Packaging">Packaging & Processing</option>
+                        <option value="Other Expense">Other Expense</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Bird Sales">Live & Processed Bird Sales</option>
+                        <option value="Egg Sales">Fresh Egg Sales</option>
+                        <option value="Pre-orders">Pre-order Inflows</option>
+                        <option value="Manure Sales">Poultry Manure Sales</option>
+                        <option value="Other Income">Other Income</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Amount (₦) *</label>
+                  <input
+                    type="number"
+                    value={editingFinancial.amount}
+                    onChange={(e) => setEditingFinancial({ ...editingFinancial, amount: Number(e.target.value) })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#0F3D24]">Description *</label>
+                <input
+                  type="text"
+                  value={editingFinancial.description}
+                  onChange={(e) => setEditingFinancial({ ...editingFinancial, description: e.target.value })}
+                  className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Payment Method</label>
+                  <select
+                    value={editingFinancial.paymentMethod}
+                    onChange={(e) => setEditingFinancial({ ...editingFinancial, paymentMethod: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  >
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Cash">Cash</option>
+                    <option value="POS">POS / Card</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Transaction Date</label>
+                  <input
+                    type="date"
+                    value={editingFinancial.transactionDate}
+                    onChange={(e) => setEditingFinancial({ ...editingFinancial, transactionDate: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setEditingFinancial(null)}
+                className="rounded-full bg-gray-100 px-5 py-2 text-xs font-semibold text-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={!editingFinancial.amount || !editingFinancial.description.trim() || updateFinancialMut.isPending}
+                onClick={() => updateFinancialMut.mutate(editingFinancial)}
+                className="rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {updateFinancialMut.isPending ? "Updating..." : "Save Changes"}
               </button>
             </div>
           </div>
