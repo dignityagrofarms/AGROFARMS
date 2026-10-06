@@ -90,6 +90,7 @@ function OrderPage() {
   const delivery = zone === "owerri" ? 0 : 1000;
   const total = subtotal + delivery - voucherDiscount;
   const belowMinimum = subtotal < MIN_ORDER_SUBTOTAL;
+  const isSoldOut = option.soldOut === true;
   // Calculate minPreorderDate safely for SSR
   const [minPreorderDate, setMinPreorderDate] = useState("");
   const [preorderLabel, setPreorderLabel] = useState<string | null>(null);
@@ -417,7 +418,11 @@ function OrderPage() {
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => { setProductId(p.id); setOptionIdx(0); }}
+                      onClick={() => { 
+                        setProductId(p.id); 
+                        const avail = p.options.findIndex(opt => !opt.soldOut);
+                        setOptionIdx(avail >= 0 ? avail : 0); 
+                      }}
                       className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
                         productId === p.id
                           ? "border-[#3F8F3F] bg-[#3F8F3F]/10 text-[#0F3D24]"
@@ -440,13 +445,16 @@ function OrderPage() {
                         key={o.label}
                         type="button"
                         onClick={() => setOptionIdx(i)}
+                        disabled={o.soldOut}
                         className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                          active
-                            ? "bg-[#3F8F3F] text-white shadow"
-                            : "border border-[#0F3D24]/15 bg-white text-[#0F3D24] hover:border-[#3F8F3F]"
+                          o.soldOut
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-transparent"
+                            : active
+                              ? "bg-[#3F8F3F] text-white shadow border border-transparent"
+                              : "border border-[#0F3D24]/15 bg-white text-[#0F3D24] hover:border-[#3F8F3F]"
                         }`}
                       >
-                        {o.label} · {naira(o.price)}
+                        {o.label} · {naira(o.price)} {o.soldOut && "(Sold out)"}
                       </button>
                     );
                   })}
@@ -540,8 +548,8 @@ function OrderPage() {
               {errorMsg && (
                 <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">{errorMsg}</div>
               )}
-              <button type="submit" disabled={submitting || belowMinimum} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-6 py-4 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#134a2c] hover:shadow-[0_10px_20px_rgba(15,61,36,0.3)] disabled:transform-none disabled:opacity-60 disabled:shadow-none">
-                <ShoppingBag size={16} /> {submitting ? "Sending..." : `Place order · ${naira(total)}`}
+              <button type="submit" disabled={submitting || belowMinimum || isSoldOut} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-6 py-4 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#134a2c] hover:shadow-[0_10px_20px_rgba(15,61,36,0.3)] disabled:transform-none disabled:opacity-60 disabled:shadow-none">
+                <ShoppingBag size={16} /> {submitting ? "Sending..." : isSoldOut ? "Currently sold out" : `Place order · ${naira(total)}`}
               </button>
             </form>
           )}

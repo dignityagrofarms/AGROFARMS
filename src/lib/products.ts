@@ -6,6 +6,7 @@ export type ProductOption = {
   label: string;
   price: number;
   qtyLabel?: string;
+  soldOut?: boolean;
 };
 
 export type Product = {
@@ -28,11 +29,11 @@ export const PRODUCTS: Product[] = [
       "Healthy, well-raised live broiler chickens sold by the kilogram at farm price in Owerri. Weighed in your presence, never cheated, always fresh.",
     image: `${BASE}/assets/live-broiler.jpg`,
     options: [
-      { label: "Small · 1.5 Kg", price: 5250 },
-      { label: "Medium · 2 Kg", price: 7000 },
-      { label: "Medium plus · 2.5 Kg", price: 8750 },
+      { label: "Small · 1.5 Kg", price: 5250, soldOut: true },
+      { label: "Medium · 2 Kg", price: 7000, soldOut: true },
+      { label: "Medium plus · 2.5 Kg", price: 8750, soldOut: true },
       { label: "Large · 3 Kg", price: 10500 },
-      { label: "Extra Large · 3.5 Kg", price: 12250 },
+      { label: "Extra Large · 3.5 Kg", price: 12000 },
     ],
   },
   {
@@ -43,11 +44,11 @@ export const PRODUCTS: Product[] = [
       "Freshly cleaned and dressed broiler chickens, never frozen, delivered straight from our farm to your kitchen in Owerri.",
     image: `${BASE}/assets/dressed-chicken.jpg`,
     options: [
-      { label: "Small · 1.5 Kg", price: 6000 },
-      { label: "Medium · 2 Kg", price: 8000 },
-      { label: "Medium plus · 2.5 Kg", price: 10000 },
-      { label: "Large · 3 Kg", price: 12000 },
-      { label: "Extra Large · 3.5 Kg", price: 14000 },
+      { label: "Small · 1.5 Kg", price: 6000, soldOut: true },
+      { label: "Medium · 2 Kg", price: 8000, soldOut: true },
+      { label: "Medium plus · 2.5 Kg", price: 10000, soldOut: true },
+      { label: "Large · 3 Kg", price: 10500 },
+      { label: "Extra Large · 3.5 Kg", price: 13000 },
     ],
   },
   {
@@ -58,9 +59,9 @@ export const PRODUCTS: Product[] = [
       "Farm-fresh table eggs collected daily from our layer flock. Supplied by the dozen, half crate, or full crate to homes, shops, bakeries and events in Owerri.",
     image: `${BASE}/assets/eggs.jpg`,
     options: [
-      { label: "Dozen (12)", price: 1800 },
-      { label: "Half crate (15)", price: 2300 },
-      { label: "Full crate or tray (30)", price: 4500 },
+      { label: "Dozen (12)", price: 1800, soldOut: true },
+      { label: "Half crate (15)", price: 2300, soldOut: true },
+      { label: "Full crate or tray (30)", price: 4500, soldOut: true },
     ],
   },
   {
