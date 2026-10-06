@@ -420,25 +420,40 @@ function OrderPage() {
 
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">1. Choose a product</div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {PRODUCTS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => { 
-                        setProductId(p.id); 
-                        const avail = p.options.findIndex(opt => !opt.soldOut);
-                        setOptionIdx(avail >= 0 ? avail : 0); 
-                      }}
-                      className={`rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                        productId === p.id
-                          ? "border-[#3F8F3F] bg-[#3F8F3F]/10 text-[#0F3D24]"
-                          : "border-[#0F3D24]/15 bg-white text-[#0F3D24] hover:border-[#3F8F3F]"
-                      }`}
-                    >
-                      {p.name}
-                    </button>
-                  ))}
+                <div className="mt-3 grid gap-2.5 sm:grid-cols-2">
+                  {PRODUCTS.map((p) => {
+                    const imgSrc = p.image.startsWith("http") ? new URL(p.image).pathname : p.image;
+                    const isSelected = productId === p.id;
+                    const lowestPrice = Math.min(...p.options.map((o) => o.price));
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => { 
+                          setProductId(p.id); 
+                          const avail = p.options.findIndex(opt => !opt.soldOut);
+                          setOptionIdx(avail >= 0 ? avail : 0); 
+                        }}
+                        className={`flex items-center gap-3 rounded-2xl border p-2.5 text-left text-sm font-semibold transition ${
+                          isSelected
+                            ? "border-[#3F8F3F] bg-[#3F8F3F]/10 text-[#0F3D24] ring-2 ring-[#3F8F3F]/30"
+                            : "border-[#0F3D24]/15 bg-white text-[#0F3D24] hover:border-[#3F8F3F]"
+                        }`}
+                      >
+                        <img
+                          src={imgSrc}
+                          alt={p.name}
+                          className="h-12 w-12 shrink-0 rounded-xl object-cover"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="truncate font-semibold text-xs sm:text-sm">{p.name}</div>
+                          <div className="text-[11px] font-normal text-[#0F3D24]/60">
+                            From ₦{lowestPrice.toLocaleString("en-NG")} / {p.unitLabel}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

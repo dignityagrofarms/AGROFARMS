@@ -139,36 +139,82 @@ function ProductsPage() {
         </div>
 
         {/* Product cards auto-generated from PRODUCTS catalog */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-8 md:grid-cols-2">
           {PRODUCTS.map((product) => {
-            const Icon = ICONS[product.id] ?? Drumstick;
             const lowestPrice = Math.min(...product.options.map((o) => o.price));
+            const imgSrc = product.image.startsWith("http")
+              ? new URL(product.image).pathname
+              : product.image;
+
             return (
               <article
                 key={product.id}
                 id={product.id}
-                className="group rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5 transition hover:-translate-y-1 hover:shadow-md"
+                className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/10 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
               >
-                <div className="flex items-center gap-4">
-                  <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#0F3D24] text-[#a8e6a8] transition group-hover:bg-[#3F8F3F] group-hover:text-white">
-                    <Icon size={26} />
-                  </div>
-                  <h2 className="text-2xl font-semibold">{product.name}</h2>
+                {/* Real Product Photo Cover */}
+                <div className="relative h-60 w-full overflow-hidden bg-[#0F3D24]/5 sm:h-64">
+                  <img
+                    src={imgSrc}
+                    alt={product.name}
+                    className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  
+                  {/* Price Tag Badge */}
+                  <span className="absolute bottom-4 left-4 rounded-full bg-[#0F3D24]/90 px-3.5 py-1 text-xs font-bold text-[#a8e6a8] shadow-md backdrop-blur-md">
+                    From {naira(lowestPrice)} / {product.unitLabel}
+                  </span>
                 </div>
-                <p className="mt-5 leading-relaxed text-[#0F3D24]/75">{product.description}</p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {product.options.map((opt) => (
-                    <span key={opt.label} className="rounded-full bg-[#3F8F3F]/10 px-3 py-1 text-xs font-semibold text-[#0F3D24]">
-                      {opt.label} — {naira(opt.price)}
+
+                {/* Content */}
+                <div className="flex flex-1 flex-col p-6 sm:p-8">
+                  <h2 className="text-2xl font-bold text-[#0F3D24]">{product.name}</h2>
+                  <p className="mt-3 flex-1 text-sm leading-relaxed text-[#0F3D24]/80">
+                    {product.description}
+                  </p>
+
+                  {/* Options List */}
+                  <div className="mt-6 border-t border-[#0F3D24]/10 pt-4">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#3F8F3F]">
+                      Available Options & Prices
                     </span>
-                  ))}
-                </div>
-                <p className="mt-4 text-sm font-semibold text-[#3F8F3F]">
-                  From {naira(lowestPrice)} / {product.unitLabel}
-                </p>
-                <div className="mt-6 flex gap-3">
-                  <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4ea94e]">Order Now</Link>
-                  <Link to="/contact" className="inline-flex items-center rounded-full border border-[#0F3D24]/15 px-5 py-2.5 text-sm font-semibold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white">Enquire</Link>
+                    <div className="mt-2.5 flex flex-wrap gap-2">
+                      {product.options.map((opt) => (
+                        <span
+                          key={opt.label}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            opt.soldOut
+                              ? "bg-slate-100 text-slate-400 line-through"
+                              : "bg-[#3F8F3F]/10 text-[#0F3D24]"
+                          }`}
+                        >
+                          {opt.label} — {naira(opt.price)}
+                          {opt.soldOut && (
+                            <span className="ml-1 text-[10px] font-normal text-rose-500 no-underline">
+                              (Sold out)
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* CTA Buttons */}
+                  <div className="mt-6 flex flex-wrap gap-3 pt-2">
+                    <Link
+                      to="/order"
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#3F8F3F] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4ea94e]"
+                    >
+                      Order Now
+                    </Link>
+                    <Link
+                      to="/contact"
+                      className="inline-flex items-center justify-center rounded-full border border-[#0F3D24]/20 px-5 py-3 text-sm font-semibold text-[#0F3D24] transition hover:bg-[#0F3D24] hover:text-white"
+                    >
+                      Enquire
+                    </Link>
+                  </div>
                 </div>
               </article>
             );
