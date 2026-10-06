@@ -574,7 +574,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
       </div>
 
       {/* Interactive Sales & Revenue Line Chart */}
-      <FinanceSalesChart passcode={passcode} financials={financials} />
+      <FinanceSalesChart passcode={passcode} financials={allFinancials} />
 
       {/* Batch Detailed Financial Report (If a batch is selected) */}
       {selectedBatchId !== "all" && reportQuery.data && (
