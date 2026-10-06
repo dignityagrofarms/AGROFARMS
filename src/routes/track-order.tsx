@@ -227,6 +227,12 @@ function TrackOrder() {
                             <span className="text-white/60">Amount</span><span className="text-right font-semibold">{naira(order.total)}</span>
                           </div>
                         </div>
+                        <div className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-left ring-1 ring-amber-200">
+                          <Clock className="mt-0.5 shrink-0 text-amber-600" size={16} />
+                          <p className="text-xs text-amber-900">
+                            <span className="font-bold">Please note:</span> Orders typically take up to <strong>3 to 5 hours</strong> to be confirmed, processed, and delivered. Please exercise patience while we prepare your fresh order.
+                          </p>
+                        </div>
                       </div>
                     ) : (
                       <ol className="mt-6 space-y-3">

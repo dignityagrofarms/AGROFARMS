@@ -328,6 +328,13 @@ function OrderPage() {
                 </p>
               </div>
 
+              <div className="mt-4 flex items-start gap-3 rounded-2xl bg-amber-50 p-4 text-left ring-1 ring-amber-200">
+                <Clock className="mt-0.5 shrink-0 text-amber-600" size={18} />
+                <p className="text-xs text-amber-900">
+                  <span className="font-bold">Please note:</span> Orders typically take up to <strong>3 to 5 hours</strong> to be confirmed, processed, and delivered. Please exercise patience while we prepare your fresh order.
+                </p>
+              </div>
+
               {paymentClaimed ? (
                 <div className="mt-6 rounded-2xl bg-[#3F8F3F]/10 p-5 text-left ring-1 ring-[#3F8F3F]/30">
                   <p className="text-sm font-semibold text-[#0F3D24]">Thank you, we have been notified.</p>
