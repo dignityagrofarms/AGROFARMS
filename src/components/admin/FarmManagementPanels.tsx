@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -32,8 +32,10 @@ import {
   PhoneCall,
   UserCheck,
   ShieldAlert,
+  Download,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
+import { adminListOrders, type AdminOrder } from "@/lib/orders.functions";
 import {
   adminListBatches,
   adminCreateBatch,
@@ -71,7 +73,7 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
 
-  // Server functions
+  const listOrdersFn = useServerFn(adminListOrders);
   const listBatchesFn = useServerFn(adminListBatches);
   const createBatchFn = useServerFn(adminCreateBatch);
   const deleteBatchFn = useServerFn(adminDeleteBatch);
@@ -81,6 +83,13 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
   const getBatchReportFn = useServerFn(adminGetBatchReport);
 
   // Queries
+  const ordersQuery = useQuery({
+    queryKey: ["admin-orders-financials", passcode],
+    queryFn: () => listOrdersFn({ data: { passcode } }),
+    enabled: Boolean(passcode),
+    staleTime: 30000,
+  });
+
   const batchesQuery = useQuery({
     queryKey: ["farm-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode } }),
@@ -202,18 +211,62 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
   });
 
   const batches = batchesQuery.data || [];
-  const financials = financialsQuery.data || [];
+  const rawFinancials = financialsQuery.data || [];
+  const orders = ordersQuery.data?.orders || [];
+
+  // Convert non-cancelled store orders to financial income records
+  const storeOrderTransactions = useMemo(() => {
+    // If a specific batch is selected, only show store orders if batch overview is selected or match
+    if (selectedBatchId !== "all") return [];
+    return orders
+      .filter((o) => o.status !== "cancelled")
+      .map((o) => ({
+        id: `order_${o.id}`,
+        batchId: null,
+        batchName: "Store Sales",
+        type: "income" as const,
+        category: "Store Order",
+        amount: o.total || 0,
+        description: `Order #${o.orderCode} (${o.customerName})`,
+        paymentMethod: o.paymentStatus === "approved" ? "Bank Transfer" : "Submitted/Pending",
+        transactionDate: o.createdAt.split("T")[0],
+        referenceNo: o.orderCode,
+        createdAt: o.createdAt,
+        isOrder: true,
+      }));
+  }, [orders, selectedBatchId]);
+
+  // Combine store orders + manual farm financials
+  const allFinancials = useMemo(() => {
+    const combined = [...storeOrderTransactions, ...rawFinancials];
+    return combined.sort(
+      (a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()
+    );
+  }, [storeOrderTransactions, rawFinancials]);
 
   // Metrics calculation
-  const totalIncome = financials
-    .filter((f) => f.type === "income")
-    .reduce((sum, f) => sum + f.amount, 0);
-  const totalExpense = financials
-    .filter((f) => f.type === "expense")
-    .reduce((sum, f) => sum + f.amount, 0);
+  const totalStoreIncome = useMemo(() => {
+    if (selectedBatchId !== "all") return 0;
+    return storeOrderTransactions.reduce((sum, t) => sum + t.amount, 0);
+  }, [storeOrderTransactions, selectedBatchId]);
+
+  const totalManualIncome = useMemo(() => {
+    return rawFinancials
+      .filter((f) => f.type === "income")
+      .reduce((sum, f) => sum + f.amount, 0);
+  }, [rawFinancials]);
+
+  const totalIncome = totalStoreIncome + totalManualIncome;
+
+  const totalExpense = useMemo(() => {
+    return rawFinancials
+      .filter((f) => f.type === "expense")
+      .reduce((sum, f) => sum + f.amount, 0);
+  }, [rawFinancials]);
+
   const netProfit = totalIncome - totalExpense;
 
-  const filteredFinancials = financials.filter((f) => {
+  const filteredFinancials = allFinancials.filter((f) => {
     if (typeFilter !== "all" && f.type !== typeFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -225,6 +278,51 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
     }
     return true;
   });
+
+  // Export Batch Financial Report to CSV
+  const handleExportCSV = () => {
+    const batchName = selectedBatchId === "all" ? "All_Batches_Farm_Overview" : (reportQuery.data?.batch.batchName || "Batch_Report");
+    const batchType = reportQuery.data?.batch.batchType || "Broiler & Layer";
+    const headcount = reportQuery.data?.batch.currentHeadcount || batches.reduce((sum, b) => sum + b.currentHeadcount, 0);
+    const mortality = reportQuery.data?.totalMortality || 0;
+    const mortalityRate = reportQuery.data?.mortalityRatePercentage || 0;
+    const roiVal = totalExpense > 0 ? ((netProfit / totalExpense) * 100).toFixed(1) : "0";
+
+    const headers = ["Date", "Type", "Category", "Batch", "Description", "Payment Method", "Amount (NGN)"];
+    const rows = filteredFinancials.map((t) => [
+      t.transactionDate || "",
+      t.type ? t.type.toUpperCase() : "",
+      t.category || "",
+      t.batchName || "",
+      `"${(t.description || "").replace(/"/g, '""')}"`,
+      t.paymentMethod || "",
+      t.amount || 0,
+    ]);
+
+    const csvLines = [
+      `"DIGNITY AGRO FARMS - FINANCIAL & BATCH REPORT"`,
+      `"Report Date: ${new Date().toLocaleString()}"`,
+      `"View / Batch: ${batchName}"`,
+      `"Batch Type: ${batchType}"`,
+      `"Live Headcount: ${headcount} birds"`,
+      `"Mortality Rate: ${mortality} birds (${mortalityRate}%)"`,
+      `"Total Revenue (Income): NGN ${totalIncome.toLocaleString()}"`,
+      `"Total Expenses: NGN ${totalExpense.toLocaleString()}"`,
+      `"Net Profit/Loss: NGN ${netProfit.toLocaleString()}"`,
+      `"ROI: ${roiVal}%"`,
+      "",
+      headers.join(","),
+      ...rows.map((r) => r.join(",")),
+    ];
+
+    const csvBlob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(csvBlob);
+    link.setAttribute("download", `AgroFarms_Report_${batchName}_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="space-y-6">
@@ -254,6 +352,14 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
           >
             <PlusCircle size={16} />
             Register Income / Expense
+          </button>
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-2 rounded-full border border-[#3F8F3F] bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#3F8F3F]/20 transition"
+            title="Export full batch financial report as CSV"
+          >
+            <Download size={16} className="text-[#3F8F3F]" />
+            Export Report
           </button>
         </div>
       </div>
@@ -512,15 +618,21 @@ export function BatchFinancialsPanel({ passcode }: { passcode: string }) {
                       {f.type === "income" ? "+" : "-"}{formatNaira(f.amount)}
                     </td>
                     <td className="px-4 py-3.5 text-center">
-                      <button
-                        onClick={() => {
-                          if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
-                        }}
-                        className="text-rose-600 hover:text-rose-800 transition p-1"
-                        title="Delete record"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {"isOrder" in f && f.isOrder ? (
+                        <span className="rounded-full bg-[#3F8F3F]/10 px-2 py-0.5 text-[10px] font-semibold text-[#0F3D24]">
+                          Store Order
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
+                          }}
+                          className="text-rose-600 hover:text-rose-800 transition p-1"
+                          title="Delete record"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

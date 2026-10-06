@@ -359,16 +359,25 @@ function AdminOrders() {
           />
         )}
         {passcode && (
-          <div className="mb-6 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-[#0F3D24]/10 pb-3" style={{ scrollbarWidth: "none" }} role="tablist" aria-label="Admin sections">
-            {query.data?.role && <span className="inline-flex shrink-0 items-center rounded-full bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24]">Signed in as {query.data.role}</span>}
-            <div className="shrink-0"><AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders & reports</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "financials"} onClick={() => setActiveTab("financials")} icon={<TrendingUp size={15} />}>Batches & Financials</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "activities"} onClick={() => setActiveTab("activities")} icon={<Activity size={15} />}>Daily Activities & Mortality</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Order Clients</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "leads"} onClick={() => setActiveTab("leads")} icon={<UserPlus size={15} />}>Customer Leads CRM</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab></div>
-            <div className="shrink-0"><AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<Gift size={15} />}>December Pre-Orders</AdminTab></div>
+          <div className="mb-6 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">Admin Navigation & Controls</span>
+              {query.data?.role && (
+                <span className="inline-flex items-center rounded-full bg-[#3F8F3F]/10 px-3 py-1 text-xs font-bold text-[#0F3D24]">
+                  Signed in as {query.data.role}
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8" role="tablist" aria-label="Admin sections">
+              <AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders & reports</AdminTab>
+              <AdminTab active={activeTab === "financials"} onClick={() => setActiveTab("financials")} icon={<TrendingUp size={15} />}>Batches & Financials</AdminTab>
+              <AdminTab active={activeTab === "activities"} onClick={() => setActiveTab("activities")} icon={<Activity size={15} />}>Daily Activities & Mortality</AdminTab>
+              <AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Order Clients</AdminTab>
+              <AdminTab active={activeTab === "leads"} onClick={() => setActiveTab("leads")} icon={<UserPlus size={15} />}>Customer Leads CRM</AdminTab>
+              <AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab>
+              <AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab>
+              <AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<Gift size={15} />}>December Pre-Orders</AdminTab>
+            </div>
           </div>
         )}
         {!passcode ? (
@@ -495,9 +504,14 @@ function AdminTab({ active, onClick, icon, children }: { active: boolean; onClic
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-xs font-semibold transition ${active ? "bg-[#0F3D24] text-white" : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"}`}
+      className={`flex w-full items-center justify-center gap-1.5 rounded-2xl px-2.5 py-2.5 text-center text-xs font-semibold transition ${
+        active
+          ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
+          : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
+      }`}
     >
-      {icon} {children}
+      <span className="shrink-0">{icon}</span>
+      <span className="truncate">{children}</span>
     </button>
   );
 }
