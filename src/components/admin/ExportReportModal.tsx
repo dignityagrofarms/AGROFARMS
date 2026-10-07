@@ -204,17 +204,17 @@ export function ExportReportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
+      <div className="w-full h-[96dvh] sm:h-auto sm:max-h-[92vh] max-w-2xl overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#0F3D24]/10 bg-[#0F3D24] px-6 py-5 text-white">
+        <div className="flex items-center justify-between border-b border-[#0F3D24]/10 bg-[#0F3D24] px-4 sm:px-6 py-4 text-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-[#3F8F3F]/30 p-2.5 text-[#A2E0A2]">
-              <Sparkles size={22} />
+            <div className="rounded-xl bg-[#3F8F3F]/30 p-2 sm:p-2.5 text-[#A2E0A2] shrink-0">
+              <Sparkles size={20} className="sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className="text-lg font-bold">Export Custom Farm Report</h3>
-              <p className="text-xs text-white/70">
+              <h3 className="text-base sm:text-lg font-bold leading-tight">Export Custom Farm Report</h3>
+              <p className="text-[11px] sm:text-xs text-white/70">
                 Customize format, filters, financial ledgers & farm activities
               </p>
             </div>
@@ -227,7 +227,8 @@ export function ExportReportModal({
           </button>
         </div>
 
-        <div className="max-h-[78vh] overflow-y-auto p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+
           {/* Format Selection */}
           <div>
             <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[#0F3D24]">

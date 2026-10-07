@@ -52,8 +52,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
     newPasscode.trim() === confirmPasscode.trim();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden">
+      <div className="w-full h-[96dvh] sm:h-auto sm:max-h-[90vh] max-w-md flex flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10">
+
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#0F3D24]/10 bg-[#0F3D24] px-5 sm:px-6 py-4 sm:py-5 text-white shrink-0">
           <div className="flex items-center gap-3">

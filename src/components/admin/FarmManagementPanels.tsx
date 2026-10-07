@@ -838,16 +838,17 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
       {/* Modal: New Batch */}
       {showBatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-lg font-bold text-[#0F3D24]">Register New Farm Batch</h3>
-              <button onClick={() => setShowBatchModal(false)} className="text-gray-400 hover:text-gray-600">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-md overflow-hidden animate-in fade-in duration-200">
+          <div className="w-full h-[96dvh] sm:h-auto sm:max-h-[90vh] max-w-lg rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b pb-3 shrink-0">
+              <h3 className="text-base sm:text-lg font-bold text-[#0F3D24]">Register New Farm Batch</h3>
+              <button onClick={() => setShowBatchModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+
               <div>
                 <label className="block text-xs font-bold text-[#0F3D24]">Batch Name *</label>
                 <input
@@ -939,16 +940,17 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
       {/* Modal: New Financial Record */}
       {showFinancialModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-lg font-bold text-[#0F3D24]">Register Financial Transaction</h3>
-              <button onClick={() => setShowFinancialModal(false)} className="text-gray-400 hover:text-gray-600">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 p-0 sm:p-4 backdrop-blur-md overflow-hidden animate-in fade-in duration-200">
+          <div className="w-full h-[96dvh] sm:h-auto sm:max-h-[90vh] max-w-lg rounded-t-3xl sm:rounded-3xl bg-white p-5 sm:p-6 shadow-2xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between border-b pb-3 shrink-0">
+              <h3 className="text-base sm:text-lg font-bold text-[#0F3D24]">Register Financial Transaction</h3>
+              <button onClick={() => setShowFinancialModal(false)} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={20} />
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="flex-1 overflow-y-auto py-4 space-y-3">
+
               {/* Type Switcher */}
               <div className="grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 p-1 text-center font-bold text-xs">
                 <button

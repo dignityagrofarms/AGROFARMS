@@ -228,8 +228,8 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
                 <Loader2 size={18} className="animate-spin mx-auto mb-1" /> Loading accounts...
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-[#0F3D24]/10">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto rounded-2xl border border-[#0F3D24]/10 shadow-sm">
+                <table className="w-full text-left text-xs min-w-[600px]">
                   <thead className="bg-[#F7F5F0] text-[#0F3D24]/70 font-bold uppercase tracking-wider">
                     <tr>
                       <th className="p-3">Username</th>
@@ -311,7 +311,7 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
 
       {/* Modal for Resetting a Target Account Password */}
       {resetTargetUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl space-y-4">
             <h3 className="text-base font-bold text-[#0F3D24]">Reset Passcode for "{resetTargetUser}"</h3>
             <input
@@ -337,3 +337,4 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
     </div>
   );
 }
+

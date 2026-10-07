@@ -188,18 +188,19 @@ export function FinancialImportModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
-      <div className="relative w-full max-w-3xl rounded-3xl bg-white p-6 shadow-2xl space-y-5 my-8">
-        <div className="flex items-center justify-between border-b pb-3">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 overflow-hidden animate-in fade-in duration-200">
+      <div className="w-full h-[96dvh] sm:h-auto sm:max-h-[92vh] max-w-3xl rounded-t-3xl sm:rounded-3xl bg-white p-4 sm:p-6 shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between border-b border-[#0F3D24]/10 pb-3 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#0F3D24]/10 text-[#0F3D24]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#0F3D24]/10 text-[#0F3D24] shrink-0">
               <FileSpreadsheet size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-[#0F3D24]">Bulk Financials & Sales Import</h3>
-              <p className="text-xs text-[#0F3D24]/70">Import income/expenses & auto-match paper sales to website orders</p>
+              <h3 className="text-base sm:text-lg font-bold text-[#0F3D24] leading-tight">Bulk Financials & Sales Import</h3>
+              <p className="text-[11px] sm:text-xs text-[#0F3D24]/70">Import income/expenses & auto-match paper sales to website orders</p>
             </div>
           </div>
+
           <button onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <X size={20} />
           </button>
