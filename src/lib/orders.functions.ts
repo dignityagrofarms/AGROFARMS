@@ -625,10 +625,56 @@ export const adminToggleUserActive = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export function verifyTotpCode(code: string, secretBase32: string): boolean {
+  if (!code || !secretBase32) return false;
+  const cleanedCode = code.replace(/\s+/g, "").trim();
+  if (cleanedCode.length !== 6 || !/^\d{6}$/.test(cleanedCode)) return false;
+
+  try {
+    const crypto = require("crypto");
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+    let bits = "";
+    const cleanB32 = secretBase32.toUpperCase().replace(/=/g, "").replace(/[^A-Z2-7]/g, "");
+    for (let i = 0; i < cleanB32.length; i++) {
+      const val = alphabet.indexOf(cleanB32.charAt(i));
+      if (val >= 0) bits += val.toString(2).padStart(5, "0");
+    }
+    const bytes = [];
+    for (let i = 0; i + 8 <= bits.length; i += 8) {
+      bytes.push(parseInt(bits.substr(i, 8), 2));
+    }
+    const key = Buffer.from(bytes);
+    const now = Math.floor(Date.now() / 1000);
+
+    for (let window = -1; window <= 1; window++) {
+      const counter = Math.floor((now + window * 30) / 30);
+      const buf = Buffer.alloc(8);
+      buf.writeBigInt64BE(BigInt(counter), 0);
+
+      const hmac = crypto.createHmac("sha1", key).update(buf).digest();
+      const offset = hmac[hmac.length - 1] & 0xf;
+      const binary =
+        ((hmac[offset] & 0x7f) << 24) |
+        ((hmac[offset + 1] & 0xff) << 16) |
+        ((hmac[offset + 2] & 0xff) << 8) |
+        (hmac[offset + 3] & 0xff);
+      const otp = (binary % 1000000).toString().padStart(6, "0");
+
+      if (otp === cleanedCode) return true;
+    }
+  } catch (e) {
+    console.warn("TOTP verification error:", e);
+  }
+
+  return false;
+}
+
 export const adminRecoverPasscode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({
-      recoveryKey: z.string().trim().min(4),
+      recoveryMethod: z.enum(["key", "totp"]).default("key"),
+      recoveryKey: z.string().trim().optional().nullable(),
+      totpCode: z.string().trim().optional().nullable(),
       targetUsername: z.string().trim().min(1).toLowerCase(),
       newPasscode: z.string().trim().min(6).max(60),
     }).parse(data),
@@ -636,16 +682,40 @@ export const adminRecoverPasscode = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const masterRecovery = process.env.ADMIN_RECOVERY_KEY;
     const masterPasscode = process.env.ADMIN_PASSCODE;
+    const masterTotpSecret = process.env.ADMIN_TOTP_SECRET;
 
-    if (!masterRecovery && !masterPasscode) {
-      throw new Error("Master Recovery Key is not configured on the server environment.");
-    }
+    let authorized = false;
 
-    const matchesRecovery = Boolean(masterRecovery && data.recoveryKey === masterRecovery);
-    const matchesMaster = Boolean(masterPasscode && data.recoveryKey === masterPasscode);
-    
-    if (!matchesRecovery && !matchesMaster) {
-      throw new Error("Invalid Master Recovery Key. Password recovery failed.");
+    if (data.recoveryMethod === "totp") {
+      if (!data.totpCode) throw new Error("Please enter your 6-digit Authenticator code.");
+      if (masterTotpSecret && verifyTotpCode(data.totpCode, masterTotpSecret)) {
+        authorized = true;
+      } else {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: userRow } = await (supabaseAdmin as any)
+          .from("admin_access")
+          .select("totp_secret")
+          .eq("username", data.targetUsername)
+          .single();
+
+        if (userRow?.totp_secret && verifyTotpCode(data.totpCode, userRow.totp_secret)) {
+          authorized = true;
+        }
+      }
+
+      if (!authorized) {
+        throw new Error("Invalid or expired 6-digit Authenticator code. Check your phone app.");
+      }
+    } else {
+      if (!data.recoveryKey) throw new Error("Please enter your Master Recovery Key.");
+      const matchesRecovery = Boolean(masterRecovery && data.recoveryKey === masterRecovery);
+      const matchesMaster = Boolean(masterPasscode && data.recoveryKey === masterPasscode);
+      if (matchesRecovery || matchesMaster) {
+        authorized = true;
+      }
+      if (!authorized) {
+        throw new Error("Invalid Master Recovery Key. Password recovery failed.");
+      }
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

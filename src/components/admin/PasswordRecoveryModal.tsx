@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { KeyRound, ShieldAlert, X, CheckCircle2, Loader2 } from "lucide-react";
+import { KeyRound, ShieldAlert, X, CheckCircle2, Loader2, Smartphone } from "lucide-react";
 import { adminRecoverPasscode } from "@/lib/orders.functions";
 
 interface PasswordRecoveryModalProps {
@@ -11,7 +11,9 @@ interface PasswordRecoveryModalProps {
 }
 
 export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRecoveryModalProps) {
+  const [recoveryMethod, setRecoveryMethod] = useState<"key" | "totp">("key");
   const [recoveryKey, setRecoveryKey] = useState("");
+  const [totpCode, setTotpCode] = useState("");
   const [targetUsername, setTargetUsername] = useState("owner");
   const [newPasscode, setNewPasscode] = useState("");
   const [confirmPasscode, setConfirmPasscode] = useState("");
@@ -23,7 +25,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
     mutationFn: () =>
       recoverFn({
         data: {
-          recoveryKey: recoveryKey.trim(),
+          recoveryMethod,
+          recoveryKey: recoveryKey.trim() || null,
+          totpCode: totpCode.trim() || null,
           targetUsername: targetUsername.trim().toLowerCase(),
           newPasscode: newPasscode.trim(),
         },
@@ -40,8 +44,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
 
   if (!isOpen) return null;
 
+  const isKeyValid = recoveryMethod === "key" ? recoveryKey.trim().length >= 4 : totpCode.trim().length === 6;
   const canSubmit =
-    recoveryKey.trim().length >= 4 &&
+    isKeyValid &&
     targetUsername.trim().length >= 1 &&
     newPasscode.trim().length >= 6 &&
     newPasscode.trim() === confirmPasscode.trim();
@@ -66,23 +71,72 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
         </div>
 
         <div className="p-6 space-y-4 text-xs">
-          <div className="rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-amber-900 flex items-start gap-2.5">
-            <ShieldAlert size={18} className="shrink-0 mt-0.5" />
-            <p>
-              Enter the farm's Master Recovery Key (or Master Passcode) to reset credentials safely.
-            </p>
+          {/* Recovery Method Selector */}
+          <div className="flex rounded-2xl bg-[#F7F5F0] p-1 border border-[#0F3D24]/10">
+            <button
+              type="button"
+              onClick={() => { setRecoveryMethod("key"); setErrorMsg(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 font-bold text-xs transition ${
+                recoveryMethod === "key"
+                  ? "bg-[#0F3D24] text-white shadow-xs"
+                  : "text-[#0F3D24]/70 hover:bg-[#0F3D24]/5"
+              }`}
+            >
+              <KeyRound size={14} /> Master Key / Phrase
+            </button>
+            <button
+              type="button"
+              onClick={() => { setRecoveryMethod("totp"); setErrorMsg(null); }}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 font-bold text-xs transition ${
+                recoveryMethod === "totp"
+                  ? "bg-[#0F3D24] text-white shadow-xs"
+                  : "text-[#0F3D24]/70 hover:bg-[#0F3D24]/5"
+              }`}
+            >
+              <Smartphone size={14} /> Authenticator App (TOTP)
+            </button>
           </div>
 
-          <label className="block font-bold text-[#0F3D24]">
-            Master Recovery Key
-            <input
-              type="password"
-              value={recoveryKey}
-              onChange={(e) => setRecoveryKey(e.target.value)}
-              placeholder="Enter recovery phrase or master key"
-              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
-            />
-          </label>
+          {recoveryMethod === "key" ? (
+            <div className="rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-amber-900 flex items-start gap-2.5">
+              <ShieldAlert size={18} className="shrink-0 mt-0.5" />
+              <p>
+                Enter the farm's Master Recovery Key (or Master Passcode) configured in your environment to reset credentials safely.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-blue-50 p-3.5 border border-blue-200 text-blue-900 flex items-start gap-2.5">
+              <Smartphone size={18} className="shrink-0 mt-0.5" />
+              <p>
+                Open Google Authenticator, Authy, or Apple Passwords on your phone and enter the 6-digit code.
+              </p>
+            </div>
+          )}
+
+          {recoveryMethod === "key" ? (
+            <label className="block font-bold text-[#0F3D24]">
+              Master Recovery Key / Phrase
+              <input
+                type="password"
+                value={recoveryKey}
+                onChange={(e) => setRecoveryKey(e.target.value)}
+                placeholder="Enter recovery phrase or master key"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
+              />
+            </label>
+          ) : (
+            <label className="block font-bold text-[#0F3D24]">
+              6-Digit Authenticator Code (TOTP)
+              <input
+                type="text"
+                maxLength={6}
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="e.g. 123456"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-center text-lg font-mono font-bold tracking-widest outline-none focus:border-[#3F8F3F]"
+              />
+            </label>
+          )}
 
           <label className="block font-bold text-[#0F3D24]">
             Account Username to Reset
@@ -112,25 +166,40 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               type="password"
               value={confirmPasscode}
               onChange={(e) => setConfirmPasscode(e.target.value)}
-              placeholder="Confirm new passcode"
+              placeholder="Re-enter new passcode"
               className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
             />
           </label>
 
-          {errorMsg && <p className="text-xs font-semibold text-red-600">{errorMsg}</p>}
+          {errorMsg && (
+            <div className="rounded-xl bg-rose-50 p-3 text-rose-700 font-semibold border border-rose-200">
+              {errorMsg}
+            </div>
+          )}
 
-          <div className="flex gap-2 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 rounded-full bg-slate-100 py-3 font-semibold text-[#0F3D24]">
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-gray-100 px-5 py-2.5 font-semibold text-gray-600 hover:bg-gray-200 transition"
+            >
               Cancel
             </button>
             <button
               type="button"
               disabled={!canSubmit || recoverMut.isPending}
               onClick={() => recoverMut.mutate()}
-              className="flex-1 flex items-center justify-center gap-2 rounded-full bg-[#0F3D24] py-3 font-bold text-white disabled:opacity-40 hover:bg-[#134a2c] transition"
+              className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-2.5 font-bold text-white shadow-md hover:bg-[#134a2c] disabled:opacity-50 transition"
             >
-              {recoverMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-              {recoverMut.isPending ? "Recovering..." : "Recover Passcode"}
+              {recoverMut.isPending ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Verifying...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={16} /> Recover & Reset Credentials
+                </>
+              )}
             </button>
           </div>
         </div>
