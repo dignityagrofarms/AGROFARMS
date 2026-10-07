@@ -261,223 +261,358 @@ export function generateExcelReport(options: ExportReportOptions) {
   XLSX.writeFile(wb, filename);
 }
 
-/**
- * Generate Printable Branded PDF Report
- */
 export async function generatePDFReport(options: ExportReportOptions) {
-  const container = document.createElement("div");
-  container.style.position = "fixed";
-  container.style.top = "-9999px";
-  container.style.left = "0";
-  container.style.width = "800px";
-  container.style.backgroundColor = "#ffffff";
-  container.style.padding = "32px";
-  container.style.fontFamily = "'Inter', sans-serif";
-  container.style.color = "#0F3D24";
-  container.style.zIndex = "-9999";
+  const PAGE_W = 794; // A4 @ 96dpi
+  const PAGE_H = 1123;
+  const PAD = 32;
+  const FOOTER_H = 34;
+  const CONTENT_W = PAGE_W - PAD * 2;
+  const CONTENT_MAX_H = PAGE_H - PAD * 2 - FOOTER_H;
 
-  const finRowsHtml = options.includeFinancials
-    ? options.financials
-        .map(
-          (t, idx) => `
-        <tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#F7F5F0"}; border-bottom: 1px solid #E5E7EB;">
-          <td style="padding: 8px 12px; font-size: 11px;">${t.transactionDate}</td>
-          <td style="padding: 8px 12px; font-size: 11px; font-weight: 600; color: ${t.type === "income" ? "#166534" : "#991B1B"};">
-            ${t.type ? t.type.toUpperCase() : ""}
-          </td>
-          <td style="padding: 8px 12px; font-size: 11px;">${t.category || ""}</td>
-          <td style="padding: 8px 12px; font-size: 11px;">${t.batchName || "N/A"}</td>
-          <td style="padding: 8px 12px; font-size: 11px;">${t.description || ""}</td>
-          <td style="padding: 8px 12px; font-size: 11px; text-align: right; font-weight: 700;">
-            ${formatNaira(t.amount || 0)}
-          </td>
-        </tr>
-      `
-        )
-        .join("")
-    : "";
+  const esc = (v: unknown) =>
+    String(v ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  const money = (val: number) => (val < 0 ? "-" : "") + formatNaira(Math.abs(val));
+  const dateOnly = (d?: string) => (d ? d.split("T")[0] : "");
 
-  const actRowsHtml = options.includeActivities
-    ? options.activities
-        .map(
-          (a, idx) => `
-        <tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#F7F5F0"}; border-bottom: 1px solid #E5E7EB;">
-          <td style="padding: 8px 12px; font-size: 11px;">${a.activityDate}</td>
-          <td style="padding: 8px 12px; font-size: 11px; font-weight: 600; color: #0F3D24;">
-            ${a.activityType || "General"}
-          </td>
-          <td style="padding: 8px 12px; font-size: 11px;">${a.batchName || "N/A"}</td>
-          <td style="padding: 8px 12px; font-size: 11px;">${a.description || ""}</td>
-          <td style="padding: 8px 12px; font-size: 11px;">${a.notes || "-"}</td>
-        </tr>
-      `
-        )
-        .join("")
-    : "";
+  interface Block {
+    html: string;
+    h: number;
+    repeat?: { key: string; html: string; h: number };
+    sets?: string;
+  }
+  interface RawBlock {
+    html: string;
+    repeat?: { key: string; html: string };
+    sets?: string;
+  }
 
-  container.innerHTML = `
-    <div id="pdf-report-target" style="width: 100%; box-sizing: border-box; font-family: system-ui, sans-serif;">
-      <!-- Header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0F3D24; pb-16px; margin-bottom: 24px; padding-bottom: 16px;">
-        <div>
-          <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #0F3D24; letter-spacing: -0.5px;">
-            DIGNITY AGRO FARMS
-          </h1>
-          <p style="margin: 4px 0 0 0; font-size: 12px; color: #3F8F3F; font-weight: 600;">
-            Official Farm Financial & Operations Report
-          </p>
-        </div>
-        <div style="text-align: right;">
-          <p style="margin: 0; font-size: 11px; color: #6B7280; font-weight: 600;">Report Date</p>
-          <p style="margin: 2px 0 0 0; font-size: 13px; font-weight: 700; color: #0F3D24;">
-            ${new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })}
-          </p>
-        </div>
+  const th = (label: string, align = "left") =>
+    `<th style="padding: 8px 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; text-align: ${align};">${label}</th>`;
+  const td = (content: string, extra = "") =>
+    `<td style="padding: 7px 10px; font-size: 11px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; ${extra}">${content}</td>`;
+  const tableWrap = (cols: number[], inner: string) =>
+    `<table style="width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left;"><colgroup>${cols
+      .map((c) => `<col style="width: ${c}%;">`)
+      .join("")}</colgroup>${inner}</table>`;
+
+  const finCols = [12, 9, 14, 14, 24, 13, 14];
+  const actCols = [13, 15, 17, 33, 22];
+
+  const finHead = tableWrap(
+    finCols,
+    `<thead><tr style="background-color: #0F3D24; color: #ffffff;">${th("Date")}${th("Type")}${th("Category")}${th(
+      "Batch"
+    )}${th("Description")}${th("Payment")}${th("Amount (NGN)", "right")}</tr></thead>`
+  );
+  const actHead = tableWrap(
+    actCols,
+    `<thead><tr style="background-color: #0F3D24; color: #ffffff;">${th("Date")}${th("Activity")}${th("Batch")}${th(
+      "Description"
+    )}${th("Notes")}</tr></thead>`
+  );
+  const sectionTitle = (text: string, cont = false) =>
+    `<h2 style="font-size: 14px; font-weight: 700; color: #0F3D24; margin: 0; padding: 0 0 6px 0; border-bottom: 2px solid #3F8F3F;">${text}${
+      cont ? ' <span style="font-weight: 500; color: #6B7280; font-size: 11px;">(continued)</span>' : ""
+    }</h2><div style="height: 8px;"></div>`;
+
+  // Totals computed from the exported rows so they always match the table.
+  let totalInc = 0;
+  let totalExp = 0;
+  options.financials.forEach((t) => {
+    const amt = Number(t.amount || 0);
+    if (t.type === "income") totalInc += amt;
+    if (t.type === "expense") totalExp += amt;
+  });
+  const totalNet = totalInc - totalExp;
+  const totalActivityCost = options.activities.reduce((s, a) => s + Number(a.cost || 0), 0);
+
+  const raw: RawBlock[] = [];
+
+  // Header
+  raw.push({
+    html: `
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0F3D24; padding-bottom: 14px;">
+      <div>
+        <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #0F3D24; letter-spacing: -0.5px;">DIGNITY AGRO FARMS</h1>
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: #3F8F3F; font-weight: 600;">Official Farm Financial &amp; Operations Report</p>
       </div>
-
-      <!-- Report Metadata -->
-      <div style="background-color: #F7F5F0; border-radius: 12px; padding: 16px; margin-bottom: 24px; display: flex; justify-content: space-between; gap: 16px; border: 1px solid #0F3D24/10;">
-        <div>
-          <span style="font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Batch / View</span>
-          <p style="margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: #0F3D24;">${options.batchName}</p>
-        </div>
-        <div>
-          <span style="font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Batch Type</span>
-          <p style="margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: #0F3D24;">${options.batchType}</p>
-        </div>
-        <div>
-          <span style="font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Date Period</span>
-          <p style="margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: #0F3D24;">${options.dateRangeText}</p>
-        </div>
-        <div>
-          <span style="font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase;">Live Headcount</span>
-          <p style="margin: 2px 0 0 0; font-size: 14px; font-weight: 700; color: #0F3D24;">${options.headcount} birds</p>
-        </div>
-      </div>
-
-      <!-- KPI Metric Cards -->
-      ${
-        options.includeKpis
-          ? `
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
-          <div style="background-color: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 10px; padding: 12px;">
-            <span style="font-size: 10px; font-weight: 700; color: #065F46; text-transform: uppercase;">Total Revenue</span>
-            <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #065F46;">${formatNaira(options.kpis.totalIncome)}</p>
-          </div>
-          <div style="background-color: #FFF1F2; border: 1px solid #FECDD3; border-radius: 10px; padding: 12px;">
-            <span style="font-size: 10px; font-weight: 700; color: #9F1239; text-transform: uppercase;">Total Expenses</span>
-            <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #9F1239;">${formatNaira(options.kpis.totalExpense)}</p>
-          </div>
-          <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 10px; padding: 12px;">
-            <span style="font-size: 10px; font-weight: 700; color: #166534; text-transform: uppercase;">Net Profit / Loss</span>
-            <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #166534;">${formatNaira(options.kpis.netProfit)}</p>
-          </div>
-          <div style="background-color: #F3F4F6; border: 1px solid #E5E7EB; border-radius: 10px; padding: 12px;">
-            <span style="font-size: 10px; font-weight: 700; color: #374151; text-transform: uppercase;">Profit Margin / ROI</span>
-            <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 800; color: #111827;">${options.kpis.roi}</p>
-          </div>
-        </div>
-      `
-          : ""
-      }
-
-      <!-- Financial Ledger Table -->
-      ${
-        options.includeFinancials
-          ? `
-        <div style="margin-bottom: 24px;">
-          <h2 style="font-size: 14px; font-weight: 700; color: #0F3D24; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #3F8F3F;">
-            Financial Ledger Transactions
-          </h2>
-          <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-              <tr style="background-color: #0F3D24; color: #ffffff;">
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Date</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Type</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Category</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Batch</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Description</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; text-align: right;">Amount (NGN)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${finRowsHtml}
-            </tbody>
-          </table>
-        </div>
-      `
-          : ""
-      }
-
-      <!-- Farm Activities Log Table -->
-      ${
-        options.includeActivities && options.activities.length > 0
-          ? `
-        <div style="margin-bottom: 24px;">
-          <h2 style="font-size: 14px; font-weight: 700; color: #0F3D24; margin: 0 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #3F8F3F;">
-            Daily Farm Operations & Activities Log
-          </h2>
-          <table style="width: 100%; border-collapse: collapse; text-align: left;">
-            <thead>
-              <tr style="background-color: #0F3D24; color: #ffffff;">
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Date</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Activity</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Batch</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Description</th>
-                <th style="padding: 8px 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${actRowsHtml}
-            </tbody>
-          </table>
-        </div>
-      `
-          : ""
-      }
-
-      <!-- Footer & Signature Block -->
-      <div style="margin-top: 40px; pt-16px; border-top: 1px solid #E5E7EB; display: flex; justify-content: space-between; align-items: flex-end; padding-top: 16px;">
-        <div>
-          <p style="margin: 0; font-size: 10px; color: #6B7280; font-weight: 600;">Dignity Agro Farms Management System</p>
-          <p style="margin: 2px 0 0 0; font-size: 10px; color: #9CA3AF;">Owerri, Imo State, Nigeria • Contact: support@dignityagrofarms.com</p>
-        </div>
-        <div style="text-align: right;">
-          <div style="width: 140px; border-bottom: 1px solid #0F3D24; margin-bottom: 4px;"></div>
-          <p style="margin: 0; font-size: 10px; font-weight: 700; color: #0F3D24;">Authorized Farm Manager</p>
-        </div>
+      <div style="text-align: right;">
+        <p style="margin: 0; font-size: 11px; color: #6B7280; font-weight: 600;">Report Date</p>
+        <p style="margin: 2px 0 0 0; font-size: 13px; font-weight: 700; color: #0F3D24;">${esc(
+          new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })
+        )}</p>
       </div>
     </div>
-  `;
+    <div style="height: 16px;"></div>`,
+  });
 
-  document.body.appendChild(container);
+  // Metadata
+  const metaCell = (label: string, value: string) => `
+    <div>
+      <span style="font-size: 10px; font-weight: 700; color: #6B7280; text-transform: uppercase;">${label}</span>
+      <p style="margin: 2px 0 0 0; font-size: 13px; font-weight: 700; color: #0F3D24;">${value}</p>
+    </div>`;
+  raw.push({
+    html: `
+    <div style="background-color: #F7F5F0; border-radius: 12px; padding: 14px 16px; border: 1px solid rgba(15,61,36,0.12);">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 16px;">
+        ${metaCell("Batch / View", esc(options.batchName))}
+        ${metaCell("Batch Type", esc(options.batchType))}
+        ${metaCell("Date Period", esc(options.dateRangeText))}
+        ${metaCell("Live Headcount", `${esc(options.headcount)} birds`)}
+        ${metaCell("Mortality", `${esc(options.mortality)} birds`)}
+        ${metaCell("Mortality Rate", `${esc(options.mortalityRate)}%`)}
+      </div>
+    </div>
+    <div style="height: 16px;"></div>`,
+  });
+
+  // KPI cards
+  if (options.includeKpis) {
+    const card = (bg: string, border: string, color: string, label: string, value: string) => `
+      <div style="background-color: ${bg}; border: 1px solid ${border}; border-radius: 10px; padding: 10px;">
+        <span style="font-size: 10px; font-weight: 700; color: ${color}; text-transform: uppercase;">${label}</span>
+        <p style="margin: 4px 0 0 0; font-size: 15px; font-weight: 800; color: ${color};">${value}</p>
+      </div>`;
+    raw.push({
+      html: `
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+        ${card("#ECFDF5", "#A7F3D0", "#065F46", "Total Revenue", money(options.kpis.totalIncome))}
+        ${card("#FFF1F2", "#FECDD3", "#9F1239", "Total Expenses", money(options.kpis.totalExpense))}
+        ${card(
+          options.kpis.netProfit >= 0 ? "#F0FDF4" : "#FEF2F2",
+          options.kpis.netProfit >= 0 ? "#BBF7D0" : "#FECACA",
+          options.kpis.netProfit >= 0 ? "#166534" : "#991B1B",
+          "Net Profit / Loss",
+          money(options.kpis.netProfit)
+        )}
+        ${card("#F3F4F6", "#E5E7EB", "#111827", "Profit Margin / ROI", esc(options.kpis.roi))}
+      </div>
+      <div style="height: 20px;"></div>`,
+    });
+  }
+
+  // Financial ledger
+  if (options.includeFinancials) {
+    const finRepeat = {
+      key: "fin",
+      html: sectionTitle("Financial Ledger Transactions", true) + finHead,
+    };
+    raw.push({
+      html: sectionTitle("Financial Ledger Transactions") + finHead,
+      sets: "fin",
+    });
+    if (options.financials.length === 0) {
+      raw.push({
+        html: `<p style="font-size: 11px; color: #6B7280; padding: 8px 10px; margin: 0;">No financial transactions found for this selection.</p>`,
+        repeat: finRepeat,
+      });
+    }
+    options.financials.forEach((t, idx) => {
+      raw.push({
+        html: tableWrap(
+          finCols,
+          `<tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#F7F5F0"}; border-bottom: 1px solid #E5E7EB;">
+            ${td(esc(dateOnly(t.transactionDate)))}
+            ${td(esc(t.type ? t.type.toUpperCase() : ""), `font-weight: 600; color: ${t.type === "income" ? "#166534" : "#991B1B"};`)}
+            ${td(esc(t.category || ""))}
+            ${td(esc(t.batchName || "N/A"))}
+            ${td(esc(t.description || ""))}
+            ${td(esc(t.paymentMethod || "N/A"))}
+            ${td(esc(formatNaira(Number(t.amount || 0))), "text-align: right; font-weight: 700;")}
+          </tr>`
+        ),
+        repeat: finRepeat,
+      });
+    });
+
+    const totalRow = (label: string, value: string, color: string, bg: string) =>
+      `<tr style="background-color: ${bg};">
+        <td colspan="6" style="padding: 8px 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; color: ${color};">${label}</td>
+        <td style="padding: 8px 10px; font-size: 12px; font-weight: 800; text-align: right; color: ${color};">${value}</td>
+      </tr>`;
+    raw.push({
+      html:
+        tableWrap(
+          finCols,
+          `<tbody style="border-top: 2px solid #0F3D24;">
+            ${totalRow("Total Revenue (Income)", money(totalInc), "#065F46", "#ECFDF5")}
+            ${totalRow("Total Expenses", money(totalExp), "#9F1239", "#FFF1F2")}
+            ${totalRow("Net Profit / Loss", money(totalNet), totalNet >= 0 ? "#166534" : "#991B1B", totalNet >= 0 ? "#F0FDF4" : "#FEF2F2")}
+          </tbody>`
+        ) + `<div style="height: 22px;"></div>`,
+      repeat: finRepeat,
+    });
+  }
+
+  // Farm activities
+  if (options.includeActivities && options.activities.length > 0) {
+    const actRepeat = {
+      key: "act",
+      html: sectionTitle("Daily Farm Operations &amp; Activities Log", true) + actHead,
+    };
+    raw.push({
+      html: sectionTitle("Daily Farm Operations &amp; Activities Log") + actHead,
+      sets: "act",
+    });
+    options.activities.forEach((a, idx) => {
+      const costNote = a.cost ? `Cost: ${formatNaira(Number(a.cost))}` : "";
+      const notes = [a.notes, costNote].filter(Boolean).join(" | ") || "-";
+      raw.push({
+        html: tableWrap(
+          actCols,
+          `<tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#F7F5F0"}; border-bottom: 1px solid #E5E7EB;">
+            ${td(esc(dateOnly(a.activityDate)))}
+            ${td(esc(a.activityType || "General"), "font-weight: 600; color: #0F3D24;")}
+            ${td(esc(a.batchName || "N/A"))}
+            ${td(esc(a.description || ""))}
+            ${td(esc(notes))}
+          </tr>`
+        ),
+        repeat: actRepeat,
+      });
+    });
+    if (totalActivityCost > 0) {
+      raw.push({
+        html: `<div style="padding: 8px 10px; font-size: 11px; font-weight: 800; color: #0F3D24; text-align: right; border-top: 2px solid #0F3D24;">Total Logged Activity Cost: ${esc(
+          formatNaira(totalActivityCost)
+        )}</div><div style="height: 20px;"></div>`,
+        repeat: actRepeat,
+      });
+    }
+  }
+
+  // Signature block
+  raw.push({
+    html: `
+    <div style="height: 18px;"></div>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 26px;">
+      <div style="text-align: left;">
+        <div style="width: 200px; border-bottom: 1px solid #0F3D24; margin-bottom: 4px;"></div>
+        <p style="margin: 0; font-size: 10px; font-weight: 700; color: #0F3D24;">Authorized Farm Manager (Signature)</p>
+      </div>
+      <div style="text-align: right;">
+        <div style="width: 200px; border-bottom: 1px solid #0F3D24; margin-bottom: 4px;"></div>
+        <p style="margin: 0; font-size: 10px; font-weight: 700; color: #0F3D24;">Date &amp; Official Stamp</p>
+      </div>
+    </div>`,
+  });
+
+  // ---- Measure blocks ----
+  const measurer = document.createElement("div");
+  // CRITICAL MOBILE FIX: Force fixed minimum width and ignore global box-sizing/max-width limits
+  measurer.style.cssText = `position: fixed; top: -99999px; left: -99999px; width: ${CONTENT_W}px; min-width: ${CONTENT_W}px !important; max-width: ${CONTENT_W}px !important; font-family: system-ui, sans-serif; color: #0F3D24; z-index: -9999; background: #fff; margin: 0 !important; padding: 0 !important; box-sizing: content-box !important;`;
+  document.body.appendChild(measurer);
+
+  const pageHost = document.createElement("div");
+  pageHost.style.cssText = `position: fixed; top: -99999px; left: -99999px; width: ${PAGE_W}px; min-width: ${PAGE_W}px !important; max-width: ${PAGE_W}px !important; z-index: -9999; background: #fff; margin: 0 !important; padding: 0 !important; box-sizing: content-box !important;`;
+  document.body.appendChild(pageHost);
 
   try {
-    const targetElement = container.querySelector("#pdf-report-target") as HTMLElement;
-    if (!targetElement) throw new Error("PDF target container not rendered");
+    if ((document as any).fonts?.ready) {
+      try {
+        await (document as any).fonts.ready;
+      } catch {
+        /* ignore */
+      }
+    }
 
-    const dataUrl = await toPng(targetElement, {
-      quality: 1.0,
-      pixelRatio: 2,
-      backgroundColor: "#ffffff",
+    const measureHtml = (html: string) => {
+      const el = document.createElement("div");
+      el.innerHTML = html;
+      measurer.appendChild(el);
+      const h = el.offsetHeight;
+      measurer.removeChild(el);
+      return h;
+    };
+
+    const blocks: Block[] = raw.map((b) => ({
+      html: b.html,
+      h: measureHtml(b.html),
+      sets: b.sets,
+      repeat: b.repeat ? { key: b.repeat.key, html: b.repeat.html, h: measureHtml(b.repeat.html) } : undefined,
+    }));
+
+    // ---- Paginate ----
+    const pages: string[][] = [];
+    let cur: string[] = [];
+    let curH = 0;
+    let activeKey: string | null = null;
+
+    const newPage = () => {
+      if (cur.length) pages.push(cur);
+      cur = [];
+      curH = 0;
+      activeKey = null;
+    };
+
+    blocks.forEach((b, i) => {
+      const needsRepeat = () => !!b.repeat && activeKey !== b.repeat.key;
+      const lookahead = b.sets && blocks[i + 1] ? blocks[i + 1].h : 0;
+      let need = b.h + lookahead + (needsRepeat() ? b.repeat!.h : 0);
+      if (curH + need > CONTENT_MAX_H && cur.length > 0) {
+        newPage();
+        need = b.h + lookahead + (needsRepeat() ? b.repeat!.h : 0);
+      }
+      if (needsRepeat()) {
+        cur.push(b.repeat!.html);
+        curH += b.repeat!.h;
+        activeKey = b.repeat!.key;
+      }
+      cur.push(b.html);
+      curH += b.h;
+      if (b.sets) activeKey = b.sets;
     });
+    if (cur.length) pages.push(cur);
 
-    const imgProps = new jsPDF().getImageProperties(dataUrl);
-    const pxToMm = 0.264583;
-    const pdfWidth = imgProps.width * (pxToMm / 2);
-    const pdfHeight = imgProps.height * (pxToMm / 2);
+    // ---- Render each page ----
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    const total = pages.length;
 
-    const pdf = new jsPDF({
-      orientation: pdfWidth > pdfHeight ? "landscape" : "portrait",
-      unit: "mm",
-      format: [pdfWidth, pdfHeight],
-    });
+    for (let p = 0; p < total; p++) {
+      pageHost.innerHTML = `
+        <div id="pdf-page-target" style="position: relative; width: ${PAGE_W}px; height: ${PAGE_H}px; min-width: ${PAGE_W}px; max-width: ${PAGE_W}px; box-sizing: border-box; padding: ${PAD}px; background: #ffffff; font-family: system-ui, sans-serif; color: #0F3D24; overflow: hidden; margin: 0; display: block;">
+          ${
+            p > 0
+              ? `<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #0F3D24; padding-bottom: 6px; margin-bottom: 14px;">
+                   <span style="font-size: 11px; font-weight: 800; color: #0F3D24;">DIGNITY AGRO FARMS — ${esc(options.batchName)} (continued)</span>
+                   <span style="font-size: 10px; color: #6B7280;">${esc(options.dateRangeText)}</span>
+                 </div>`
+              : ""
+          }
+          <div style="width: ${CONTENT_W}px;">${pages[p].join("")}</div>
+          <div style="position: absolute; left: ${PAD}px; right: ${PAD}px; bottom: 14px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #E5E7EB; padding-top: 8px; font-size: 10px; color: #6B7280;">
+            <span style="font-weight: 600;">Dignity Agro Farms Management System • Owerri, Imo State, Nigeria</span>
+            <span style="font-weight: 700; color: #0F3D24;">Page ${p + 1} of ${total}</span>
+          </div>
+        </div>`;
+      const target = pageHost.querySelector("#pdf-page-target") as HTMLElement;
+      if (!target) throw new Error("PDF page target not rendered");
 
-    pdf.addImage(dataUrl, "PNG", 0, 0, pdfWidth, pdfHeight);
+      // Wait a tick for fonts/layout if needed on mobile
+      await new Promise(r => setTimeout(r, 20));
+
+      const dataUrl = await toPng(target, {
+        quality: 1.0,
+        pixelRatio: 2,
+        backgroundColor: "#ffffff",
+      });
+
+      if (p > 0) pdf.addPage("a4", "portrait");
+      pdf.addImage(dataUrl, "PNG", 0, 0, pdfW, pdfH);
+    }
+
     const filename = `AgroFarms_Report_${options.batchName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.pdf`;
     pdf.save(filename);
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(measurer);
+    document.body.removeChild(pageHost);
   }
 }
 
