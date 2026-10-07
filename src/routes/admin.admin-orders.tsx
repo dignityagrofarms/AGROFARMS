@@ -482,24 +482,9 @@ function AdminOrders() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        {passcode && showSettings && (
-          <UserAccountsPanel
-            passcode={passcode}
-            role={query.data?.role || "owner"}
-            onPasscodeChanged={(next) => {
-              const u = parseAdminCredential(passcode).username;
-              const credential = JSON.stringify({ username: u, passcode: next, loginAt: Date.now(), lastActive: Date.now() });
-              localStorage.setItem(STORAGE_KEY, credential);
-              setPasscode(credential);
-            }}
-          />
-        )}
-        {passcode && query.data?.role === "owner" && (
-          <PendingApprovalsPanel passcode={passcode} role="owner" />
-        )}
         {passcode && (() => {
           const unprocessedOrders = (query.data?.orders || []).filter(
-            (o) => o.status === "received" || o.paymentStatus === "pending"
+            (o) => o.status === "received" || o.paymentStatus === "pending" || o.paymentStatus === "submitted"
           );
           if (unprocessedOrders.length === 0) return null;
           return (
@@ -520,7 +505,9 @@ function AdminOrders() {
               <button
                 onClick={() => {
                   setActiveTab("orders");
-                  setApplied((prev) => ({ ...prev, status: "received" }));
+                  setFilter("all");
+                  setStatusFilter("");
+                  setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
                 }}
                 className="rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white hover:bg-[#134a2c] transition shadow-sm"
               >
