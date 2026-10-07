@@ -625,13 +625,14 @@ export const adminToggleUserActive = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-export function verifyTotpCode(code: string, secretBase32: string): boolean {
+export async function verifyTotpCode(code: string, secretBase32: string): Promise<boolean> {
   if (!code || !secretBase32) return false;
   const cleanedCode = code.replace(/\s+/g, "").trim();
   if (cleanedCode.length !== 6 || !/^\d{6}$/.test(cleanedCode)) return false;
 
   try {
-    const crypto = require("crypto");
+    const cryptoModule = await import("crypto");
+    const crypto = cryptoModule.default || cryptoModule;
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     let bits = "";
     const cleanB32 = secretBase32.toUpperCase().replace(/=/g, "").replace(/[^A-Z2-7]/g, "");
@@ -688,7 +689,7 @@ export const adminRecoverPasscode = createServerFn({ method: "POST" })
 
     if (data.recoveryMethod === "totp") {
       if (!data.totpCode) throw new Error("Please enter your 6-digit Authenticator code.");
-      if (masterTotpSecret && verifyTotpCode(data.totpCode, masterTotpSecret)) {
+      if (masterTotpSecret && (await verifyTotpCode(data.totpCode, masterTotpSecret))) {
         authorized = true;
       } else {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -698,7 +699,7 @@ export const adminRecoverPasscode = createServerFn({ method: "POST" })
           .eq("username", data.targetUsername)
           .single();
 
-        if (userRow?.totp_secret && verifyTotpCode(data.totpCode, userRow.totp_secret)) {
+        if (userRow?.totp_secret && (await verifyTotpCode(data.totpCode, userRow.totp_secret))) {
           authorized = true;
         }
       }
