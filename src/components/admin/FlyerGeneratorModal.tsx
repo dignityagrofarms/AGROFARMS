@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Sparkles,
   Download,
@@ -9,8 +11,12 @@ import {
   ShieldCheck,
   Loader2,
   Eye,
+  ChevronRight,
+  ShoppingBag,
 } from "lucide-react";
+import logo from "@/assets/logo.png";
 import { drawSocialProofFlyerCanvas, maskName } from "@/lib/flyer-generator";
+import { adminListOrders, type AdminOrder } from "@/lib/orders.functions";
 
 export interface FlyerOrderData {
   orderCode: string;
@@ -27,10 +33,35 @@ interface FlyerGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialOrderData?: FlyerOrderData | null;
+  passcode?: string;
 }
 
-export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: FlyerGeneratorModalProps) {
+export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcode: propPasscode }: FlyerGeneratorModalProps) {
   const [mode, setMode] = useState<"promo" | "social_proof">(initialOrderData ? "social_proof" : "promo");
+  const listOrdersFn = useServerFn(adminListOrders);
+
+  // Retrieve passcode for database order queries
+  const [adminPasscode, setAdminPasscode] = useState(propPasscode || "");
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !adminPasscode) {
+      const saved =
+        localStorage.getItem("daf_admin_passcode") ||
+        localStorage.getItem("agrofarms_admin_passcode") ||
+        "";
+      if (saved) setAdminPasscode(saved);
+    }
+  }, [adminPasscode]);
+
+  // Fetch verified customer orders for 1-click social proof flyer creation
+  const ordersQuery = useQuery({
+    queryKey: ["admin-orders-flyer-select", adminPasscode],
+    queryFn: () => listOrdersFn({ data: { passcode: adminPasscode } }),
+    enabled: isOpen && Boolean(adminPasscode),
+    staleTime: 30000,
+  });
+
+  const availableOrders: AdminOrder[] = ordersQuery.data?.orders || [];
 
   // Promo Flyer Form State
   const [promoTitle, setPromoTitle] = useState("🎄 Christmas & Holiday Poultry Special");
@@ -55,6 +86,32 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
   const [generating, setGenerating] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const promoRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto-fill flyer fields when a verified order is selected from the list
+  const applyOrderToFlyer = (ord: AdminOrder | FlyerOrderData) => {
+    setCustomerName(ord.customerName);
+    setPhone("phone" in ord && ord.phone ? ord.phone : "07012345678");
+    setOrderCode(ord.orderCode);
+    setAddress("location" in ord ? ord.location : (ord as AdminOrder).address || "Owerri, Imo State");
+    
+    if ("itemsText" in ord && ord.itemsText) {
+      setItemsText(ord.itemsText);
+    } else if ("items" in ord && Array.isArray((ord as AdminOrder).items)) {
+      setItemsText((ord as AdminOrder).items.map((i) => `${i.product} × ${i.qty}`).join(", "));
+    }
+
+    if ("orderDate" in ord && ord.orderDate) {
+      setOrderDate(ord.orderDate);
+    } else if ("createdAt" in ord) {
+      setOrderDate(
+        new Date((ord as AdminOrder).createdAt).toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      );
+    }
+  };
 
   // Redraw canvas whenever form fields or mode change
   useEffect(() => {
@@ -85,7 +142,7 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
         const htmlToImage = await import("html-to-image");
         const dataUrl = await htmlToImage.toPng(promoRef.current, { quality: 0.95, pixelRatio: 2 });
         const link = document.createElement("a");
-        link.download = `DignityAgroFarms_Promo_Flyer_${Date.now()}.png`;
+        link.download = `DignityAgroFarms_ChristmasPromo_${Date.now()}.png`;
         link.href = dataUrl;
         link.click();
       }
@@ -124,7 +181,7 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
         // Fallback
       }
     } else {
-      const promoCaption = `🎄 *Dignity Agro Farms Special Promo!*\n${productName} @ ${promoPrice}\n${promoSubtitle}\n\nOrder online: https://dignityagrofarms.com`;
+      const promoCaption = `🎄 *Dignity Agro Farms Special Christmas Promo!*\n${productName} @ ${promoPrice}\n${promoSubtitle}\n\nOrder online: https://dignityagrofarms.com\nFollow us on IG/FB: @dignityagrofarms`;
       window.open(`https://wa.me/?text=${encodeURIComponent(promoCaption)}`, "_blank", "noopener,noreferrer");
     }
   };
@@ -137,7 +194,7 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
         <div className="flex items-center justify-between border-b border-[#0F3D24]/10 bg-[#0F3D24] px-4 sm:px-6 py-3.5 text-white shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="rounded-xl bg-[#3F8F3F]/30 p-2 text-[#A2E0A2] shrink-0">
-              <Sparkles size={18} className="sm:w-5 sm:h-5" />
+              <Sparkles size={18} className="sm:w-5 sm:h-5 text-amber-300" />
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-bold leading-tight">Flyer & Social Proof Generator</h3>
@@ -178,7 +235,7 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
               }`}
             >
               <Gift size={15} className="shrink-0 text-amber-400" />
-              <span className="truncate">Promo Poster</span>
+              <span className="truncate">🎄 Christmas Promo</span>
             </button>
           </div>
         </div>
@@ -190,6 +247,69 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
           <div className="space-y-4 text-xs">
             {mode === "social_proof" ? (
               <>
+                {/* 1-Click Order Selection Section */}
+                <div className="bg-[#F7F5F0] p-3.5 rounded-2xl border border-[#0F3D24]/15 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-[#0F3D24] flex items-center gap-1.5">
+                      <ShoppingBag size={15} className="text-[#3F8F3F]" />
+                      Auto-Fill From Verified Customer Orders
+                    </span>
+                    {availableOrders.length > 0 && (
+                      <span className="text-[10px] bg-[#0F3D24]/10 text-[#0F3D24] font-extrabold px-2 py-0.5 rounded-full">
+                        {availableOrders.length} Orders
+                      </span>
+                    )}
+                  </div>
+
+                  {availableOrders.length > 0 ? (
+                    <div className="space-y-2">
+                      <select
+                        onChange={(e) => {
+                          const found = availableOrders.find((o) => o.orderCode === e.target.value);
+                          if (found) applyOrderToFlyer(found);
+                        }}
+                        value={orderCode}
+                        className="w-full bg-white border border-[#0F3D24]/20 rounded-xl px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                      >
+                        <option value="">-- Choose Customer Order to Auto-Fill --</option>
+                        {availableOrders.map((ord) => (
+                          <option key={ord.id} value={ord.orderCode}>
+                            #{ord.orderCode} • {ord.customerName} ({ord.items.map((i) => `${i.product} × ${i.qty}`).join(", ")})
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Mini Scrollable Order Cards List */}
+                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 divide-y divide-[#0F3D24]/10 border-t border-[#0F3D24]/10 pt-2">
+                        {availableOrders.slice(0, 5).map((ord) => (
+                          <div
+                            key={ord.id}
+                            className="flex items-center justify-between py-1.5 text-xs gap-2 group hover:bg-white/60 p-1 rounded-lg transition"
+                          >
+                            <div className="truncate">
+                              <span className="font-mono font-bold text-[#3F8F3F] text-[11px]">#{ord.orderCode}</span>
+                              <span className="font-semibold text-[#0F3D24] ml-1.5 truncate">{ord.customerName}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => applyOrderToFlyer(ord)}
+                              className="shrink-0 bg-[#0F3D24] hover:bg-[#134a2c] text-white px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition"
+                            >
+                              <span>Create Flyer</span>
+                              <ChevronRight size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[#0F3D24]/70">
+                      You can enter order details manually below, or select from verified store orders.
+                    </p>
+                  )}
+                </div>
+
+                {/* Privacy Masking Toggle */}
                 <div className="flex items-center justify-between bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200/80 shadow-sm">
                   <div className="flex items-center gap-2.5 text-[#0F3D24] pr-2">
                     <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
@@ -338,50 +458,70 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
                 <canvas ref={canvasRef} className="w-full h-full object-contain block" />
               </div>
             ) : (
+              /* UPGRADED WHITE LUXURY HOLIDAY PROMO FLYER DESIGN */
               <div
                 ref={promoRef}
-                className="w-full max-w-[290px] sm:max-w-[340px] aspect-[4/5] bg-gradient-to-br from-[#0F3D24] via-[#134a2c] to-[#0A2918] p-5 sm:p-6 text-white rounded-3xl shadow-xl flex flex-col justify-between relative overflow-hidden ring-4 ring-[#3F8F3F]/30"
+                className="w-full max-w-[290px] sm:max-w-[340px] aspect-[4/5] bg-white border-4 border-[#0F3D24]/20 rounded-3xl p-5 sm:p-6 text-[#0F3D24] shadow-2xl flex flex-col justify-between relative overflow-hidden ring-4 ring-amber-400/40"
               >
-                <div className="flex items-center justify-between border-b border-white/15 pb-3.5 relative z-10">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-full bg-[#3F8F3F] flex items-center justify-center font-extrabold text-xs shadow-md shrink-0">
-                      DAF
-                    </div>
+                {/* Decorative Festive Top Bar */}
+                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 via-[#3F8F3F] to-amber-500" />
+
+                {/* Header: Logo, Title, Official Badge */}
+                <div className="flex items-center justify-between border-b border-[#0F3D24]/15 pb-3 relative z-10">
+                  <div className="flex items-center gap-2.5">
+                    <img
+                      src={logo}
+                      alt="Dignity Agro Farms"
+                      className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover ring-2 ring-[#0F3D24] shadow-sm shrink-0"
+                    />
                     <div>
-                      <h4 className="font-black text-xs sm:text-sm tracking-tight leading-none text-white">
+                      <h4 className="font-black text-xs sm:text-sm tracking-tight leading-none text-[#0F3D24]">
                         DIGNITY AGRO FARMS
                       </h4>
-                      <span className="text-[9px] text-[#A2E0A2] font-semibold">QUALITY POULTRY & FARM PRODUCE</span>
+                      <span className="text-[8px] sm:text-[9px] text-[#3F8F3F] font-black uppercase tracking-wider">
+                        QUALITY POULTRY & FARM PRODUCE
+                      </span>
                     </div>
                   </div>
-                  <span className="text-[9px] font-extrabold uppercase bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full shadow shrink-0">
-                    OFFICIAL
+                  <span className="text-[8px] sm:text-[9px] font-black uppercase bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full shadow-xs shrink-0 border border-amber-500/30">
+                    OFFICIAL DEAL
                   </span>
                 </div>
 
+                {/* Middle Body */}
                 <div className="my-auto py-3 space-y-2.5 relative z-10">
-                  <div className="inline-block rounded-full bg-[#3F8F3F]/30 px-2.5 py-0.5 text-[10px] font-extrabold text-[#A2E0A2] ring-1 ring-[#3F8F3F]">
+                  <div className="inline-block rounded-full bg-[#0F3D24] px-3 py-1 text-[9px] sm:text-[10px] font-black text-amber-300 shadow-sm">
                     {badgeText}
                   </div>
-                  <h2 className="text-lg sm:text-xl font-black leading-tight text-amber-300 drop-shadow-sm">{promoTitle}</h2>
-                  <p className="text-xs text-white/80 font-medium leading-snug">{promoSubtitle}</p>
-                  <div className="rounded-2xl bg-white/10 p-3 backdrop-blur-sm border border-white/15 space-y-0.5">
-                    <span className="text-[9px] text-white/70 block uppercase font-bold tracking-wider">
-                      Featured Deal
+                  
+                  <h2 className="text-lg sm:text-xl font-black leading-tight text-[#0F3D24] drop-shadow-xs">
+                    {promoTitle}
+                  </h2>
+                  <p className="text-xs text-slate-700 font-semibold leading-snug">{promoSubtitle}</p>
+                  
+                  {/* Featured Deal White/Gold Card */}
+                  <div className="rounded-2xl bg-gradient-to-br from-amber-50/90 to-emerald-50/80 border-2 border-amber-400/80 p-3.5 shadow-sm space-y-0.5">
+                    <span className="text-[9px] text-[#0F3D24]/80 block uppercase font-black tracking-wider">
+                      FEATURED HOLIDAY DEAL
                     </span>
-                    <div className="font-extrabold text-xs sm:text-sm text-white">{productName}</div>
-                    <div className="text-base sm:text-lg font-black text-amber-400">{promoPrice}</div>
+                    <div className="font-black text-xs sm:text-sm text-[#0F3D24]">{productName}</div>
+                    <div className="text-base sm:text-lg font-black text-amber-600">{promoPrice}</div>
                   </div>
                 </div>
 
-                <div className="border-t border-white/15 pt-2.5 flex items-center justify-between text-[10px] text-white/80 relative z-10">
+                {/* Footer: Phone, Social Handles & Website */}
+                <div className="border-t border-[#0F3D24]/15 pt-2.5 flex items-center justify-between text-[10px] text-[#0F3D24] relative z-10 font-bold">
                   <div>
-                    <span className="block font-bold">📲 Call / WhatsApp:</span>
-                    <span className="font-mono text-amber-300">{contactPhone}</span>
+                    <span className="block font-semibold text-[9px] text-[#0F3D24]/70">📲 Call / WhatsApp:</span>
+                    <span className="font-mono text-amber-700 text-[11px] font-black">{contactPhone}</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block font-semibold text-[9px] text-[#0F3D24]/70">🌐 Social Handles:</span>
+                    <span className="text-[#3F8F3F] font-black text-[10px]">@dignityagrofarms</span>
                   </div>
                   <div className="text-right">
-                    <span className="block font-semibold">dignityagrofarms.com</span>
-                    <span className="text-[9px] text-[#A2E0A2]">Owerri, Imo State</span>
+                    <span className="block font-semibold text-[#0F3D24]">dignityagrofarms.com</span>
+                    <span className="text-[9px] text-[#3F8F3F] block font-bold">Owerri, Imo State</span>
                   </div>
                 </div>
               </div>
@@ -416,3 +556,4 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData }: Flyer
     </div>
   );
 }
+

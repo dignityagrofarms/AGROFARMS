@@ -573,8 +573,9 @@ export interface UserAccountItem {
 export const adminListUserAccounts = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ passcode: z.string() }).parse(data))
   .handler(async ({ data }): Promise<UserAccountItem[]> => {
-    await checkOwner(data.passcode);
+    await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
     const { data: rows, error } = await supabaseAdmin
       .from("admin_access")
       .select("id, username, role, active, created_at, last_login_at")
