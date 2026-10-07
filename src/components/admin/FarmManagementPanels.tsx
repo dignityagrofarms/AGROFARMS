@@ -34,10 +34,14 @@ import {
   ShieldAlert,
   Download,
   Gift,
+  LayoutGrid,
+  List,
+  FileSpreadsheet,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
 import { ExportReportModal } from "./ExportReportModal";
 import { LeadImportModal } from "./LeadImportModal";
+import { FinancialImportModal } from "./FinancialImportModal";
 import { ReminderModal } from "./ReminderModal";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
@@ -75,6 +79,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showFinancialModal, setShowFinancialModal] = useState(false);
+  const [showFinancialImportModal, setShowFinancialImportModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState<FarmBatch | null>(null);
   const [editingFinancial, setEditingFinancial] = useState<FarmFinancial | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
@@ -114,6 +119,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const batchesQuery = useQuery({
     queryKey: ["farm-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode } }),
+    enabled: Boolean(passcode),
     placeholderData: (previousData) => previousData,
   });
 
@@ -126,6 +132,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
+    enabled: Boolean(passcode),
     placeholderData: (previousData) => previousData,
   });
 
@@ -138,6 +145,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
+    enabled: Boolean(passcode),
     placeholderData: (previousData) => previousData,
   });
 
@@ -147,7 +155,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
       selectedBatchId === "all"
         ? null
         : getBatchReportFn({ data: { passcode, batchId: selectedBatchId } }),
-    enabled: selectedBatchId !== "all",
+    enabled: Boolean(passcode) && selectedBatchId !== "all",
     placeholderData: (previousData) => previousData,
   });
 
@@ -322,6 +330,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         paymentMethod: o.paymentStatus === "approved" ? "Bank Transfer" : "Submitted/Pending",
         transactionDate: o.createdAt.split("T")[0],
         referenceNo: o.orderCode,
+        recordedBy: null,
         createdAt: o.createdAt,
         isOrder: true,
         isDecemberPreorder: false,
@@ -346,6 +355,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         paymentMethod: "Bank Transfer",
         transactionDate: p.createdAt.split("T")[0],
         referenceNo: p.preorderCode,
+        recordedBy: null,
         createdAt: p.createdAt,
         isOrder: true,
         isDecemberPreorder: true,
@@ -473,6 +483,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
             Register Income / Expense
           </button>
           <button
+            onClick={() => setShowFinancialImportModal(true)}
+            className="flex items-center gap-2 rounded-full border border-[#0F3D24]/20 bg-white px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#0F3D24]/5 transition"
+            title="Import expenses & sales from CSV / Excel sheet with automatic order matching"
+          >
+            <FileSpreadsheet size={16} className="text-[#0F3D24]" />
+            Import Financials (CSV)
+          </button>
+          <button
             onClick={() => setShowExportModal(true)}
             className="flex items-center gap-2 rounded-full border border-[#3F8F3F] bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#3F8F3F]/20 transition"
             title="Export custom farm report in PDF, Excel, or CSV format"
@@ -573,11 +591,11 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
             {formatNaira(netProfit)}
           </p>
           <span className="mt-1 block text-xs text-[#0F3D24]/60">
-            {totalExpense > 0 
-              ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%` 
-              : netProfit > 0 
-              ? "100% Margin (No Expenses)" 
-              : "0% ROI"}
+            {totalExpense > 0
+              ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%`
+              : netProfit > 0
+                ? "100% Margin (No Expenses)"
+                : "0% ROI"}
           </span>
         </div>
 
@@ -598,7 +616,13 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
       </div>
 
       {/* Interactive Sales & Revenue Line Chart */}
-      <FinanceSalesChart passcode={passcode} financials={allFinancials} />
+      <FinanceSalesChart
+        passcode={passcode}
+        financials={allFinancials.map((f) => ({
+          ...f,
+          recordedBy: f.recordedBy || null,
+        }))}
+      />
 
       {/* Batch Detailed Financial Report (If a batch is selected) */}
       {selectedBatchId !== "all" && reportQuery.data && (
@@ -1196,7 +1220,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                 <label className="block text-xs font-bold text-[#0F3D24]">Assign to Batch</label>
                 <select
                   value={editingFinancial.batchId || ""}
-                  onChange={(e) => setEditingFinancial({ ...editingFinancial, batchId: e.target.value || undefined })}
+                  onChange={(e) => setEditingFinancial({ ...editingFinancial, batchId: e.target.value || null })}
                   className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                 >
                   <option value="">General Farm Expense / Income</option>
@@ -1312,8 +1336,26 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         onClose={() => setShowExportModal(false)}
         batches={batches}
         selectedBatchId={selectedBatchId}
-        financials={allFinancials}
-        activities={activitiesQuery.data || []}
+        financials={allFinancials.map((f) => ({
+          id: f.id,
+          transactionDate: f.transactionDate,
+          type: f.type,
+          category: f.category,
+          batchName: f.batchName || undefined,
+          description: f.description,
+          paymentMethod: f.paymentMethod || undefined,
+          amount: f.amount,
+          referenceNo: f.referenceNo || undefined,
+        }))}
+        activities={(activitiesQuery.data || []).map((a) => ({
+          id: a.id,
+          activityDate: a.activityDate,
+          activityType: a.activityType,
+          batchName: a.batchName || undefined,
+          description: a.notes || a.activityType,
+          notes: a.notes || undefined,
+          loggedBy: a.recordedBy || undefined,
+        }))}
         totalIncome={totalIncome}
         totalExpense={totalExpense}
         netProfit={netProfit}
@@ -1321,10 +1363,26 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           totalExpense > 0
             ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%`
             : netProfit > 0
-            ? "100% Margin (No Expenses)"
-            : "0% ROI"
+              ? "100% Margin (No Expenses)"
+              : "0% ROI"
         }
       />
+
+      {showFinancialImportModal && (
+        <FinancialImportModal
+          isOpen={showFinancialImportModal}
+          onClose={() => setShowFinancialImportModal(false)}
+          passcode={passcode}
+          batches={batches}
+          defaultBatchId={selectedBatchId === "all" ? null : selectedBatchId}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["farm-financials"] });
+            queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
+            queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-orders-financials"] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1340,6 +1398,7 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const listLeadsFn = useServerFn(adminListLeads);
@@ -1350,6 +1409,7 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
   const leadsQuery = useQuery({
     queryKey: ["crm-leads", passcode],
     queryFn: () => listLeadsFn({ data: { passcode } }),
+    enabled: Boolean(passcode),
     placeholderData: (previousData) => previousData,
   });
 
@@ -1562,22 +1622,22 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
 
       {/* Filter & Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#F7F5F0] p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full sm:w-64">
             <Search size={16} className="absolute left-3.5 top-3 text-[#0F3D24]/40" />
             <input
               type="text"
               placeholder="Search leads by name, phone, location..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="rounded-full border border-[#0F3D24]/15 bg-white pl-10 pr-4 py-2 text-xs outline-none focus:border-[#3F8F3F] w-64"
+              className="w-full rounded-full border border-[#0F3D24]/15 bg-white pl-10 pr-4 py-2 text-xs outline-none focus:border-[#3F8F3F]"
             />
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none"
+            className="w-full sm:w-auto rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none"
           >
             <option value="all">All Statuses</option>
             <option value="New Lead">New Lead</option>
@@ -1590,7 +1650,7 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
           <select
             value={sourceFilter}
             onChange={(e) => setSourceFilter(e.target.value)}
-            className="rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none"
+            className="w-full sm:w-auto rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none"
           >
             <option value="all">All Lead Sources</option>
             <option value="WhatsApp">WhatsApp Inbound</option>
@@ -1601,14 +1661,42 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
             <option value="Walk-in">Walk-in</option>
           </select>
         </div>
+
+        {/* View Mode Toggle: Grid vs List */}
+        <div className="flex items-center gap-1 rounded-2xl bg-white p-1 border border-[#0F3D24]/15 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+              viewMode === "grid"
+                ? "bg-[#0F3D24] text-white shadow-xs"
+                : "text-[#0F3D24]/70 hover:bg-[#0F3D24]/5"
+            }`}
+            title="Grid View"
+          >
+            <LayoutGrid size={15} /> Grid
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("list")}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+              viewMode === "list"
+                ? "bg-[#0F3D24] text-white shadow-xs"
+                : "text-[#0F3D24]/70 hover:bg-[#0F3D24]/5"
+            }`}
+            title="List View"
+          >
+            <List size={15} /> List
+          </button>
+        </div>
       </div>
 
-      {/* Leads Grid Cards */}
+      {/* Leads Content: Grid vs List */}
       {leadsQuery.isLoading ? (
         <div className="py-12 text-center text-sm text-[#0F3D24]/60">Loading customer leads...</div>
       ) : filteredLeads.length === 0 ? (
         <div className="py-12 text-center text-sm text-[#0F3D24]/60">No customer leads found.</div>
-      ) : (
+      ) : viewMode === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredLeads.map((lead) => (
             <div
@@ -1691,6 +1779,85 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        /* List View Table */
+        <div className="overflow-x-auto rounded-3xl bg-white shadow-sm ring-1 ring-[#0F3D24]/5">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#F7F5F0] text-[#0F3D24] font-bold uppercase tracking-wider text-[11px] border-b border-[#0F3D24]/10">
+              <tr>
+                <th className="p-4">Customer Name & Phone</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Source</th>
+                <th className="p-4">Interested In</th>
+                <th className="p-4">Est. Value</th>
+                <th className="p-4">Notes / Location</th>
+                <th className="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredLeads.map((lead) => (
+                <tr key={lead.id} className="hover:bg-[#F7F5F0]/50 transition">
+                  <td className="p-4">
+                    <div className="font-bold text-sm text-[#0F3D24]">{lead.fullName}</div>
+                    <div className="text-xs font-mono text-[#0F3D24]/70">{lead.phone}</div>
+                    {lead.email && <div className="text-[11px] text-gray-500">{lead.email}</div>}
+                  </td>
+                  <td className="p-4">
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ring-1 ${getStatusBadge(lead.status)}`}
+                    >
+                      {lead.status}
+                    </span>
+                  </td>
+                  <td className="p-4 font-medium text-gray-700">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-amber-500" />
+                      {lead.leadSource}
+                    </div>
+                  </td>
+                  <td className="p-4 text-gray-800 font-medium">
+                    {lead.interestedIn || <span className="text-gray-400 italic">General Inquiry</span>}
+                  </td>
+                  <td className="p-4 font-bold text-[#0F3D24]">
+                    {lead.estimatedValue > 0 ? formatNaira(lead.estimatedValue) : "—"}
+                  </td>
+                  <td className="p-4 text-gray-600 max-w-xs truncate">
+                    {lead.location && <div className="font-medium text-gray-800">📍 {lead.location}</div>}
+                    {lead.notes && <div className="text-[11px] italic text-gray-500">"{lead.notes}"</div>}
+                  </td>
+                  <td className="p-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setReminderTarget({ name: lead.fullName, phone: lead.phone })}
+                        className="rounded-full bg-emerald-50 p-2 text-emerald-800 hover:bg-emerald-100 transition"
+                        title="Send SMS / Reminder"
+                      >
+                        <MessageSquare size={14} />
+                      </button>
+                      <button
+                        onClick={() => openEdit(lead)}
+                        className="p-2 text-[#0F3D24]/70 hover:text-[#0F3D24] transition"
+                        title="Edit Lead"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete lead record for ${lead.fullName}?`)) deleteLeadMut.mutate(lead.id);
+                        }}
+                        className="p-2 text-rose-600 hover:text-rose-800 transition"
+                        title="Delete Lead"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -1868,6 +2035,7 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
   const batchesQuery = useQuery({
     queryKey: ["farm-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode } }),
+    enabled: Boolean(passcode),
     placeholderData: (previousData) => previousData,
   });
 
@@ -1880,6 +2048,7 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
+    enabled: Boolean(passcode),
     placeholderData: (previousData) => previousData,
   });
 
@@ -2065,15 +2234,14 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
               >
                 <div className="flex items-start gap-3">
                   <div
-                    className={`rounded-xl p-2.5 ${
-                      act.activityType === "Mortality Record"
+                    className={`rounded-xl p-2.5 ${act.activityType === "Mortality Record"
                         ? "bg-rose-100 text-rose-700"
                         : act.activityType === "Feeding"
-                        ? "bg-amber-100 text-amber-800"
-                        : act.activityType === "Medication / Vaccination"
-                        ? "bg-purple-100 text-purple-800"
-                        : "bg-emerald-100 text-emerald-800"
-                    }`}
+                          ? "bg-amber-100 text-amber-800"
+                          : act.activityType === "Medication / Vaccination"
+                            ? "bg-purple-100 text-purple-800"
+                            : "bg-emerald-100 text-emerald-800"
+                      }`}
                   >
                     <Activity size={20} />
                   </div>

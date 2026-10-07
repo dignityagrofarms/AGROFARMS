@@ -434,7 +434,7 @@ export type AdminRole = "owner" | "manager" | "staff";
 
 type AdminCredential = { username: string; passcode: string };
 
-function parseAdminCredential(value: string): AdminCredential {
+export function parseAdminCredential(value: string): AdminCredential {
   try {
     const parsed = JSON.parse(value) as Partial<AdminCredential>;
     if (typeof parsed.username === "string" && typeof parsed.passcode === "string") {
@@ -772,7 +772,7 @@ export const adminAssignOrderBatch = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { error } = await (supabaseAdmin as any)
       .from("orders")
       .update({ batch_id: data.batchId || null, updated_at: new Date().toISOString() })
       .eq("id", data.id);

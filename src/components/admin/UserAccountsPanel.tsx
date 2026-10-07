@@ -54,7 +54,7 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
   const accountsQuery = useQuery({
     queryKey: ["admin-user-accounts", passcode],
     queryFn: () => listAccountsFn({ data: { passcode } }),
-    enabled: role === "owner",
+    enabled: role === "owner" && Boolean(passcode),
   });
 
   const saveOwnPasscode = useMutation({

@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
-import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
+import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, parseAdminCredential, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { adminListBatches, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
@@ -182,6 +182,7 @@ function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState("");
   const [payFilter, setPayFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
+  const [reasonFilter, setReasonFilter] = useState("");
   const [search, setSearch] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showFlyerModal, setShowFlyerModal] = useState(false);
@@ -1440,7 +1441,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OrderRow({ order, passcode, role, batches, onSaved }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void }) {
+export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerModal }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void; onOpenFlyerModal?: (data: FlyerOrderData) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.statusNote ?? "");
@@ -1703,23 +1704,24 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
             >
               <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedFlyerOrder({
-                  orderCode: order.orderCode,
-                  customerName: order.customerName,
-                  location: order.address,
-                  itemsText: order.items.map((i) => `${i.product} × ${i.qty}`).join(", "),
-                  totalAmount: order.total,
-                  paymentStatus: order.paymentStatus,
-                });
-                setShowFlyerModal(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 transition"
-            >
-              <Sparkles size={14} className="text-amber-600" /> Generate Order Flyer
-            </button>
+            {onOpenFlyerModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenFlyerModal({
+                    orderCode: order.orderCode,
+                    customerName: order.customerName,
+                    location: order.address,
+                    itemsText: order.items.map((i) => `${i.product} × ${i.qty}`).join(", "),
+                    totalAmount: order.total,
+                    paymentStatus: order.paymentStatus,
+                  });
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 transition"
+              >
+                <Sparkles size={14} className="text-amber-600" /> Generate Order Flyer
+              </button>
+            )}
             <a
               href={waLink(order)}
               target="_blank"

@@ -222,13 +222,14 @@ export const adminCreateBatch = createServerFn({ method: "POST" })
       .single();
 
     if (error) throw new Error(error.message);
+    if (!row) throw new Error("Failed to register new farm batch in database.");
     return { id: row.id };
   });
 
 export const adminUpdateBatch = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => updateBatchSchema.parse(data))
   .handler(async ({ data }): Promise<void> => {
-    await checkOwner(data.passcode);
+    await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await supabaseAdmin
@@ -731,3 +732,147 @@ export const adminDeleteActivity = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin.from("farm_activities").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
   });
+
+export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        batchId: z.string().uuid().optional().nullable(),
+        records: z.array(
+          z.object({
+            type: z.enum(["income", "expense"]),
+            category: z.string().trim().min(1),
+            amount: z.number().min(0),
+            description: z.string().trim().min(1),
+            paymentMethod: z.string().trim().default("Bank Transfer"),
+            transactionDate: z.string().trim().min(1),
+            referenceNo: z.string().trim().optional().nullable(),
+            customerName: z.string().trim().optional().nullable(),
+            customerPhone: z.string().trim().optional().nullable(),
+          })
+        ),
+      })
+      .parse(data)
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      totalImported: number;
+      matchedOrdersCount: number;
+      unmatchedOfflineCount: number;
+      matchedDetails: string[];
+    }> => {
+      await checkPasscode(data.passcode);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      // Fetch active website orders and preorders for customer auto-matching
+      const { data: orders } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_code, customer_name, phone, total, batch_id");
+
+      const { data: preorders } = await (supabaseAdmin as any)
+        .from("preorders")
+        .select("id, preorder_code, customer_name, customer_phone, phone, total_amount, batch_id");
+
+      let matchedOrdersCount = 0;
+      let unmatchedOfflineCount = 0;
+      const matchedDetails: string[] = [];
+      const insertRows: any[] = [];
+
+      for (const item of data.records) {
+        let matchedOrderCode: string | null = null;
+        let matchedOrderId: string | null = null;
+        let isPreorder = false;
+
+        if (item.type === "income" && (item.customerPhone || item.customerName)) {
+          const normPhone = (item.customerPhone || "").replace(/\D/g, "");
+          const normName = (item.customerName || "").trim().toLowerCase();
+
+          // 1. Check orders by phone
+          let matchedOrder = (orders as any[])?.find((o: any) => {
+            const ph = o.phone || o.customer_phone;
+            if (!ph) return false;
+            const p = String(ph).replace(/\D/g, "");
+            return p.length >= 7 && normPhone.length >= 7 && (p.endsWith(normPhone) || normPhone.endsWith(p));
+          });
+
+          // 2. Check orders by name tokens if phone not matched
+          if (!matchedOrder && normName.length >= 3) {
+            const nameTokens = normName.split(/\s+/).filter((t) => t.length > 2);
+            matchedOrder = (orders as any[])?.find((o: any) => {
+              if (!o.customer_name) return false;
+              const cName = o.customer_name.toLowerCase();
+              return nameTokens.every((tok) => cName.includes(tok));
+            });
+          }
+
+          // 3. Check preorders if still not matched
+          if (!matchedOrder && normPhone.length >= 7) {
+            const matchedPre = (preorders as any[])?.find((po: any) => {
+              const ph = po.customer_phone || po.phone;
+              if (!ph) return false;
+              const p = String(ph).replace(/\D/g, "");
+              return p.length >= 7 && (p.endsWith(normPhone) || normPhone.endsWith(p));
+            });
+            if (matchedPre) {
+              matchedOrderCode = matchedPre.preorder_code;
+              matchedOrderId = matchedPre.id;
+              isPreorder = true;
+            }
+          }
+
+          if (matchedOrder) {
+            matchedOrderCode = matchedOrder.order_code;
+            matchedOrderId = matchedOrder.id;
+          }
+
+          if (matchedOrderCode && matchedOrderId) {
+            matchedOrdersCount++;
+            matchedDetails.push(`Matched '${item.customerName || item.customerPhone}' -> Order #${matchedOrderCode}`);
+
+            // Automatically link website order to the specified farm batch if selected
+            if (data.batchId) {
+              const table = isPreorder ? "preorders" : "orders";
+              await supabaseAdmin.from(table).update({ batch_id: data.batchId }).eq("id", matchedOrderId);
+            }
+          } else {
+            unmatchedOfflineCount++;
+          }
+        } else {
+          unmatchedOfflineCount++;
+        }
+
+        const desc = matchedOrderCode
+          ? `${item.description} (Auto-matched Order #${matchedOrderCode})`
+          : item.customerName
+          ? `${item.description} (Customer: ${item.customerName})`
+          : item.description;
+
+        insertRows.push({
+          batch_id: data.batchId || null,
+          type: item.type,
+          category: item.category,
+          amount: item.amount,
+          description: desc,
+          payment_method: item.paymentMethod || "Bank Transfer",
+          transaction_date: item.transactionDate || new Date().toISOString().split("T")[0],
+          reference_no: item.referenceNo || (matchedOrderCode ? `ORDER-${matchedOrderCode}` : null),
+        });
+      }
+
+      if (insertRows.length > 0) {
+        const { error: insErr } = await supabaseAdmin.from("farm_financials").insert(insertRows);
+        if (insErr) throw new Error(insErr.message);
+      }
+
+      return {
+        totalImported: insertRows.length,
+        matchedOrdersCount,
+        unmatchedOfflineCount,
+        matchedDetails,
+      };
+    }
+  );
+
