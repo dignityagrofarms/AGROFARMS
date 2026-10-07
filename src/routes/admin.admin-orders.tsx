@@ -218,7 +218,7 @@ function AdminOrders() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let throttleTimeout: NodeJS.Timeout | null = null;
-    
+
     const checkSession = () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return;
@@ -229,7 +229,7 @@ function AdminOrders() {
           parsed.lastActive = Date.now();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         }
-        
+
         const now = Date.now();
         // If we have query.data.role use it, else guess based on username
         const role = query.data?.role || (parsed.username === "staff" ? "staff" : "owner");
@@ -271,7 +271,7 @@ function AdminOrders() {
 
     checkSession();
     const interval = setInterval(checkSession, 60000);
-    
+
     window.addEventListener("mousemove", updateActivity, { passive: true });
     window.addEventListener("keydown", updateActivity, { passive: true });
     window.addEventListener("click", updateActivity, { passive: true });
@@ -328,7 +328,7 @@ function AdminOrders() {
     const p = input;
     const u = username.trim().toLowerCase();
     if (!u || !p) return;
-    
+
     setIsLoggingIn(true);
     setTimeout(() => {
       const credential = JSON.stringify({ username: u, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
@@ -432,7 +432,7 @@ function AdminOrders() {
               type="text"
               autoFocus
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onj={(e) => setUsername(e.target.value)}
               placeholder="Username"
               autoComplete="username"
               className="mt-6 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
@@ -464,102 +464,102 @@ function AdminOrders() {
           <p className="text-center text-[#0F3D24]/60">Loading orders…</p>
         ) : query.data ? (
           (() => {
-          const allOrders = query.data.orders;
-          const role = query.data.role;
-          const reasonOptions = Array.from(
-            new Set(allOrders.map((o) => (o.cancelReason ?? "").trim()).filter(Boolean)),
-          ).sort();
-          const scoped = reasonFilter
-            ? allOrders.filter((o) => (o.cancelReason ?? "").trim() === reasonFilter)
-            : allOrders;
-           return (
-           <>
-             {activeTab === "orders" ? (
-             <>
-            <ReportsPanel
-              orders={scoped}
-              from={from} setFrom={setFrom}
-              to={to} setTo={setTo}
-              statusFilter={statusFilter} setStatusFilter={setStatusFilter}
-              payFilter={payFilter} setPayFilter={setPayFilter}
-              zoneFilter={zoneFilter} setZoneFilter={setZoneFilter}
-              search={search} setSearch={setSearch}
-              reasonFilter={reasonFilter} setReasonFilter={setReasonFilter} reasonOptions={reasonOptions}
-              onApply={applyFilters} onReset={resetFilters} onQuickRange={setRange}
-            />
-            <div className="mb-4 flex flex-wrap gap-2">
-              <FilterBtn
-                active={filter === "awaiting"}
-                onClick={() => setFilter("awaiting")}
-                count={scoped.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")).length}
-              >
-                Awaiting payment approval
-              </FilterBtn>
-              <FilterBtn active={filter === "cancelled_customer"} onClick={() => setFilter("cancelled_customer")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy === "customer").length}>
-                Cancelled by customer
-              </FilterBtn>
-              <FilterBtn active={filter === "cancelled_admin"} onClick={() => setFilter("cancelled_admin")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy !== "customer").length}>
-                Cancelled by farm
-              </FilterBtn>
-              <FilterBtn active={filter === "not_completed"} onClick={() => setFilter("not_completed")} count={scoped.filter(isNotCompleted).length}>
-                Not completed
-              </FilterBtn>
-              <FilterBtn active={filter === "all"} onClick={() => setFilter("all")} count={scoped.length}>
-                All orders
-              </FilterBtn>
-            </div>
-          <div className="mt-4">
-            {(() => {
-              const all = scoped;
-              const filtered =
-                filter === "awaiting" ? all.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved"))
-                : filter === "cancelled_customer" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy === "customer")
-                : filter === "cancelled_admin" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy !== "customer")
-                : filter === "not_completed" ? all.filter(isNotCompleted)
-                : all;
-              return (
-                <OrganizedOrdersList
-                  orders={filtered}
-                  passcode={passcode}
-                  role={role}
-                  batches={batchesQuery.data || []}
-                  onSaved={() => query.refetch()}
-                />
-              );
-            })()}
-          </div>
-             </>
-             ) : activeTab === "financials" ? (
-                <BatchFinancialsPanel passcode={passcode} />
-              ) : activeTab === "activities" ? (
-                <DailyActivitiesPanel passcode={passcode} />
-              ) : activeTab === "clients" ? (
-                <ClientCrmPanel passcode={passcode} />
-              ) : activeTab === "leads" ? (
-                <LeadCrmPanel passcode={passcode} />
-              ) : activeTab === "vouchers" ? (
-                <VoucherPanel passcode={passcode} />
-              ) : activeTab === "december" ? (
-                <DecemberPreorderPanel passcode={passcode} />
-              ) : activeTab === "flyers" ? (
-                <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
-                  <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
-                  <h3 className="text-xl font-extrabold text-[#0F3D24]">Digital Promotion & Order Flyers</h3>
-                  <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
-                    Generate branded promotional posters for Christmas specials or single order verification graphics to post on WhatsApp and social media.
-                  </p>
-                  <button
-                    onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
-                    className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
-                  >
-                    Open Digital Flyer Generator
-                  </button>
-                </div>
-              ) : (
-                <SocialProofPanel orders={allOrders} />
-              )}
-            </>
-          );
+            const allOrders = query.data.orders;
+            const role = query.data.role;
+            const reasonOptions = Array.from(
+              new Set(allOrders.map((o) => (o.cancelReason ?? "").trim()).filter(Boolean)),
+            ).sort();
+            const scoped = reasonFilter
+              ? allOrders.filter((o) => (o.cancelReason ?? "").trim() === reasonFilter)
+              : allOrders;
+            return (
+              <>
+                {activeTab === "orders" ? (
+                  <>
+                    <ReportsPanel
+                      orders={scoped}
+                      from={from} setFrom={setFrom}
+                      to={to} setTo={setTo}
+                      statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+                      payFilter={payFilter} setPayFilter={setPayFilter}
+                      zoneFilter={zoneFilter} setZoneFilter={setZoneFilter}
+                      search={search} setSearch={setSearch}
+                      reasonFilter={reasonFilter} setReasonFilter={setReasonFilter} reasonOptions={reasonOptions}
+                      onApply={applyFilters} onReset={resetFilters} onQuickRange={setRange}
+                    />
+                    <div className="mb-4 flex flex-wrap gap-2">
+                      <FilterBtn
+                        active={filter === "awaiting"}
+                        onClick={() => setFilter("awaiting")}
+                        count={scoped.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")).length}
+                      >
+                        Awaiting payment approval
+                      </FilterBtn>
+                      <FilterBtn active={filter === "cancelled_customer"} onClick={() => setFilter("cancelled_customer")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy === "customer").length}>
+                        Cancelled by customer
+                      </FilterBtn>
+                      <FilterBtn active={filter === "cancelled_admin"} onClick={() => setFilter("cancelled_admin")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy !== "customer").length}>
+                        Cancelled by farm
+                      </FilterBtn>
+                      <FilterBtn active={filter === "not_completed"} onClick={() => setFilter("not_completed")} count={scoped.filter(isNotCompleted).length}>
+                        Not completed
+                      </FilterBtn>
+                      <FilterBtn active={filter === "all"} onClick={() => setFilter("all")} count={scoped.length}>
+                        All orders
+                      </FilterBtn>
+                    </div>
+                    <div className="mt-4">
+                      {(() => {
+                        const all = scoped;
+                        const filtered =
+                          filter === "awaiting" ? all.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved"))
+                            : filter === "cancelled_customer" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy === "customer")
+                              : filter === "cancelled_admin" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy !== "customer")
+                                : filter === "not_completed" ? all.filter(isNotCompleted)
+                                  : all;
+                        return (
+                          <OrganizedOrdersList
+                            orders={filtered}
+                            passcode={passcode}
+                            role={role}
+                            batches={batchesQuery.data || []}
+                            onSaved={() => query.refetch()}
+                          />
+                        );
+                      })()}
+                    </div>
+                  </>
+                ) : activeTab === "financials" ? (
+                  <BatchFinancialsPanel passcode={passcode} />
+                ) : activeTab === "activities" ? (
+                  <DailyActivitiesPanel passcode={passcode} />
+                ) : activeTab === "clients" ? (
+                  <ClientCrmPanel passcode={passcode} />
+                ) : activeTab === "leads" ? (
+                  <LeadCrmPanel passcode={passcode} />
+                ) : activeTab === "vouchers" ? (
+                  <VoucherPanel passcode={passcode} />
+                ) : activeTab === "december" ? (
+                  <DecemberPreorderPanel passcode={passcode} />
+                ) : activeTab === "flyers" ? (
+                  <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+                    <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
+                    <h3 className="text-xl font-extrabold text-[#0F3D24]">Digital Promotion & Order Flyers</h3>
+                    <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
+                      Generate branded promotional posters for Christmas specials or single order verification graphics to post on WhatsApp and social media.
+                    </p>
+                    <button
+                      onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
+                      className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
+                    >
+                      Open Digital Flyer Generator
+                    </button>
+                  </div>
+                ) : (
+                  <SocialProofPanel orders={allOrders} />
+                )}
+              </>
+            );
           })()
         ) : null}
       </section>
@@ -594,11 +594,10 @@ function AdminTab({ active, onClick, icon, children }: { active: boolean; onClic
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex w-full items-center justify-center gap-1.5 rounded-2xl px-2.5 py-2.5 text-center text-xs font-semibold transition ${
-        active
-          ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
-          : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
-      }`}
+      className={`flex w-full items-center justify-center gap-1.5 rounded-2xl px-2.5 py-2.5 text-center text-xs font-semibold transition ${active
+        ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
+        : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
+        }`}
     >
       <span className="shrink-0">{icon}</span>
       <span className="truncate">{children}</span>
@@ -1512,9 +1511,8 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className={`w-full text-left p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 transition-colors ${
-          expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
-        }`}
+        className={`w-full text-left p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 transition-colors ${expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
+          }`}
       >
         <div className="min-w-0 space-y-1.5 flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -1532,12 +1530,11 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
               </span>
             )}
             {/* Status Pill Badge */}
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-              order.status === "delivered" ? "bg-emerald-100 text-emerald-800" :
+            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${order.status === "delivered" ? "bg-emerald-100 text-emerald-800" :
               order.status === "cancelled" ? "bg-red-100 text-red-800" :
-              order.status === "preparing" ? "bg-blue-100 text-blue-800" :
-              "bg-amber-100 text-amber-800"
-            }`}>
+                order.status === "preparing" ? "bg-blue-100 text-blue-800" :
+                  "bg-amber-100 text-amber-800"
+              }`}>
               {order.status.replace("_", " ")}
             </span>
           </div>
@@ -1787,9 +1784,9 @@ function PaymentSection({
 }) {
   const badge =
     order.paymentStatus === "approved" ? { bg: "bg-[#3F8F3F]/10", ring: "ring-[#3F8F3F]/30", text: "text-[#0F3D24]", label: "Payment approved", icon: <CheckCircle2 size={14} className="text-[#3F8F3F]" /> }
-    : order.paymentStatus === "submitted" ? { bg: "bg-amber-100", ring: "ring-amber-200", text: "text-amber-800", label: "Payment submitted, awaiting approval", icon: <Clock size={14} /> }
-    : order.paymentStatus === "rejected" ? { bg: "bg-red-50", ring: "ring-red-200", text: "text-red-700", label: `Rejected${order.paymentRejectionReason ? ": " + order.paymentRejectionReason : ""}`, icon: <XCircle size={14} /> }
-    : { bg: "bg-[#F7F5F0]", ring: "ring-[#0F3D24]/10", text: "text-[#0F3D24]/70", label: "Payment pending", icon: <Clock size={14} /> };
+      : order.paymentStatus === "submitted" ? { bg: "bg-amber-100", ring: "ring-amber-200", text: "text-amber-800", label: "Payment submitted, awaiting approval", icon: <Clock size={14} /> }
+        : order.paymentStatus === "rejected" ? { bg: "bg-red-50", ring: "ring-red-200", text: "text-red-700", label: `Rejected${order.paymentRejectionReason ? ": " + order.paymentRejectionReason : ""}`, icon: <XCircle size={14} /> }
+          : { bg: "bg-[#F7F5F0]", ring: "ring-[#0F3D24]/10", text: "text-[#0F3D24]/70", label: "Payment pending", icon: <Clock size={14} /> };
 
   const canDecide = order.paymentStatus === "submitted" || order.paymentStatus === "pending" || order.paymentStatus === "rejected";
 
@@ -1899,7 +1896,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         <div className="flex items-center gap-2 text-[#3F8F3F]"><Gift size={18} /><span className="text-xs font-semibold uppercase tracking-widest">December Pre-Orders</span></div>
         <h2 className="mt-2 text-2xl font-semibold text-[#0F3D24]">Holiday Pre-Orders</h2>
         <p className="mt-1 max-w-2xl text-sm text-[#0F3D24]/65">Manage reservations, update delivery status, and coordinate December collections.</p>
-        
+
         {/* Pending Payments Alert */}
         {pendingQuery.data && pendingQuery.data.length > 0 && (
           <div className="mt-6 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
@@ -1913,7 +1910,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                   </div>
                   <div className="flex gap-2">
                     <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition">Approve</button>
-                    <button onClick={async () => { if(confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-50 px-4 py-2 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition">Reject</button>
+                    <button onClick={async () => { if (confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-50 px-4 py-2 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition">Reject</button>
                   </div>
                 </div>
               ))}
@@ -1945,20 +1942,19 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
               f.id === "all"
                 ? query.data?.preorders.length || 0
                 : f.id === "awaiting_approval"
-                ? (query.data?.preorders || []).filter(
+                  ? (query.data?.preorders || []).filter(
                     (o: any) => o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted"
                   ).length
-                : 0;
+                  : 0;
 
             return (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
-                className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${
-                  filter === f.id
-                    ? "bg-[#0F3D24] text-white shadow-md"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                }`}
+                className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${filter === f.id
+                  ? "bg-[#0F3D24] text-white shadow-md"
+                  : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                  }`}
               >
                 {f.label} {count > 0 && <span className="ml-1 text-[10px] opacity-80">({count})</span>}
               </button>
@@ -1975,7 +1971,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
       )}
 
       {query.isLoading && <p className="text-center text-sm text-[#0F3D24]/60 py-10">Loading pre-orders...</p>}
-      
+
       {query.data && (
         <div className="space-y-4">
           {(() => {
@@ -2078,9 +2074,8 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className={`w-full text-left p-4 sm:p-5 flex flex-col gap-3 transition-colors ${
-          expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
-        }`}
+        className={`w-full text-left p-4 sm:p-5 flex flex-col gap-3 transition-colors ${expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
+          }`}
       >
         {/* Top Row: Code, Badges & Chevron */}
         <div className="flex flex-wrap items-center justify-between gap-2 w-full">
@@ -2126,11 +2121,10 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
               {preorder.reservationType.replace("_", " ")}
             </span>
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-              preorder.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" :
+            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${preorder.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" :
               preorder.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" :
-              "bg-slate-100 text-slate-600"
-            }`}>
+                "bg-slate-100 text-slate-600"
+              }`}>
               {preorder.paymentStatus.replace("_", " ")}
             </span>
           </div>
@@ -2183,185 +2177,185 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             <div className="rounded-2xl bg-white p-4 ring-1 ring-[#0F3D24]/10 space-y-3">
               <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">Payment Installments</h4>
               <div className="space-y-2">
-            {preorder.payments.map((p: any, i: number) => (
-              <div key={p.id} className={`flex flex-col gap-2 sm:flex-row sm:items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0 ${p.confirmedByAdmin ? "border-[#0F3D24]/5" : "border-amber-200 bg-amber-50 rounded-xl p-3"}`}>
-                <div>
-                  <div className={`font-semibold ${p.confirmedByAdmin ? "text-[#0F3D24]" : "text-amber-800"}`}>₦{p.amount.toLocaleString()} {p.confirmedByAdmin ? "" : "(Pending Approval)"}</div>
-                  <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
-                </div>
-                {p.confirmedByAdmin ? (
-                  <button 
-                    onClick={async () => {
-                      setDownloadingPdf(p.id);
-                      try {
-                        // find the visual index of this confirmed payment among other confirmed payments
-                        const visualIndex = preorder.payments.filter((x: any) => x.confirmedByAdmin).findIndex((x: any) => x.id === p.id) + 1;
-                        await downloadPdf(preorderPaymentReceiptHtml(preorder, p, visualIndex), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
-                      } catch (e: any) {
-                        alert("PDF Error: " + (e.message || String(e)));
-                      } finally {
-                        setDownloadingPdf(null);
-                      }
-                    }}
-                    disabled={downloadingPdf === p.id}
-                    className="flex items-center gap-1 rounded bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10 disabled:opacity-50 transition-all"
-                  >
-                    {downloadingPdf === p.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                    {downloadingPdf === p.id ? "Preparing PDF..." : "Receipt PDF"}
-                  </button>
-                ) : (
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={async () => { 
-                        await confirmPaymentFn({ data: { passcode, paymentId: p.id } }); 
-                        onSaved(); 
-                      }} 
-                      className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
-                    >
-                      Approve
-                    </button>
-                    <button 
-                      onClick={async () => { 
-                        if(confirm("Reject this payment?")) { 
-                          await deletePaymentFn({ data: { passcode, paymentId: p.id } }); 
-                          onSaved(); 
-                        } 
-                      }} 
-                      className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition"
-                    >
-                      Reject
-                    </button>
+                {preorder.payments.map((p: any, i: number) => (
+                  <div key={p.id} className={`flex flex-col gap-2 sm:flex-row sm:items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0 ${p.confirmedByAdmin ? "border-[#0F3D24]/5" : "border-amber-200 bg-amber-50 rounded-xl p-3"}`}>
+                    <div>
+                      <div className={`font-semibold ${p.confirmedByAdmin ? "text-[#0F3D24]" : "text-amber-800"}`}>₦{p.amount.toLocaleString()} {p.confirmedByAdmin ? "" : "(Pending Approval)"}</div>
+                      <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
+                    </div>
+                    {p.confirmedByAdmin ? (
+                      <button
+                        onClick={async () => {
+                          setDownloadingPdf(p.id);
+                          try {
+                            // find the visual index of this confirmed payment among other confirmed payments
+                            const visualIndex = preorder.payments.filter((x: any) => x.confirmedByAdmin).findIndex((x: any) => x.id === p.id) + 1;
+                            await downloadPdf(preorderPaymentReceiptHtml(preorder, p, visualIndex), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
+                          } catch (e: any) {
+                            alert("PDF Error: " + (e.message || String(e)));
+                          } finally {
+                            setDownloadingPdf(null);
+                          }
+                        }}
+                        disabled={downloadingPdf === p.id}
+                        className="flex items-center gap-1 rounded bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10 disabled:opacity-50 transition-all"
+                      >
+                        {downloadingPdf === p.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        {downloadingPdf === p.id ? "Preparing PDF..." : "Receipt PDF"}
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={async () => {
+                            await confirmPaymentFn({ data: { passcode, paymentId: p.id } });
+                            onSaved();
+                          }}
+                          className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm("Reject this payment?")) {
+                              await deletePaymentFn({ data: { passcode, paymentId: p.id } });
+                              onSaved();
+                            }
+                          }}
+                          className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            ))}
+            </div>
+          )}
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+              Delivery Status
+              <select
+                value={deliveryStatus}
+                onChange={(e) => setDeliveryStatus(e.target.value)}
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0] px-3 py-2 text-sm font-semibold outline-none focus:border-[#3F8F3F]"
+              >
+                <option value="pending">Pending</option>
+                <option value="delivered">Delivered</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+              WhatsApp Note (optional)
+              <input
+                value={customNote}
+                onChange={(e) => setCustomNote(e.target.value)}
+                placeholder="e.g. ETA tomorrow afternoon"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+              />
+            </label>
+            <div className="flex items-end">
+              <button
+                onClick={() => mutation.mutate()}
+                disabled={!dirty || mutation.isPending}
+                className="w-full rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50 sm:w-auto"
+              >
+                {mutation.isPending ? "Saving…" : "Save Only"}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_2fr_auto]">
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
-          Delivery Status
-          <select
-            value={deliveryStatus}
-            onChange={(e) => setDeliveryStatus(e.target.value)}
-            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0] px-3 py-2 text-sm font-semibold outline-none focus:border-[#3F8F3F]"
-          >
-            <option value="pending">Pending</option>
-            <option value="delivered">Delivered</option>
-          </select>
-        </label>
-        <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
-          WhatsApp Note (optional)
-          <input
-            value={customNote}
-            onChange={(e) => setCustomNote(e.target.value)}
-            placeholder="e.g. ETA tomorrow afternoon"
-            className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
-          />
-        </label>
-        <div className="flex items-end">
-          <button
-            onClick={() => mutation.mutate()}
-            disabled={!dirty || mutation.isPending}
-            className="w-full rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50 sm:w-auto"
-          >
-            {mutation.isPending ? "Saving…" : "Save Only"}
-          </button>
-        </div>
-      </div>
+          {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
+          {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
 
-      {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
-      {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
+            <button
+              onClick={saveAndNotify}
+              disabled={mutation.isPending}
+              className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
+            >
+              <MessageCircle size={16} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowReminderModal(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition"
+            >
+              <MessageSquare size={16} /> Send SMS / Payment Reminder
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const cleanPhone = preorder.phone.replace(/\D+/g, "");
+                const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+                const text = `🎄 *Dignity Agro Farms December Pre-Order Statement*\n\nCustomer: ${preorder.customerName}\nPre-Order Code: ${preorder.preorderCode}\nProduct: ${preorder.product} × ${preorder.quantity}\nTotal Amount: ₦${preorder.totalAmount.toLocaleString()}\nAmount Paid: ₦${preorder.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${preorder.balance.toLocaleString()}\n\nPayment Bank: Moniepoint MFB · 4006179439\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for pre-ordering with Dignity Agro Farms!`;
+                window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
+            >
+              <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
+            </button>
+            <a
+              href={getWaLink()}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs font-semibold text-[#0F3D24]/60 underline hover:text-[#0F3D24]"
+            >
+              Open message
+            </a>
+            <button
+              onClick={async () => {
+                const amt = prompt("Enter amount to add manually (e.g. 3500):");
+                if (!amt) return;
+                const ref = prompt("Enter payment reference (optional):");
+                try {
+                  await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || `MANUAL_ADD_${Date.now()}` } });
+                  onSaved();
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : "Failed to add manual payment");
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+            >
+              <span className="text-emerald-700">＋ Add manual payment</span>
+            </button>
+            {role === "owner" && (
+              <>
+                <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
+                <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete pre-order ${preorder.preorderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete pre-order</button>
+              </>
+            )}
+            <div className="w-full mt-2">
+              <button
+                onClick={async () => {
+                  setDownloadingPdf("complete");
+                  try {
+                    await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter((p: any) => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
+                  } catch (e: any) {
+                    alert("PDF Error: " + (e.message || String(e)));
+                  } finally {
+                    setDownloadingPdf(null);
+                  }
+                }}
+                disabled={downloadingPdf === "complete"}
+                className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20 disabled:opacity-50 transition-all"
+              >
+                {downloadingPdf === "complete" ? <Loader2 size={14} className="text-[#3F8F3F] animate-spin" /> : <FileText size={14} className="text-[#3F8F3F]" />}
+                {downloadingPdf === "complete" ? "Generating Master PDF..." : "Download Complete Receipt PDF"}
+              </button>
+            </div>
+          </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
-        <button
-          onClick={saveAndNotify}
-          disabled={mutation.isPending}
-          className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
-        >
-          <MessageCircle size={16} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowReminderModal(true)}
-          className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition"
-        >
-          <MessageSquare size={16} /> Send SMS / Payment Reminder
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const cleanPhone = preorder.phone.replace(/\D+/g, "");
-            const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
-            const text = `🎄 *Dignity Agro Farms December Pre-Order Statement*\n\nCustomer: ${preorder.customerName}\nPre-Order Code: ${preorder.preorderCode}\nProduct: ${preorder.product} × ${preorder.quantity}\nTotal Amount: ₦${preorder.totalAmount.toLocaleString()}\nAmount Paid: ₦${preorder.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${preorder.balance.toLocaleString()}\n\nPayment Bank: Moniepoint MFB · 4006179439\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for pre-ordering with Dignity Agro Farms!`;
-            window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-          }}
-          className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
-        >
-          <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
-        </button>
-        <a
-          href={getWaLink()}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs font-semibold text-[#0F3D24]/60 underline hover:text-[#0F3D24]"
-        >
-          Open message
-        </a>
-        <button
-          onClick={async () => {
-            const amt = prompt("Enter amount to add manually (e.g. 3500):");
-            if (!amt) return;
-            const ref = prompt("Enter payment reference (optional):");
-            try {
-              await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || `MANUAL_ADD_${Date.now()}` } });
-              onSaved();
-            } catch (err) {
-              alert(err instanceof Error ? err.message : "Failed to add manual payment");
-            }
-          }}
-          className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
-        >
-          <span className="text-emerald-700">＋ Add manual payment</span>
-        </button>
-        {role === "owner" && (
-          <>
-            <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
-            <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete pre-order ${preorder.preorderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete pre-order</button>
-          </>
-        )}
-        <div className="w-full mt-2">
-          <button 
-            onClick={async () => {
-              setDownloadingPdf("complete");
-              try {
-                await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter((p: any) => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
-              } catch (e: any) {
-                alert("PDF Error: " + (e.message || String(e)));
-              } finally {
-                setDownloadingPdf(null);
-              }
-            }}
-            disabled={downloadingPdf === "complete"}
-            className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20 disabled:opacity-50 transition-all"
-          >
-            {downloadingPdf === "complete" ? <Loader2 size={14} className="text-[#3F8F3F] animate-spin" /> : <FileText size={14} className="text-[#3F8F3F]" />}
-            {downloadingPdf === "complete" ? "Generating Master PDF..." : "Download Complete Receipt PDF"}
-          </button>
-        </div>
-      </div>
-
-      {role === "owner" && editing && (
-        <div className="mt-4 grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-          <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
-          {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
-        </div>
-      )}
+          {role === "owner" && editing && (
+            <div className="mt-4 grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
+              <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
+              {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+            </div>
+          )}
         </div>
       )}
       {showReminderModal && (
