@@ -430,6 +430,7 @@ export const cancelOrderByCustomer = createServerFn({ method: "POST" })
 
 // ---------- Admin ----------
 
+export const ADMIN_STORAGE_KEY = "daf_admin_passcode";
 export type AdminRole = "owner" | "manager" | "staff";
 
 type AdminCredential = { username: string; passcode: string };

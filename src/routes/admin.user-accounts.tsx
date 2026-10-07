@@ -24,6 +24,7 @@ import {
   adminVerifyLogin,
   adminListUserAccounts,
   parseAdminCredential,
+  ADMIN_STORAGE_KEY,
   type AdminRole,
 } from "@/lib/orders.functions";
 import { adminListPendingApprovals } from "@/lib/farm.functions";
@@ -45,6 +46,7 @@ function UserAccountsPage() {
   const listAccountsFn = useServerFn(adminListUserAccounts);
   const listPendingFn = useServerFn(adminListPendingApprovals);
 
+  const [mounted, setMounted] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [username, setUsername] = useState("");
   const [inputPasscode, setInputPasscode] = useState("");
@@ -52,18 +54,18 @@ function UserAccountsPage() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<"accounts" | "approvals">("accounts");
 
-  // Load session credentials from localStorage on mount
+  // Load session credentials from localStorage on mount (prevents SSR hydration error #418)
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== "undefined") {
-      const savedPasscode = localStorage.getItem("agrofarms_admin_passcode") || "";
-      const savedUser = localStorage.getItem("agrofarms_admin_user") || "";
+      const savedPasscode =
+        localStorage.getItem(ADMIN_STORAGE_KEY) ||
+        localStorage.getItem("daf_admin_passcode") ||
+        localStorage.getItem("agrofarms_admin_passcode") ||
+        "";
 
       if (savedPasscode) {
-        if (savedUser && !savedPasscode.includes(":")) {
-          setPasscode(`${savedUser}:${savedPasscode}`);
-        } else {
-          setPasscode(savedPasscode);
-        }
+        setPasscode(savedPasscode);
       }
     }
   }, []);
@@ -76,7 +78,7 @@ function UserAccountsPage() {
       const cred = parseAdminCredential(passcode);
       return verifyLoginFn({ data: { username: cred.username, passcode: cred.passcode } });
     },
-    enabled: Boolean(passcode),
+    enabled: Boolean(passcode) && mounted,
     staleTime: 60 * 1000,
   });
 
@@ -86,14 +88,14 @@ function UserAccountsPage() {
   const accountsQuery = useQuery({
     queryKey: ["admin-user-accounts-kpi", passcode],
     queryFn: () => listAccountsFn({ data: { passcode } }),
-    enabled: Boolean(passcode) && verifyQuery.isSuccess,
+    enabled: Boolean(passcode) && verifyQuery.isSuccess && mounted,
   });
 
   // Fetch pending approvals count
   const pendingQuery = useQuery({
     queryKey: ["pending-approvals-kpi", passcode],
     queryFn: () => listPendingFn({ data: { passcode } }),
-    enabled: Boolean(passcode) && role === "owner" && verifyQuery.isSuccess,
+    enabled: Boolean(passcode) && role === "owner" && verifyQuery.isSuccess && mounted,
     refetchInterval: 15000,
   });
 
@@ -107,7 +109,7 @@ function UserAccountsPage() {
     try {
       const res = await verifyLoginFn({
         data: {
-          username: username.trim(),
+          username: username.trim().toLowerCase() || "owner",
           passcode: inputPasscode.trim(),
         },
       });
@@ -119,11 +121,13 @@ function UserAccountsPage() {
       }
 
       queryClient.clear();
-      const sessionToken = username.trim() ? `${username.trim()}:${inputPasscode.trim()}` : inputPasscode.trim();
+      const sessionToken = username.trim()
+        ? JSON.stringify({ username: username.trim().toLowerCase(), passcode: inputPasscode.trim() })
+        : inputPasscode.trim();
 
+      localStorage.setItem(ADMIN_STORAGE_KEY, sessionToken);
+      localStorage.setItem("daf_admin_passcode", sessionToken);
       localStorage.setItem("agrofarms_admin_passcode", sessionToken);
-      if (username.trim()) localStorage.setItem("agrofarms_admin_user", username.trim());
-      else localStorage.removeItem("agrofarms_admin_user");
 
       setPasscode(sessionToken);
     } catch (err: any) {
@@ -134,6 +138,8 @@ function UserAccountsPage() {
   };
 
   const handleSignOut = () => {
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    localStorage.removeItem("daf_admin_passcode");
     localStorage.removeItem("agrofarms_admin_passcode");
     localStorage.removeItem("agrofarms_admin_user");
     queryClient.clear();
@@ -146,6 +152,20 @@ function UserAccountsPage() {
   const ownerCount = accounts.filter((a) => a.role === "owner").length;
   const managerCount = accounts.filter((a) => a.role === "manager").length;
   const staffCount = accounts.filter((a) => a.role === "staff").length;
+
+  // Prevent SSR Hydration Mismatch Error #418
+  if (!mounted) {
+    return (
+      <SiteLayout>
+        <div className="min-h-screen bg-[#FDFBF7] py-12 flex items-center justify-center">
+          <div className="flex items-center space-x-3 text-[#0F3D24]">
+            <Loader2 className="w-6 h-6 animate-spin text-[#3F8F3F]" />
+            <span className="text-sm font-semibold">Loading user accounts portal...</span>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
 
   return (
     <SiteLayout>
@@ -339,8 +359,10 @@ function UserAccountsPage() {
                   passcode={passcode}
                   role={role}
                   onPasscodeChanged={(newPasscode) => {
-                    const updatedToken = username.trim() ? `${username.trim()}:${newPasscode}` : newPasscode;
-                    localStorage.setItem("agrofarms_admin_passcode", updatedToken);
+                    const cred = parseAdminCredential(passcode);
+                    const updatedToken = JSON.stringify({ username: cred.username, passcode: newPasscode });
+                    localStorage.setItem(ADMIN_STORAGE_KEY, updatedToken);
+                    localStorage.setItem("daf_admin_passcode", updatedToken);
                     setPasscode(updatedToken);
                   }}
                 />

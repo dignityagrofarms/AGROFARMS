@@ -8,7 +8,7 @@ import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
-import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
+import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, ADMIN_STORAGE_KEY, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { adminListBatches, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
@@ -163,7 +163,7 @@ const STATUS_OPTIONS: { value: AdminOrder["status"]; label: string }[] = [
 ];
 
 const naira = (n: number) => "\u20a6" + n.toLocaleString("en-NG");
-const STORAGE_KEY = "daf_admin_passcode";
+const STORAGE_KEY = ADMIN_STORAGE_KEY;
 
 // An order that was started but never paid for, with no activity for 24h+.
 function isNotCompleted(o: AdminOrder): boolean {
