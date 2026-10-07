@@ -69,13 +69,23 @@ export function ReminderModal({
       return [
         {
           id: "order_status_update",
-          title: "📦 Order Status & Delivery Alert",
-          text: `Hi ${firstName}, greetings from Dignity Agro Farms! Your order (${orderCode || "DAF-XXXX"}) is being prepared for delivery. Total: ₦${(totalAmount || 0).toLocaleString()}. Tracking details available on our website.`,
+          title: "📦 Order Received & Preparation Alert",
+          text: `Hi ${firstName}, warm greetings from Dignity Agro Farms! Your order (${orderCode || "DAF-XXXX"}) has been received and is being prepared for dispatch. Total Amount: ₦${(totalAmount || 0).toLocaleString()}. Track your order live at dignityagrofarms.com!`,
+        },
+        {
+          id: "order_out_for_delivery",
+          title: "🚚 Out for Delivery / Dispatch Alert",
+          text: `Hi ${firstName}, your Dignity Agro Farms order (${orderCode || "DAF-XXXX"}) is now out for delivery! Please keep your phone reachable for our logistics rider. Thank you!`,
+        },
+        {
+          id: "order_payment_statement",
+          title: "💳 Payment & Balance Statement",
+          text: `Hi ${firstName}, payment update for your Dignity Agro Farms order (${orderCode || "DAF-XXXX"}):\nTotal: ₦${(totalAmount || 0).toLocaleString()}\nPaid: ₦${(amountPaid || 0).toLocaleString()}\nBalance: ₦${(balance || 0).toLocaleString()}\nPayment Account: Moniepoint MFB · 4006179439 (Dignity Agro Farms Ltd).`,
         },
         {
           id: "order_thankyou",
-          title: "🙌 Order Thank You & Feedback",
-          text: `Hi ${firstName}, thank you for purchasing from Dignity Agro Farms! Your order ${orderCode || ""} has been completed. We hope you enjoy your farm-fresh produce!`,
+          title: "🙌 Delivery Thank You & Feedback",
+          text: `Hi ${firstName}, thank you for choosing Dignity Agro Farms! Your order (${orderCode || "DAF-XXXX"}) has been delivered. We appreciate your patronage and hope you enjoy your farm-fresh produce!`,
         },
         {
           id: "order_custom",

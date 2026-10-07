@@ -25,6 +25,7 @@ interface OrganizedOrdersListProps {
   role: AdminRole;
   batches?: FarmBatch[];
   onSaved: () => void;
+  onOpenSmsModal?: (order: AdminOrder) => void;
 }
 
 const formatNaira = (val: number) =>
@@ -42,7 +43,7 @@ interface SectionGroup {
   defaultExpanded: boolean;
 }
 
-export function OrganizedOrdersList({ orders, passcode, role, batches, onSaved }: OrganizedOrdersListProps) {
+export function OrganizedOrdersList({ orders, passcode, role, batches, onSaved, onOpenSmsModal }: OrganizedOrdersListProps) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -375,6 +376,7 @@ export function OrganizedOrdersList({ orders, passcode, role, batches, onSaved }
                         role={role}
                         batches={batches}
                         onSaved={onSaved}
+                        onOpenSmsModal={onOpenSmsModal}
                       />
                     ))
                   )}

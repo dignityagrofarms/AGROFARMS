@@ -12,6 +12,8 @@ import {
   Lock,
   UserCheck,
   UserX,
+  Clock,
+  Trash2,
 } from "lucide-react";
 import {
   adminGetPasscode,
@@ -20,6 +22,7 @@ import {
   adminCreateUserAccount,
   adminResetUserPasscode,
   adminToggleUserActive,
+  adminDeleteUserAccount,
   type AdminRole,
   type UserAccountItem,
 } from "@/lib/orders.functions";
@@ -49,6 +52,7 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
   const createAccountFn = useServerFn(adminCreateUserAccount);
   const resetPasscodeFn = useServerFn(adminResetUserPasscode);
   const toggleActiveFn = useServerFn(adminToggleUserActive);
+  const deleteAccountFn = useServerFn(adminDeleteUserAccount);
   const setPasscodeFn = useServerFn(adminSetPasscode);
 
   const accountsQuery = useQuery({
@@ -110,6 +114,13 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
       toggleActiveFn({ data: { passcode, targetUsername: vars.username, active: vars.active } }),
     onSuccess: () => accountsQuery.refetch(),
     onError: (e: Error) => alert(e.message),
+  });
+
+  const deleteAccountMut = useMutation({
+    mutationFn: (username: string) =>
+      deleteAccountFn({ data: { passcode, targetUsername: username } }),
+    onSuccess: () => accountsQuery.refetch(),
+    onError: (e: Error) => alert("Delete error: " + e.message),
   });
 
   const canSaveOwn = nextPasscode.trim().length >= 6 && nextPasscode.trim() === confirmPasscode.trim();
@@ -210,7 +221,7 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
           {/* Accounts List Table */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70 flex items-center gap-2">
-              <Users size={15} /> Active System Accounts ({accountsQuery.data?.length || 0})
+              <Users size={15} /> Registered System Accounts ({accountsQuery.data?.length || 0})
             </h3>
             {accountsQuery.isLoading ? (
               <div className="py-6 text-center text-xs text-[#0F3D24]/50">
@@ -223,7 +234,8 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
                     <tr>
                       <th className="p-3">Username</th>
                       <th className="p-3">Role</th>
-                      <th className="p-3">Status</th>
+                      <th className="p-3">Account Status</th>
+                      <th className="p-3">Last Active / Login</th>
                       <th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
@@ -242,10 +254,16 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
                         </td>
                         <td className="p-3">
                           {acc.active ? (
-                            <span className="text-emerald-700 font-semibold flex items-center gap-1"><UserCheck size={13} /> Active</span>
+                            <span className="text-emerald-700 font-semibold flex items-center gap-1"><UserCheck size={13} /> Active / Enabled</span>
                           ) : (
                             <span className="text-red-600 font-semibold flex items-center gap-1"><UserX size={13} /> Deactivated</span>
                           )}
+                        </td>
+                        <td className="p-3 text-[#0F3D24]/70">
+                          <span className="flex items-center gap-1 text-[11px]">
+                            <Clock size={12} className="text-gray-400" />
+                            {acc.lastLoginAt ? new Date(acc.lastLoginAt).toLocaleString() : "Not logged in yet"}
+                          </span>
                         </td>
                         <td className="p-3 text-right space-x-2">
                           <button
@@ -258,14 +276,27 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
                             Reset Password
                           </button>
                           {acc.username !== "owner" && acc.username !== "admin" && (
-                            <button
-                              onClick={() => toggleActiveMut.mutate({ username: acc.username, active: !acc.active })}
-                              className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
-                                acc.active ? "bg-red-50 text-red-700 hover:bg-red-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                              }`}
-                            >
-                              {acc.active ? "Deactivate" : "Activate"}
-                            </button>
+                            <>
+                              <button
+                                onClick={() => toggleActiveMut.mutate({ username: acc.username, active: !acc.active })}
+                                className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                                  acc.active ? "bg-amber-50 text-amber-800 hover:bg-amber-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {acc.active ? "Deactivate" : "Activate"}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm(`Delete user account "${acc.username}"? This action cannot be undone.`)) {
+                                    deleteAccountMut.mutate(acc.username);
+                                  }
+                                }}
+                                className="rounded-full bg-red-50 p-1.5 text-red-600 hover:bg-red-100 transition inline-flex items-center align-middle"
+                                title="Delete account"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </>
                           )}
                         </td>
                       </tr>

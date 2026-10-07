@@ -25,6 +25,7 @@ export type Database = {
           active: boolean
           created_at: string
           id: string
+          last_login_at: string | null
           passcode_hash: string
           role: string
           updated_at: string
@@ -34,6 +35,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          last_login_at?: string | null
           passcode_hash: string
           role: string
           updated_at?: string
@@ -43,6 +45,7 @@ export type Database = {
           active?: boolean
           created_at?: string
           id?: string
+          last_login_at?: string | null
           passcode_hash?: string
           role?: string
           updated_at?: string

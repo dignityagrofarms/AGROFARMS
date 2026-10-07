@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,8 +16,56 @@ import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/comp
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
 import { ReminderModal } from "@/components/admin/ReminderModal";
 import { UserAccountsPanel } from "@/components/admin/UserAccountsPanel";
+import { PendingApprovalsPanel } from "@/components/admin/PendingApprovalsPanel";
 import { PasswordRecoveryModal } from "@/components/admin/PasswordRecoveryModal";
 import { FlyerGeneratorModal, type FlyerOrderData } from "@/components/admin/FlyerGeneratorModal";
+
+function playNewOrderChime() {
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(880, now);
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(1174.66, now + 0.15);
+    gain2.gain.setValueAtTime(0.4, now + 0.15);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 0.6);
+  } catch {
+    // Autoplay policy fallback
+  }
+}
+
+function triggerDesktopNotification(order: AdminOrder) {
+  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (Notification.permission === "granted") {
+    try {
+      new Notification(`🔔 New Order Received: #${order.orderCode}`, {
+        body: `Customer: ${order.customerName}\nTotal: ₦${order.total.toLocaleString()} (${order.items.length} item(s))`,
+        icon: "/favicon.ico",
+      });
+    } catch {
+      // Notification fallback
+    }
+  }
+}
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -190,6 +238,12 @@ function AdminOrders() {
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+  
+  // Real-time Order Alerts & SMS Target state
+  const [orderSmsTarget, setOrderSmsTarget] = useState<AdminOrder | null>(null);
+  const [newOrderPopupAlert, setNewOrderPopupAlert] = useState<AdminOrder | null>(null);
+  const initializedOrderIds = useRef<Set<string> | null>(null);
+
   const listFn = useServerFn(adminListOrders);
   const qc = useQueryClient();
 
@@ -197,10 +251,40 @@ function AdminOrders() {
     queryKey: ["admin-orders", passcode, applied],
     queryFn: () => listFn({ data: { passcode: passcode!, ...applied } }),
     enabled: !!passcode,
-    refetchInterval: 20000,
+    refetchInterval: 12000,
     retry: 1,
     placeholderData: (previousData) => previousData,
   });
+
+  // Effect to detect newly arrived orders during polling
+  useEffect(() => {
+    const orders = query.data?.orders;
+    if (!orders || orders.length === 0) return;
+
+    if (initializedOrderIds.current === null) {
+      initializedOrderIds.current = new Set(orders.map((o) => o.id));
+      return;
+    }
+
+    const newlyReceived = orders.find(
+      (o) => !initializedOrderIds.current!.has(o.id) && (o.status === "received" || o.paymentStatus === "pending")
+    );
+
+    orders.forEach((o) => initializedOrderIds.current!.add(o.id));
+
+    if (newlyReceived) {
+      playNewOrderChime();
+      triggerDesktopNotification(newlyReceived);
+      setNewOrderPopupAlert(newlyReceived);
+    }
+  }, [query.data?.orders]);
+
+  // Request browser desktop notification permission
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const listBatchesFn = useServerFn(adminListBatches);
   const batchesQuery = useQuery({
@@ -402,6 +486,41 @@ function AdminOrders() {
             }}
           />
         )}
+        {passcode && query.data?.role === "owner" && (
+          <PendingApprovalsPanel passcode={passcode} role="owner" />
+        )}
+        {passcode && (() => {
+          const unprocessedOrders = (query.data?.orders || []).filter(
+            (o) => o.status === "received" || o.paymentStatus === "pending"
+          );
+          if (unprocessedOrders.length === 0) return null;
+          return (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-500/15 p-4 text-[#0F3D24] ring-2 ring-amber-500/40 animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-amber-500 p-2 text-white shadow-md">
+                  <Bell size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm">
+                    ⚠️ ATTENTION: {unprocessedOrders.length} New Unprocessed Order(s) Awaiting Review!
+                  </h4>
+                  <p className="text-xs text-[#0F3D24]/80">
+                    Latest order from <span className="font-bold">{unprocessedOrders[0].customerName}</span> ({unprocessedOrders[0].orderCode}) - ₦{unprocessedOrders[0].total.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveTab("orders");
+                  setApplied((prev) => ({ ...prev, status: "received" }));
+                }}
+                className="rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white hover:bg-[#134a2c] transition shadow-sm"
+              >
+                View New Orders Now
+              </button>
+            </div>
+          );
+        })()}
         {passcode && (
           <div className="mb-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
@@ -525,6 +644,7 @@ function AdminOrders() {
                             role={role}
                             batches={batchesQuery.data || []}
                             onSaved={() => query.refetch()}
+                            onOpenSmsModal={(order) => setOrderSmsTarget(order)}
                           />
                         );
                       })()}
@@ -573,16 +693,103 @@ function AdminOrders() {
         />
       )}
 
-      {showRecoveryModal && (
-        <PasswordRecoveryModal
-          isOpen={showRecoveryModal}
-          onClose={() => setShowRecoveryModal(false)}
-          onSuccess={(newPasscode) => {
-            const credential = JSON.stringify({ username: "owner", passcode: newPasscode, loginAt: Date.now(), lastActive: Date.now() });
-            localStorage.setItem(STORAGE_KEY, credential);
-            setPasscode(credential);
-          }}
+      {/* Orders Tab SMS & WhatsApp Reminder Modal */}
+      {orderSmsTarget && (
+        <ReminderModal
+          isOpen={Boolean(orderSmsTarget)}
+          onClose={() => setOrderSmsTarget(null)}
+          targetType="order"
+          recipientName={orderSmsTarget.customerName}
+          recipientPhone={orderSmsTarget.phone}
+          orderCode={orderSmsTarget.orderCode}
+          totalAmount={orderSmsTarget.total}
+          amountPaid={orderSmsTarget.paymentStatus === "approved" ? orderSmsTarget.total : 0}
+          balance={orderSmsTarget.paymentStatus === "approved" ? 0 : orderSmsTarget.total}
         />
+      )}
+
+      {/* Real-time Incoming Order Glowing Pop-Up Modal */}
+      {newOrderPopupAlert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl ring-4 ring-emerald-500/80">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-[#0F3D24] to-[#1a5d38] p-6 text-white text-center relative">
+              <button
+                onClick={() => setNewOrderPopupAlert(null)}
+                className="absolute top-4 right-4 text-white/70 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-300 animate-pulse">
+                <Bell size={28} />
+              </div>
+              <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-emerald-300">
+                JUST IN · NEW ORDER RECEIVED
+              </span>
+              <h3 className="mt-2 text-2xl font-black tracking-tight text-white">
+                Order #{newOrderPopupAlert.orderCode}
+              </h3>
+              <p className="text-xs text-white/80">
+                Placed by <span className="font-bold text-emerald-300">{newOrderPopupAlert.customerName}</span>
+              </p>
+            </div>
+
+            {/* Body Details */}
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#F7F5F0] p-4 text-xs">
+                <div>
+                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Customer Phone</span>
+                  <p className="font-mono font-bold text-[#0F3D24] text-sm">{newOrderPopupAlert.phone}</p>
+                </div>
+                <div>
+                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Total Order Amount</span>
+                  <p className="font-black text-emerald-700 text-base">₦{newOrderPopupAlert.total.toLocaleString()}</p>
+                </div>
+                <div>
+                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Delivery Zone</span>
+                  <p className="font-semibold text-gray-800">{newOrderPopupAlert.deliveryZone || "Standard Delivery"}</p>
+                </div>
+                <div>
+                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Payment Status</span>
+                  <p className="font-bold uppercase text-amber-700">{newOrderPopupAlert.paymentStatus}</p>
+                </div>
+              </div>
+
+              {/* Item list */}
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70 mb-2">Ordered Items ({newOrderPopupAlert.items.length})</h4>
+                <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 rounded-xl border border-gray-200 bg-gray-50/50 p-2 text-xs">
+                  {newOrderPopupAlert.items.map((it, idx) => (
+                    <div key={idx} className="flex justify-between py-1.5 font-medium">
+                      <span>{it.product} × {it.qty}</span>
+                      <span className="font-bold text-[#0F3D24]">₦{(it.unitPrice * it.qty).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setNewOrderPopupAlert(null);
+                    setActiveTab("orders");
+                    setApplied((prev) => ({ ...prev, search: newOrderPopupAlert.orderCode }));
+                  }}
+                  className="flex-1 rounded-full bg-[#0F3D24] py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition text-center"
+                >
+                  Review Order Details
+                </button>
+                <button
+                  onClick={() => setNewOrderPopupAlert(null)}
+                  className="rounded-full bg-gray-100 px-5 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </SiteLayout>
   );
@@ -1584,7 +1791,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerModal }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void; onOpenFlyerModal?: (data: FlyerOrderData) => void }) {
+export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerModal, onOpenSmsModal }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void; onOpenFlyerModal?: (data: FlyerOrderData) => void; onOpenSmsModal?: (order: AdminOrder) => void }) {
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.statusNote ?? "");
@@ -1873,14 +2080,13 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             >
               Resend status
             </a>
-            {order.status === "delivered" && (
-              <a
-                href={thankYouSms(order)}
-                className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]"
-              >
-                <MessageCircle size={14} /> Send thank you SMS
-              </a>
-            )}
+            <button
+              type="button"
+              onClick={() => onOpenSmsModal?.(order)}
+              className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#347834] transition"
+            >
+              <MessageSquare size={14} /> Send SMS / Notification
+            </button>
             <Link
               to="/receipt/$orderCode"
               params={{ orderCode: order.orderCode }}

@@ -464,12 +464,16 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
     .eq("username", credential.username)
     .maybeSingle();
   if (configured?.active && configured.passcode_hash && (await hashPasscode(credential.passcode)) === configured.passcode_hash) {
+    void supabaseAdmin
+      .from("admin_access")
+      .update({ last_login_at: new Date().toISOString() })
+      .eq("username", credential.username);
     return configured.role as AdminRole;
   }
 
   const master = process.env.ADMIN_PASSCODE;
-  const masterUsername = process.env.ADMIN_USERNAME;
-  if (masterUsername && credential.username === masterUsername && master && credential.passcode === master) return "owner";
+  const masterUsername = process.env.ADMIN_USERNAME || "owner";
+  if (credential.username === masterUsername && master && credential.passcode === master) return "owner";
 
   const { data: staffSetting } = await supabaseAdmin
     .from("app_settings")
@@ -533,6 +537,7 @@ export interface UserAccountItem {
   role: AdminRole;
   active: boolean;
   createdAt: string;
+  lastLoginAt?: string | null;
 }
 
 export const adminListUserAccounts = createServerFn({ method: "POST" })
@@ -542,16 +547,31 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin
       .from("admin_access")
-      .select("id, username, role, active, created_at")
+      .select("id, username, role, active, created_at, last_login_at")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-    return (rows || []).map((r) => ({
+    const items: UserAccountItem[] = (rows || []).map((r: any) => ({
       id: r.id,
       username: r.username,
       role: r.role as AdminRole,
       active: r.active,
       createdAt: r.created_at,
+      lastLoginAt: r.last_login_at ?? null,
     }));
+
+    const masterUser = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
+    if (!items.some((i) => i.username === masterUser)) {
+      items.unshift({
+        id: "master-owner-account",
+        username: masterUser,
+        role: "owner",
+        active: true,
+        createdAt: new Date().toISOString(),
+        lastLoginAt: new Date().toISOString(),
+      });
+    }
+
+    return items;
   });
 
 export const adminCreateUserAccount = createServerFn({ method: "POST" })
@@ -579,6 +599,27 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
         },
         { onConflict: "username" },
       );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminDeleteUserAccount = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().trim().min(1).toLowerCase(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    if (data.targetUsername === "owner" || data.targetUsername === "admin") {
+      throw new Error("Cannot delete primary Administrator account.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("admin_access")
+      .delete()
+      .eq("username", data.targetUsername);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

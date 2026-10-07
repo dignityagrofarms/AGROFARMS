@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { checkPasscode, checkOwner } from "./orders.functions";
+import { checkPasscode, checkOwner, parseAdminCredential } from "./orders.functions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,7 @@ export type FarmFinancial = {
   transactionDate: string;
   referenceNo: string | null;
   recordedBy: string | null;
+  approvalStatus?: "approved" | "pending_approval" | "rejected";
   createdAt: string;
 };
 
@@ -70,6 +71,7 @@ export type FarmActivity = {
   medicationGiven: string | null;
   notes: string | null;
   recordedBy: string | null;
+  approvalStatus?: "approved" | "pending_approval" | "rejected";
   createdAt: string;
 };
 
@@ -263,7 +265,7 @@ export const adminDeleteBatch = createServerFn({ method: "POST" })
 // ─── Financials Server Functions ─────────────────────────────────────────────
 
 export const adminListFinancials = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable() }).parse(data))
+  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable(), includePending: z.boolean().optional() }).parse(data))
   .handler(async ({ data }): Promise<FarmFinancial[]> => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -275,6 +277,10 @@ export const adminListFinancials = createServerFn({ method: "POST" })
 
     if (data.batchId) {
       query = query.eq("batch_id", data.batchId);
+    }
+
+    if (!data.includePending) {
+      query = query.or("approval_status.eq.approved,approval_status.is.null");
     }
 
     const { data: rows, error } = await query;
@@ -295,6 +301,7 @@ export const adminListFinancials = createServerFn({ method: "POST" })
       transactionDate: r.transaction_date,
       referenceNo: r.reference_no ?? null,
       recordedBy: r.recorded_by ?? null,
+      approvalStatus: r.approval_status ?? "approved",
       createdAt: r.created_at,
     }));
   });
@@ -302,7 +309,11 @@ export const adminListFinancials = createServerFn({ method: "POST" })
 export const adminCreateFinancial = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createFinancialSchema.parse(data))
   .handler(async ({ data }): Promise<{ id: string }> => {
-    await checkPasscode(data.passcode);
+    const role = await checkPasscode(data.passcode);
+    const credential = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
+    const approvalStatus = isOwner ? "approved" : "pending_approval";
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: row, error } = await supabaseAdmin
@@ -316,6 +327,8 @@ export const adminCreateFinancial = createServerFn({ method: "POST" })
         payment_method: data.paymentMethod,
         transaction_date: data.transactionDate,
         reference_no: data.referenceNo || null,
+        approval_status: approvalStatus,
+        recorded_by: credential.username,
       })
       .select("id")
       .single();
@@ -642,7 +655,7 @@ export const adminBatchImportLeads = createServerFn({ method: "POST" })
 // ─── Farm Activities Server Functions ────────────────────────────────────────
 
 export const adminListActivities = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable() }).parse(data))
+  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable(), includePending: z.boolean().optional() }).parse(data))
   .handler(async ({ data }): Promise<FarmActivity[]> => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -654,6 +667,10 @@ export const adminListActivities = createServerFn({ method: "POST" })
 
     if (data.batchId) {
       query = query.eq("batch_id", data.batchId);
+    }
+
+    if (!data.includePending) {
+      query = query.or("approval_status.eq.approved,approval_status.is.null");
     }
 
     const { data: rows, error } = await query;
@@ -675,6 +692,7 @@ export const adminListActivities = createServerFn({ method: "POST" })
       medicationGiven: r.medication_given ?? null,
       notes: r.notes ?? null,
       recordedBy: r.recorded_by ?? null,
+      approvalStatus: r.approval_status ?? "approved",
       createdAt: r.created_at,
     }));
   });
@@ -682,7 +700,11 @@ export const adminListActivities = createServerFn({ method: "POST" })
 export const adminCreateActivity = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createActivitySchema.parse(data))
   .handler(async ({ data }): Promise<{ id: string }> => {
-    await checkPasscode(data.passcode);
+    const role = await checkPasscode(data.passcode);
+    const credential = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
+    const approvalStatus = isOwner ? "approved" : "pending_approval";
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: row, error } = await supabaseAdmin
@@ -697,14 +719,16 @@ export const adminCreateActivity = createServerFn({ method: "POST" })
         eggs_collected: data.eggsCollected,
         medication_given: data.medicationGiven || null,
         notes: data.notes || null,
+        approval_status: approvalStatus,
+        recorded_by: credential.username,
       })
       .select("id")
       .single();
 
     if (error) throw new Error(error.message);
 
-    // If mortality recorded for a batch, automatically adjust batch current_headcount
-    if (data.batchId && data.mortalityCount > 0) {
+    // If approved owner entry with mortality, adjust batch current_headcount immediately
+    if (isOwner && data.batchId && data.mortalityCount > 0) {
       const { data: b } = await supabaseAdmin
         .from("farm_batches")
         .select("current_headcount")
@@ -875,4 +899,131 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
       };
     }
   );
+
+// ─── Staff Approvals Management Server Functions ─────────────────────────────
+
+export const adminListPendingApprovals = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => baseAuthSchema.parse(data))
+  .handler(async ({ data }): Promise<{ financials: FarmFinancial[]; activities: FarmActivity[] }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: finRows } = await supabaseAdmin
+      .from("farm_financials")
+      .select("*, farm_batches(batch_name)")
+      .eq("approval_status", "pending_approval")
+      .order("created_at", { ascending: false });
+
+    const { data: actRows } = await supabaseAdmin
+      .from("farm_activities")
+      .select("*, farm_batches(batch_name)")
+      .eq("approval_status", "pending_approval")
+      .order("created_at", { ascending: false });
+
+    const financials: FarmFinancial[] = (finRows || []).map((r: any) => ({
+      id: r.id,
+      batchId: r.batch_id ?? null,
+      batchName: r.farm_batches?.batch_name ?? null,
+      type: r.type,
+      category: r.category,
+      amount: Number(r.amount || 0),
+      description: r.description,
+      paymentMethod: r.payment_method,
+      transactionDate: r.transaction_date,
+      referenceNo: r.reference_no ?? null,
+      recordedBy: r.recorded_by ?? null,
+      approvalStatus: r.approval_status,
+      createdAt: r.created_at,
+    }));
+
+    const activities: FarmActivity[] = (actRows || []).map((r: any) => ({
+      id: r.id,
+      batchId: r.batch_id ?? null,
+      batchName: r.farm_batches?.batch_name ?? null,
+      activityDate: r.activity_date,
+      activityType: r.activity_type,
+      mortalityCount: Number(r.mortality_count || 0),
+      causeOfMortality: r.cause_of_mortality ?? null,
+      feedConsumedKg: Number(r.feed_consumed_kg || 0),
+      eggsCollected: Number(r.eggs_collected || 0),
+      medicationGiven: r.medication_given ?? null,
+      notes: r.notes ?? null,
+      recordedBy: r.recorded_by ?? null,
+      approvalStatus: r.approval_status,
+      createdAt: r.created_at,
+    }));
+
+    return { financials, activities };
+  });
+
+export const adminApproveStaffRecord = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      id: z.string().uuid(),
+      targetType: z.enum(["financial", "activity"]),
+    }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.targetType === "financial") {
+      const { error } = await supabaseAdmin
+        .from("farm_financials")
+        .update({ approval_status: "approved" })
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+    } else {
+      // Get activity details for headcount adjustment if mortality recorded
+      const { data: act } = await supabaseAdmin
+        .from("farm_activities")
+        .select("batch_id, mortality_count")
+        .eq("id", data.id)
+        .single();
+
+      const { error } = await supabaseAdmin
+        .from("farm_activities")
+        .update({ approval_status: "approved" })
+        .eq("id", data.id);
+      if (error) throw new Error(error.message);
+
+      if (act?.batch_id && Number(act.mortality_count || 0) > 0) {
+        const { data: b } = await supabaseAdmin
+          .from("farm_batches")
+          .select("current_headcount")
+          .eq("id", act.batch_id)
+          .single();
+
+        if (b) {
+          const nextCount = Math.max(0, Number(b.current_headcount || 0) - Number(act.mortality_count || 0));
+          await supabaseAdmin
+            .from("farm_batches")
+            .update({ current_headcount: nextCount, updated_at: new Date().toISOString() })
+            .eq("id", act.batch_id);
+        }
+      }
+    }
+
+    return { ok: true };
+  });
+
+export const adminRejectStaffRecord = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      id: z.string().uuid(),
+      targetType: z.enum(["financial", "activity"]),
+    }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const table = data.targetType === "financial" ? "farm_financials" : "farm_activities";
+    const { error } = await supabaseAdmin.from(table).delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
 

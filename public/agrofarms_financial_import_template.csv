@@ -1,0 +1,6 @@
+"Type","Category","Amount","Description","PaymentMethod","TransactionDate","CustomerName","CustomerPhone"
+"income","Broiler Sales","45000","10 Broilers sold offline","Cash","2026-10-07","Emeka Okonkwo","07012345678"
+"income","Fresh Eggs","28000","5 crates extra large eggs","Bank Transfer","2026-10-07","Nkechi Nwosu","08033445566"
+"expense","Feed","120000","10 Bags Starter Feed","Bank Transfer","2026-10-06","",""
+"expense","Medication","15000","Multivitamins & Vaccines","Cash","2026-10-05","",""
+"income","Broiler Sales","90000","20 Broilers delivered","Bank Transfer","2026-10-07","Chidi Ibe","08099887766"

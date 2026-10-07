@@ -1,0 +1,30 @@
+"DIGNITY AGRO FARMS - FINANCIAL & BATCH REPORT"
+"Report Date: 06/10/2026, 22:10:19"
+"View / Batch: All_Batches_Farm_Overview"
+"Batch Type: Broiler & Layer"
+"Live Headcount: 200 birds"
+"Mortality Rate: 0 birds (0%)"
+"Total Revenue (Income): NGN 452,750"
+"Total Expenses: NGN 0"
+"Net Profit/Loss: NGN 452,750"
+"ROI: 0%"
+
+Date,Type,Category,Batch,Description,Payment Method,Amount (NGN)
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-28966 (Eberechukwu Chizitere destiny)",Submitted/Pending,36750
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-32619 (Ezesi Cynthia Chizoba)",Bank Transfer,81000
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-61363 (Ihemegbulem Chukwuebuka)",Bank Transfer,30000
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-28765 (Mr IFERE CHINASAOKWU)",Bank Transfer,9500
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-61554 (Mr IFERE CHINASAOKWU)",Bank Transfer,144000
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-38466 (Comfort Kelechi)",Bank Transfer,10000
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-94896 (John Okoye)",Bank Transfer,10000
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-97123 (Nwachukwu chidinma precious)",Bank Transfer,10000
+2026-10-05,INCOME,Store Order,Store Sales,"Order #DAF-19795 (Nwokeke Nkechi Victoria)",Bank Transfer,10000
+2026-10-05,INCOME,December Pre-Order,December Pre-Orders,"December Pre-Order #DEC-18189 (Nwachukwu Chika)",Bank Transfer,10000
+2026-10-02,INCOME,Store Order,Store Sales,"Order #DAF-12389 (Onwumere Emmanuel Ugonna)",Bank Transfer,10000
+2026-10-02,INCOME,Store Order,Store Sales,"Order #DAF-81798 (CHIJIOKE ERNEST ONYEOCHA)",Bank Transfer,10000
+2026-10-02,INCOME,Store Order,Store Sales,"Order #DAF-79626 (ijeoma Nkeriu)",Bank Transfer,10000
+2026-10-02,INCOME,Store Order,Store Sales,"Order #DAF-32298 (Obinwanne Precious C.)",Bank Transfer,10000
+2026-10-01,INCOME,December Pre-Order,December Pre-Orders,"December Pre-Order #DEC-44851 (Okoroji Jerry Ogbonna)",Bank Transfer,20000
+2026-09-30,INCOME,December Pre-Order,December Pre-Orders,"December Pre-Order #DEC-44683 (Princewill Daniel)",Bank Transfer,4000
+2026-09-29,INCOME,Store Order,Store Sales,"Order #DAF-41471 (Tamuno-imiebam J Abraham)",Bank Transfer,13000
+2026-09-29,INCOME,December Pre-Order,December Pre-Orders,"December Pre-Order #DEC-61501 (Ezeh Chibuzor)",Bank Transfer,24500
