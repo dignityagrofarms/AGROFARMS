@@ -52,62 +52,77 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
     newPasscode.trim() === confirmPasscode.trim();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#0F3D24]/10 bg-[#0F3D24] px-6 py-5 text-white">
+        <div className="flex items-center justify-between border-b border-[#0F3D24]/10 bg-[#0F3D24] px-5 sm:px-6 py-4 sm:py-5 text-white shrink-0">
           <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-[#3F8F3F]/30 p-2 text-[#A2E0A2]">
-              <KeyRound size={22} />
+            <div className="rounded-xl bg-[#3F8F3F]/30 p-2 text-[#A2E0A2] shrink-0">
+              <KeyRound size={20} />
             </div>
             <div>
-              <h3 className="text-base font-bold">Account Passcode Recovery</h3>
-              <p className="text-xs text-white/70">Reset forgotten administrator or user credentials</p>
+              <h3 className="text-sm sm:text-base font-bold leading-tight">Account Passcode Recovery</h3>
+              <p className="text-[11px] sm:text-xs text-white/70 leading-tight mt-0.5">
+                Reset forgotten administrator or user credentials
+              </p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white transition">
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white transition shrink-0"
+          >
             <X size={18} />
           </button>
         </div>
 
-        <div className="p-6 space-y-4 text-xs">
+        {/* Form Body - Scrollable on small screens */}
+        <div className="p-4 sm:p-6 space-y-4 text-xs overflow-y-auto">
           {/* Recovery Method Selector */}
-          <div className="flex rounded-2xl bg-[#F7F5F0] p-1 border border-[#0F3D24]/10">
+          <div className="grid grid-cols-2 gap-1.5 rounded-2xl bg-[#F7F5F0] p-1.5 border border-[#0F3D24]/10">
             <button
               type="button"
-              onClick={() => { setRecoveryMethod("key"); setErrorMsg(null); }}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 font-bold text-xs transition ${
+              onClick={() => {
+                setRecoveryMethod("key");
+                setErrorMsg(null);
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 font-bold text-[11px] sm:text-xs transition text-center min-h-[42px] leading-tight ${
                 recoveryMethod === "key"
                   ? "bg-[#0F3D24] text-white shadow-xs"
                   : "text-[#0F3D24]/70 hover:bg-[#0F3D24]/5"
               }`}
             >
-              <KeyRound size={14} /> Master Key / Phrase
+              <KeyRound size={14} className="shrink-0" />
+              <span>Master Key / Phrase</span>
             </button>
             <button
               type="button"
-              onClick={() => { setRecoveryMethod("totp"); setErrorMsg(null); }}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2 font-bold text-xs transition ${
+              onClick={() => {
+                setRecoveryMethod("totp");
+                setErrorMsg(null);
+              }}
+              className={`flex items-center justify-center gap-1.5 rounded-xl px-2 py-2.5 font-bold text-[11px] sm:text-xs transition text-center min-h-[42px] leading-tight ${
                 recoveryMethod === "totp"
                   ? "bg-[#0F3D24] text-white shadow-xs"
                   : "text-[#0F3D24]/70 hover:bg-[#0F3D24]/5"
               }`}
             >
-              <Smartphone size={14} /> Authenticator App (TOTP)
+              <Smartphone size={14} className="shrink-0" />
+              <span>Authenticator App (TOTP)</span>
             </button>
           </div>
 
           {recoveryMethod === "key" ? (
-            <div className="rounded-2xl bg-amber-50 p-3.5 border border-amber-200 text-amber-900 flex items-start gap-2.5">
+            <div className="rounded-2xl bg-amber-50 p-3 sm:p-3.5 border border-amber-200 text-amber-900 flex items-start gap-2.5">
               <ShieldAlert size={18} className="shrink-0 mt-0.5" />
-              <p>
+              <p className="leading-relaxed">
                 Enter the farm's Master Recovery Key (or Master Passcode) configured in your environment to reset credentials safely.
               </p>
             </div>
           ) : (
-            <div className="rounded-2xl bg-blue-50 p-3.5 border border-blue-200 text-blue-900 flex items-start gap-2.5">
+            <div className="rounded-2xl bg-blue-50 p-3 sm:p-3.5 border border-blue-200 text-blue-900 flex items-start gap-2.5">
               <Smartphone size={18} className="shrink-0 mt-0.5" />
-              <p>
+              <p className="leading-relaxed">
                 Open Google Authenticator, Authy, or Apple Passwords on your phone and enter the 6-digit code.
               </p>
             </div>
@@ -121,7 +136,7 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
                 value={recoveryKey}
                 onChange={(e) => setRecoveryKey(e.target.value)}
                 placeholder="Enter recovery phrase or master key"
-                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-sm sm:text-xs outline-none focus:border-[#3F8F3F] min-h-[44px]"
               />
             </label>
           ) : (
@@ -133,7 +148,7 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
                 placeholder="e.g. 123456"
-                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-center text-lg font-mono font-bold tracking-widest outline-none focus:border-[#3F8F3F]"
+                className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-center text-xl font-mono font-bold tracking-widest outline-none focus:border-[#3F8F3F] min-h-[48px] bg-slate-50 focus:bg-white"
               />
             </label>
           )}
@@ -145,7 +160,7 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               value={targetUsername}
               onChange={(e) => setTargetUsername(e.target.value)}
               placeholder="e.g. owner, manager, staff"
-              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
+              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-sm sm:text-xs outline-none focus:border-[#3F8F3F] min-h-[44px]"
             />
           </label>
 
@@ -156,7 +171,7 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               value={newPasscode}
               onChange={(e) => setNewPasscode(e.target.value)}
               placeholder="Enter new passcode"
-              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
+              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-sm sm:text-xs outline-none focus:border-[#3F8F3F] min-h-[44px]"
             />
           </label>
 
@@ -167,7 +182,7 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               value={confirmPasscode}
               onChange={(e) => setConfirmPasscode(e.target.value)}
               placeholder="Re-enter new passcode"
-              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-xs outline-none focus:border-[#3F8F3F]"
+              className="mt-1 block w-full rounded-xl border border-[#0F3D24]/20 p-3 text-sm sm:text-xs outline-none focus:border-[#3F8F3F] min-h-[44px]"
             />
           </label>
 
@@ -177,11 +192,11 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2.5 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full bg-gray-100 px-5 py-2.5 font-semibold text-gray-600 hover:bg-gray-200 transition"
+              className="w-full sm:w-auto min-h-[44px] flex items-center justify-center rounded-full bg-gray-100 px-5 py-2.5 font-semibold text-gray-600 hover:bg-gray-200 transition text-xs sm:text-sm"
             >
               Cancel
             </button>
@@ -189,15 +204,15 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               type="button"
               disabled={!canSubmit || recoverMut.isPending}
               onClick={() => recoverMut.mutate()}
-              className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-2.5 font-bold text-white shadow-md hover:bg-[#134a2c] disabled:opacity-50 transition"
+              className="w-full sm:w-auto min-h-[44px] flex items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-6 py-2.5 font-bold text-white shadow-md hover:bg-[#134a2c] disabled:opacity-50 transition text-xs sm:text-sm"
             >
               {recoverMut.isPending ? (
                 <>
-                  <Loader2 size={16} className="animate-spin" /> Verifying...
+                  <Loader2 size={16} className="animate-spin shrink-0" /> Verifying...
                 </>
               ) : (
                 <>
-                  <CheckCircle2 size={16} /> Recover & Reset Credentials
+                  <CheckCircle2 size={16} className="shrink-0" /> Recover & Reset Credentials
                 </>
               )}
             </button>
