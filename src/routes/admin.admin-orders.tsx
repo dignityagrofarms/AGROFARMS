@@ -19,6 +19,7 @@ import { UserAccountsPanel } from "@/components/admin/UserAccountsPanel";
 import { PendingApprovalsPanel } from "@/components/admin/PendingApprovalsPanel";
 import { PasswordRecoveryModal } from "@/components/admin/PasswordRecoveryModal";
 import { FlyerGeneratorModal, type FlyerOrderData } from "@/components/admin/FlyerGeneratorModal";
+import { drawSocialProofFlyerCanvas } from "@/lib/flyer-generator";
 
 function playNewOrderChime() {
   try {
@@ -1368,98 +1369,67 @@ function SocialProofPanel({ orders }: { orders: AdminOrder[] }) {
 }
 
 function ThankYouFlyerModal({ order, onClose }: { order: AdminOrder; onClose: () => void }) {
-  const [stage, setStage] = useState<FlyerStage>(order.status === "delivered" ? "delivered" : "received");
-  const canvasRef = useState<HTMLCanvasElement | null>(null)[0];
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     if (!canvas) return;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    const width = 1080;
-    const height = 1080;
-    canvas.width = width;
-    canvas.height = height;
-    context.fillStyle = "#F7F5F0";
-    context.fillRect(0, 0, width, height);
-    context.fillStyle = "#0F3D24";
-    context.fillRect(0, 0, width, 340);
-    context.fillStyle = "#3F8F3F";
-    context.fillRect(0, 340, width, 18);
-    context.fillStyle = "#FFFFFF";
-    context.font = "700 34px Arial, sans-serif";
-    context.fillText("DIGNITY AGRO FARMS LIMITED", 76, 90);
-    context.font = "400 22px Arial, sans-serif";
-    context.fillStyle = "#A8E6A8";
-    context.fillText("Farm fresh chicken. Straight to your door.", 78, 137);
-    context.fillStyle = "#FFFFFF";
-    context.font = "700 66px Arial, sans-serif";
-    context.fillText("THANK YOU", 76, 245);
-    context.font = "700 30px Arial, sans-serif";
-    context.fillText(stage === "delivered" ? "ORDER DELIVERED" : "ORDER RECEIVED", 80, 295);
-    context.fillStyle = "#0F3D24";
-    context.font = "700 34px Arial, sans-serif";
-    context.fillText(stage === "delivered" ? "Another farm fresh order delivered." : "Your order is safely with our team.", 78, 475);
-    context.fillStyle = "#3F8F3F";
-    context.font = "700 26px Arial, sans-serif";
-    context.fillText("A THANK YOU FROM OUR FARM TO YOUR HOME", 80, 535);
-    context.fillStyle = "#0F3D24";
-    context.font = "400 30px Arial, sans-serif";
-    context.fillText(`Order ${order.orderCode}`, 80, 625);
-    context.font = "400 27px Arial, sans-serif";
-    context.fillText(`${maskedCustomerName(order.customerName)}  •  ${maskedPhone(order.phone)}`, 80, 680);
-    context.fillStyle = "#FFFFFF";
-    context.fillRect(78, 765, 924, 150);
-    context.strokeStyle = "#D5E3D4";
-    context.lineWidth = 3;
-    context.strokeRect(78, 765, 924, 150);
-    context.fillStyle = "#0F3D24";
-    context.font = "700 28px Arial, sans-serif";
-    context.fillText("Healthy birds. Fair farm prices. Honest service.", 112, 830);
-    context.font = "400 24px Arial, sans-serif";
-    context.fillText("Live birds  •  Dressed chicken  •  Fresh eggs", 112, 875);
-    context.fillStyle = "#3F8F3F";
-    context.font = "700 27px Arial, sans-serif";
-    context.fillText("Affordable meat for every home, at farm price.", 80, 985);
-  }, [canvas, order, stage]);
+    drawSocialProofFlyerCanvas(canvas, {
+      customerName: order.customerName,
+      phone: order.phone,
+      orderDate: new Date(order.createdAt).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      itemsText: order.items.map((i) => `${i.product} × ${i.qty}`).join(", "),
+      address: order.address || "Owerri, Imo State",
+      orderCode: order.orderCode,
+      maskData: true,
+    }).catch(console.error);
+  }, [canvas, order]);
 
   const download = () => {
     if (!canvas) return;
     const link = document.createElement("a");
-    link.download = `dignity-thank-you-${order.orderCode}-${stage}.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.download = `dignity-social-proof-${order.orderCode}.png`;
+    link.href = canvas.toDataURL("image/png", 1.0);
     link.click();
   };
 
   const share = async () => {
     if (!canvas) return;
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    const file = blob ? new File([blob], `dignity-thank-you-${order.orderCode}.png`, { type: "image/png" }) : null;
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
+    const file = blob ? new File([blob], `dignity-social-proof-${order.orderCode}.png`, { type: "image/png" }) : null;
+    const caption = `📦 *Order Confirmed & Verified!*\nOrder Ref: #${order.orderCode}\nItems: ${order.items
+      .map((i) => `${i.product} × ${i.qty}`)
+      .join(", ")}\n\nOrder farm-fresh poultry at https://dignityagrofarms.com`;
+
     if (file && navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-      await navigator.share({ title: "Dignity Agro Farms", text: flyerCaption(order, stage), files: [file] });
+      await navigator.share({ title: "Dignity Agro Farms Order Proof", text: caption, files: [file] });
       return;
     }
-    await navigator.clipboard?.writeText(flyerCaption(order, stage));
-    window.open(`https://wa.me/?text=${encodeURIComponent(flyerCaption(order, stage))}`, "_blank", "noopener,noreferrer");
+    await navigator.clipboard?.writeText(caption);
+    window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, "_blank", "noopener,noreferrer");
   };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-[#0F3D24]/70 p-4" role="dialog" aria-modal="true" aria-label="Thank you flyer">
       <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-7">
         <div className="flex items-start justify-between gap-4">
-          <div><div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Flyer preview</div><h3 className="mt-1 text-2xl font-semibold text-[#0F3D24]">Share this order story</h3><p className="mt-1 text-sm text-[#0F3D24]/60">Personal details are masked on the graphic.</p></div>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Official Brand Poster Preview</div>
+            <h3 className="mt-1 text-2xl font-semibold text-[#0F3D24]">Social Proof Order Graphic</h3>
+            <p className="mt-1 text-sm text-[#0F3D24]/60">Customer details are automatically masked with ***** to protect identity.</p>
+          </div>
           <button type="button" onClick={onClose} aria-label="Close flyer preview" title="Close" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#F7F5F0] text-[#0F3D24] hover:bg-[#e9e6de]"><X size={17} /></button>
         </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <button type="button" onClick={() => setStage("received")} className={`rounded-xl px-4 py-3 text-sm font-semibold ring-1 ${stage === "received" ? "bg-[#0F3D24] text-white ring-[#0F3D24]" : "bg-white text-[#0F3D24] ring-[#0F3D24]/15"}`}>Order received</button>
-          <button type="button" onClick={() => setStage("delivered")} className={`rounded-xl px-4 py-3 text-sm font-semibold ring-1 ${stage === "delivered" ? "bg-[#3F8F3F] text-white ring-[#3F8F3F]" : "bg-white text-[#0F3D24] ring-[#0F3D24]/15"}`}>Order delivered</button>
+        <div className="mt-4 flex flex-col items-center justify-center bg-slate-100 p-4 rounded-2xl border border-slate-200">
+          <canvas ref={setCanvas} className="w-full max-w-[420px] aspect-[1067/1280] rounded-2xl bg-white shadow-md border border-slate-300" />
         </div>
-        <canvas ref={setCanvas} className="mt-5 aspect-square w-full rounded-2xl bg-[#F7F5F0] shadow-sm ring-1 ring-[#0F3D24]/10" />
         <div className="mt-5 flex flex-wrap gap-3">
-          <button type="button" onClick={download} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]"><ImageDown size={16} /> Download flyer</button>
+          <button type="button" onClick={download} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]"><ImageDown size={16} /> Download High-Res PNG</button>
           <button type="button" onClick={() => void share()} className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1eb856]"><Share2 size={16} /> Share to WhatsApp</button>
         </div>
-        <p className="mt-3 text-xs text-[#0F3D24]/55">On a phone, WhatsApp opens its share sheet so you can choose your group. On a computer, download the image and attach it in WhatsApp Web.</p>
       </div>
     </div>
   );
