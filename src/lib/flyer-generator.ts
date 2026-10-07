@@ -73,13 +73,13 @@ export async function drawSocialProofFlyerOnCanvas(
       });
       const displayItems = options.itemsText || "Poultry Produce Order";
 
-      // 2. Base styles
-      ctx.fillStyle = "#0F3D24"; // Dark Dignity Agro Farms Green
-      ctx.textBaseline = "middle";
+      // 2. Base text styles
+      ctx.fillStyle = "#0F3D24"; // Dark Dignity Agro Farms Green font
+      ctx.textBaseline = "alphabetic"; // Baseline rests naturally on top of dotted lines
 
-      // Uniform X coordinate after colons, max width before white box right border
-      const startX = 355;
-      const maxWidth = 560; // Max allowed width (X=355 + 560 = 915px, well inside right border X=940px)
+      // Start X at 410px to clear the longest label "DELIVERY ADDRESS:" & colon (~390px)
+      const startX = 410;
+      const maxWidth = 515; // Max allowed width (X=410 + 515 = 925px, safely inside right border at X=940px)
 
       // Helper function to draw text with dynamic font scaling & overflow truncation
       const drawAutoScaledText = (text: string, x: number, y: number, initialSize: number) => {
@@ -87,7 +87,7 @@ export async function drawSocialProofFlyerOnCanvas(
         ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
 
         // Scale down font size if text width exceeds max width boundary
-        while (ctx.measureText(text).width > maxWidth && fontSize > 15) {
+        while (ctx.measureText(text).width > maxWidth && fontSize > 14) {
           fontSize -= 1;
           ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
         }
@@ -104,20 +104,21 @@ export async function drawSocialProofFlyerOnCanvas(
         ctx.fillText(finalText, x, y);
       };
 
-      // Line 1: FULL NAME (Y: 816)
-      drawAutoScaledText(displayName, startX, 816, 27);
+      // Y positions sit 6-8px above dotted lines (dotted lines are at Y=822, 882, 942, 1002, 1062)
+      // Line 1: FULL NAME (Y: 814)
+      drawAutoScaledText(displayName, startX, 814, 26);
 
       // Line 2: PHONE NUMBER (Y: 874)
-      drawAutoScaledText(displayPhone, startX, 874, 27);
+      drawAutoScaledText(displayPhone, startX, 874, 26);
 
-      // Line 3: ORDER DATE (Y: 932)
-      drawAutoScaledText(displayDate, startX, 932, 25);
+      // Line 3: ORDER DATE (Y: 934)
+      drawAutoScaledText(displayDate, startX, 934, 24);
 
-      // Line 4: ITEM(S) ORDERED (Y: 990)
-      drawAutoScaledText(displayItems, startX, 990, 24);
+      // Line 4: ITEM(S) ORDERED (Y: 994)
+      drawAutoScaledText(displayItems, startX, 994, 23);
 
-      // Line 5: DELIVERY ADDRESS (Y: 1046 - nicely aligned above bottom border)
-      drawAutoScaledText(displayAddress, startX, 1046, 24);
+      // Line 5: DELIVERY ADDRESS (Y: 1054)
+      drawAutoScaledText(displayAddress, startX, 1054, 23);
 
       resolve();
     };
