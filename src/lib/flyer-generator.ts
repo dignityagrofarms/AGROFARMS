@@ -73,45 +73,51 @@ export async function drawSocialProofFlyerOnCanvas(
       });
       const displayItems = options.itemsText || "Poultry Produce Order";
 
-      // 2. Configure font styles (No background rects, crisp brand green font)
+      // 2. Base styles
       ctx.fillStyle = "#0F3D24"; // Dark Dignity Agro Farms Green
       ctx.textBaseline = "middle";
 
-      // Line 1: FULL NAME
-      ctx.font = "bold 28px 'Inter', Arial, sans-serif";
-      ctx.fillText(displayName, 385, 822);
+      // Uniform X coordinate after colons, max width before white box right border
+      const startX = 355;
+      const maxWidth = 560; // Max allowed width (X=355 + 560 = 915px, well inside right border X=940px)
 
-      // Line 2: PHONE NUMBER
-      ctx.font = "bold 28px 'Inter', Arial, sans-serif";
-      ctx.fillText(displayPhone, 385, 882);
+      // Helper function to draw text with dynamic font scaling & overflow truncation
+      const drawAutoScaledText = (text: string, x: number, y: number, initialSize: number) => {
+        let fontSize = initialSize;
+        ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
 
-      // Line 3: ORDER DATE
-      ctx.font = "bold 26px 'Inter', Arial, sans-serif";
-      ctx.fillText(displayDate, 385, 942);
-
-      // Line 4: ITEM(S) ORDERED
-      ctx.font = "bold 26px 'Inter', Arial, sans-serif";
-      // Truncate if items text is too long for line
-      const maxItemsWidth = 560;
-      let trimmedItems = displayItems;
-      if (ctx.measureText(trimmedItems).width > maxItemsWidth) {
-        while (trimmedItems.length > 5 && ctx.measureText(trimmedItems + "...").width > maxItemsWidth) {
-          trimmedItems = trimmedItems.slice(0, -1);
+        // Scale down font size if text width exceeds max width boundary
+        while (ctx.measureText(text).width > maxWidth && fontSize > 15) {
+          fontSize -= 1;
+          ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
         }
-        trimmedItems += "...";
-      }
-      ctx.fillText(trimmedItems, 385, 1002);
 
-      // Line 5: DELIVERY ADDRESS
-      ctx.font = "bold 25px 'Inter', Arial, sans-serif";
-      let trimmedAddr = displayAddress;
-      if (ctx.measureText(trimmedAddr).width > maxItemsWidth) {
-        while (trimmedAddr.length > 5 && ctx.measureText(trimmedAddr + "...").width > maxItemsWidth) {
-          trimmedAddr = trimmedAddr.slice(0, -1);
+        // If text still exceeds max width at minimum font size, truncate with trailing dots (...)
+        let finalText = text;
+        if (ctx.measureText(finalText).width > maxWidth) {
+          while (finalText.length > 4 && ctx.measureText(finalText + "...").width > maxWidth) {
+            finalText = finalText.slice(0, -1);
+          }
+          finalText += "...";
         }
-        trimmedAddr += "...";
-      }
-      ctx.fillText(trimmedAddr, 385, 1062);
+
+        ctx.fillText(finalText, x, y);
+      };
+
+      // Line 1: FULL NAME (Y: 816)
+      drawAutoScaledText(displayName, startX, 816, 27);
+
+      // Line 2: PHONE NUMBER (Y: 874)
+      drawAutoScaledText(displayPhone, startX, 874, 27);
+
+      // Line 3: ORDER DATE (Y: 932)
+      drawAutoScaledText(displayDate, startX, 932, 25);
+
+      // Line 4: ITEM(S) ORDERED (Y: 990)
+      drawAutoScaledText(displayItems, startX, 990, 24);
+
+      // Line 5: DELIVERY ADDRESS (Y: 1046 - nicely aligned above bottom border)
+      drawAutoScaledText(displayAddress, startX, 1046, 24);
 
       resolve();
     };
