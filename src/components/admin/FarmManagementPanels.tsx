@@ -42,6 +42,7 @@ import { FinanceSalesChart } from "./FinanceSalesChart";
 import { ExportReportModal } from "./ExportReportModal";
 import { LeadImportModal } from "./LeadImportModal";
 import { FinancialImportModal } from "./FinancialImportModal";
+import { ActivityImportModal } from "./ActivityImportModal";
 import { ReminderModal } from "./ReminderModal";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
@@ -2038,6 +2039,7 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
   const queryClient = useQueryClient();
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showActivityImportModal, setShowActivityImportModal] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -2151,13 +2153,23 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowActivityModal(true)}
-          className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
-        >
-          <PlusCircle size={16} />
-          Log Daily Activity
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowActivityImportModal(true)}
+            className="flex items-center gap-2 rounded-full border border-[#0F3D24]/20 bg-white px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#0F3D24]/5 transition"
+            title="Import daily activities from CSV / Excel sheet"
+          >
+            <FileSpreadsheet size={16} className="text-[#0F3D24]" />
+            Import Activities (CSV/Excel)
+          </button>
+          <button
+            onClick={() => setShowActivityModal(true)}
+            className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
+          >
+            <PlusCircle size={16} />
+            Log Daily Activity
+          </button>
+        </div>
       </div>
 
       {feedback && (
@@ -2454,6 +2466,33 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {showActivityImportModal && (
+        <ActivityImportModal
+          isOpen={showActivityImportModal}
+          onClose={() => setShowActivityImportModal(false)}
+          passcode={passcode}
+          batches={batches.map((b) => ({
+            id: b.id,
+            batch_name: b.batchName,
+            bird_type: b.batchType,
+            initial_headcount: b.initialHeadcount,
+            current_headcount: b.currentHeadcount,
+            start_date: b.startDate,
+            target_harvest_date: b.targetHarvestDate || null,
+            status: b.status,
+            notes: b.notes || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }))}
+          defaultBatchId={selectedBatchId === "all" ? null : selectedBatchId}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["farm-activities"] });
+            queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
+            queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+          }}
+        />
       )}
     </div>
   );

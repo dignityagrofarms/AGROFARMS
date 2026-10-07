@@ -8,7 +8,7 @@ import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
-import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, parseAdminCredential, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
+import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { adminListBatches, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
@@ -245,6 +245,7 @@ function AdminOrders() {
   const initializedOrderIds = useRef<Set<string> | null>(null);
 
   const listFn = useServerFn(adminListOrders);
+  const verifyLoginFn = useServerFn(adminVerifyLogin);
   const qc = useQueryClient();
 
   const query = useQuery({
@@ -253,7 +254,6 @@ function AdminOrders() {
     enabled: !!passcode,
     refetchInterval: 12000,
     retry: 1,
-    placeholderData: (previousData) => previousData,
   });
 
   // Effect to detect newly arrived orders during polling
@@ -291,13 +291,12 @@ function AdminOrders() {
     queryKey: ["farm-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode: passcode! } }),
     enabled: !!passcode,
-    placeholderData: (previousData) => previousData,
   });
 
   const signOut = () => {
     if (typeof window !== "undefined") localStorage.removeItem(STORAGE_KEY);
     setPasscode(null);
-    qc.removeQueries({ queryKey: ["admin-orders"] });
+    qc.clear();
   };
 
   useEffect(() => {
@@ -407,22 +406,30 @@ function AdminOrders() {
 
 
 
-  const submitPasscode = (e: React.FormEvent) => {
+  const submitPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
     const p = input;
     const u = username.trim().toLowerCase();
-    if (!u || !p) return;
+    if (!u || !p) {
+      setAuthError("Please enter both username and passcode.");
+      return;
+    }
 
     setIsLoggingIn(true);
-    setTimeout(() => {
-      const credential = JSON.stringify({ username: u, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
+    try {
+      const res = await verifyLoginFn({ data: { username: u, passcode: p } });
+      qc.clear();
+      const credential = JSON.stringify({ username: res.username, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
       localStorage.setItem(STORAGE_KEY, credential);
       setPasscode(credential);
       setInput("");
       setUsername("");
+    } catch (err: any) {
+      setAuthError(err.message || "Invalid username or passcode.");
+    } finally {
       setIsLoggingIn(false);
-    }, 400);
+    }
   };
 
   return (
@@ -525,11 +532,20 @@ function AdminOrders() {
           <div className="mb-6 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 px-1">
               <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">Admin Navigation & Controls</span>
-              {query.data?.role && (
-                <span className="inline-flex items-center rounded-full bg-[#3F8F3F]/10 px-3 py-1 text-xs font-bold text-[#0F3D24]">
-                  Signed in as {query.data.role}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/admin/user-accounts"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-3 py-1 text-xs font-bold text-white hover:bg-[#134a2c] transition shadow-sm"
+                >
+                  <Users size={13} />
+                  <span>User Accounts & Roles</span>
+                </Link>
+                {query.data?.role && (
+                  <span className="inline-flex items-center rounded-full bg-[#3F8F3F]/10 px-3 py-1 text-xs font-bold text-[#0F3D24]">
+                    Signed in as {query.data.role}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8" role="tablist" aria-label="Admin sections">
               <AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders & reports</AdminTab>
@@ -2043,16 +2059,41 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             </button>
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 const cleanPhone = order.phone.replace(/\D+/g, "");
                 const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
                 const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
                 const text = `🧾 *Dignity Agro Farms Official Receipt*\n\nCustomer: ${order.customerName}\nOrder Reference: ${order.orderCode}\nTotal Amount: ₦${order.total.toLocaleString()}\nPayment Status: ${(order.paymentStatus || "").toUpperCase()}\n\nView PDF Receipt: ${receiptUrl}\n\nThank you for choosing Dignity Agro Farms!`;
-                window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                
+                if (typeof navigator !== "undefined" && navigator.share) {
+                  try {
+                    await navigator.share({
+                      title: `Receipt #${order.orderCode} - Dignity Agro Farms`,
+                      text: text,
+                      url: receiptUrl,
+                    });
+                    return;
+                  } catch {
+                    // Fallback to direct WhatsApp API link if share dismissed
+                  }
+                }
+                window.open(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
               }}
               className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
             >
               <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
+                navigator.clipboard.writeText(receiptUrl);
+                alert(`✅ Receipt Link for order #${order.orderCode} copied to clipboard!\n\n${receiptUrl}`);
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
+              title="Copy receipt link"
+            >
+              <Copy size={14} className="text-[#3F8F3F]" /> Copy Link
             </button>
             {onOpenFlyerModal && (
               <button

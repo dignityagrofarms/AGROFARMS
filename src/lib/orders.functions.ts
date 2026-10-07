@@ -458,31 +458,60 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
   if (!value) throw new Error("Invalid login details.");
   const credential = parseAdminCredential(value);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // First check explicit account in admin_access DB table
   const { data: configured } = await supabaseAdmin
     .from("admin_access")
     .select("username, role, passcode_hash, active")
     .eq("username", credential.username)
     .maybeSingle();
-  if (configured?.active && configured.passcode_hash && (await hashPasscode(credential.passcode)) === configured.passcode_hash) {
-    void supabaseAdmin
-      .from("admin_access")
-      .update({ last_login_at: new Date().toISOString() })
-      .eq("username", credential.username);
-    return configured.role as AdminRole;
+
+  if (configured) {
+    if (!configured.active) {
+      throw new Error("This account is deactivated. Contact your Administrator.");
+    }
+    const targetHash = await hashPasscode(credential.passcode);
+    if (configured.passcode_hash === targetHash) {
+      void supabaseAdmin
+        .from("admin_access")
+        .update({ last_login_at: new Date().toISOString() })
+        .eq("username", credential.username);
+      return configured.role as AdminRole;
+    } else {
+      throw new Error("Invalid username or passcode.");
+    }
   }
 
+  // Master owner recovery environment check
   const master = process.env.ADMIN_PASSCODE;
-  const masterUsername = process.env.ADMIN_USERNAME || "owner";
+  const masterUsername = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
   if (credential.username === masterUsername && master && credential.passcode === master) return "owner";
+  if (master && credential.username === "owner" && credential.passcode === master) return "owner";
 
+  // Legacy staff setting check
   const { data: staffSetting } = await supabaseAdmin
     .from("app_settings")
     .select("value")
     .eq("key", "admin_passcode")
     .maybeSingle();
   if (credential.username === "staff" && staffSetting?.value && credential.passcode === staffSetting.value) return "staff";
-  throw new Error("Invalid login details.");
+
+  throw new Error("Invalid username or passcode.");
 }
+
+export const adminVerifyLogin = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: unknown) =>
+      z.object({
+        username: z.string().trim().min(1).toLowerCase(),
+        passcode: z.string().trim().min(1),
+      }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean; role: AdminRole; username: string }> => {
+    const credStr = JSON.stringify({ username: data.username, passcode: data.passcode });
+    const role = await checkPasscode(credStr);
+    return { ok: true, role, username: data.username };
+  });
 
 export async function checkOwner(value: string) {
   const role = await checkPasscode(value);

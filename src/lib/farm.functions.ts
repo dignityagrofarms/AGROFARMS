@@ -1027,3 +1027,68 @@ export const adminRejectStaffRecord = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminImportActivities = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        batchId: z.string().uuid().optional().nullable(),
+        activities: z.array(
+          z.object({
+            activityDate: z.string(),
+            activityType: z.string(),
+            batchName: z.string().optional().nullable(),
+            mortalityCount: z.number().default(0),
+            causeOfMortality: z.string().optional().nullable(),
+            feedConsumedKg: z.number().default(0),
+            eggsCollected: z.number().default(0),
+            medicationGiven: z.string().optional().nullable(),
+            notes: z.string().optional().nullable(),
+          })
+        ),
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }): Promise<{ importedCount: number }> => {
+    const role = await checkPasscode(data.passcode);
+    const credential = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
+    const approvalStatus = isOwner ? "approved" : "pending_approval";
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Map batch names to IDs if provided
+    const { data: batchRows } = await supabaseAdmin.from("farm_batches").select("id, batch_name");
+    const batchMap = new Map<string, string>();
+    (batchRows ?? []).forEach((b) => batchMap.set(b.batch_name.toLowerCase().trim(), b.id));
+
+    const insertRows = [];
+    for (const item of data.activities) {
+      let resolvedBatchId = data.batchId || null;
+      if (!resolvedBatchId && item.batchName) {
+        resolvedBatchId = batchMap.get(item.batchName.toLowerCase().trim()) || null;
+      }
+
+      insertRows.push({
+        batch_id: resolvedBatchId,
+        activity_date: item.activityDate || new Date().toISOString().split("T")[0],
+        activity_type: item.activityType || "General Activity",
+        mortality_count: Math.max(0, Number(item.mortalityCount || 0)),
+        cause_of_mortality: item.causeOfMortality || null,
+        feed_consumed_kg: Math.max(0, Number(item.feedConsumedKg || 0)),
+        eggs_collected: Math.max(0, Number(item.eggsCollected || 0)),
+        medication_given: item.medicationGiven || null,
+        notes: item.notes || null,
+        approval_status: approvalStatus,
+        recorded_by: credential.username,
+      });
+    }
+
+    if (insertRows.length > 0) {
+      const { error } = await supabaseAdmin.from("farm_activities").insert(insertRows);
+      if (error) throw new Error(error.message);
+    }
+
+    return { importedCount: insertRows.length };
+  });
+
