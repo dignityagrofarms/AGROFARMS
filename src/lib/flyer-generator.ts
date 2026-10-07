@@ -77,9 +77,10 @@ export async function drawSocialProofFlyerOnCanvas(
       ctx.fillStyle = "#0F3D24"; // Dark Dignity Agro Farms Green font
       ctx.textBaseline = "alphabetic"; // Baseline rests naturally on top of dotted lines
 
-      // Start X at 410px to clear the longest label "DELIVERY ADDRESS:" & colon (~390px)
-      const startX = 410;
-      const maxWidth = 515; // Max allowed width (X=410 + 515 = 925px, safely inside right border at X=940px)
+      // Colons in the template graphic are at X = 414px across all 5 lines!
+      // Start X at 425px gives 11px padding right after colons
+      const startX = 425;
+      const maxWidth = 500; // Max allowed width (X=425 + 500 = 925px, safely inside right border X=930px)
 
       // Helper function to draw text with dynamic font scaling & overflow truncation
       const drawAutoScaledText = (text: string, x: number, y: number, initialSize: number) => {
@@ -87,7 +88,7 @@ export async function drawSocialProofFlyerOnCanvas(
         ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
 
         // Scale down font size if text width exceeds max width boundary
-        while (ctx.measureText(text).width > maxWidth && fontSize > 14) {
+        while (ctx.measureText(text).width > maxWidth && fontSize > 13) {
           fontSize -= 1;
           ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
         }
@@ -104,21 +105,21 @@ export async function drawSocialProofFlyerOnCanvas(
         ctx.fillText(finalText, x, y);
       };
 
-      // Y positions sit 6-8px above dotted lines (dotted lines are at Y=822, 882, 942, 1002, 1062)
-      // Line 1: FULL NAME (Y: 814)
-      drawAutoScaledText(displayName, startX, 814, 26);
+      // Exact Y baselines resting 6px above dotted lines (dotted lines are at Y=831, 887, 942, 1001, 1061)
+      // Line 1: FULL NAME (Y: 825)
+      drawAutoScaledText(displayName, startX, 825, 25);
 
-      // Line 2: PHONE NUMBER (Y: 874)
-      drawAutoScaledText(displayPhone, startX, 874, 26);
+      // Line 2: PHONE NUMBER (Y: 881)
+      drawAutoScaledText(displayPhone, startX, 881, 25);
 
-      // Line 3: ORDER DATE (Y: 934)
-      drawAutoScaledText(displayDate, startX, 934, 24);
+      // Line 3: ORDER DATE (Y: 936)
+      drawAutoScaledText(displayDate, startX, 936, 24);
 
-      // Line 4: ITEM(S) ORDERED (Y: 994)
-      drawAutoScaledText(displayItems, startX, 994, 23);
+      // Line 4: ITEM(S) ORDERED (Y: 995)
+      drawAutoScaledText(displayItems, startX, 995, 23);
 
-      // Line 5: DELIVERY ADDRESS (Y: 1054)
-      drawAutoScaledText(displayAddress, startX, 1054, 23);
+      // Line 5: DELIVERY ADDRESS (Y: 1055)
+      drawAutoScaledText(displayAddress, startX, 1055, 23);
 
       resolve();
     };
