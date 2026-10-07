@@ -432,7 +432,7 @@ function AdminOrders() {
               type="text"
               autoFocus
               value={username}
-              onj={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value)}
               placeholder="Username"
               autoComplete="username"
               className="mt-6 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
