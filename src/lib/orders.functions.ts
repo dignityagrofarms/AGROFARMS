@@ -634,10 +634,17 @@ export const adminRecoverPasscode = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    const masterRecovery = process.env.ADMIN_RECOVERY_KEY || "DIGNITY_RECOVERY_2026";
-    const masterPasscode = process.env.ADMIN_PASSCODE || "admin123";
+    const masterRecovery = process.env.ADMIN_RECOVERY_KEY;
+    const masterPasscode = process.env.ADMIN_PASSCODE;
+
+    if (!masterRecovery && !masterPasscode) {
+      throw new Error("Master Recovery Key is not configured on the server environment.");
+    }
+
+    const matchesRecovery = Boolean(masterRecovery && data.recoveryKey === masterRecovery);
+    const matchesMaster = Boolean(masterPasscode && data.recoveryKey === masterPasscode);
     
-    if (data.recoveryKey !== masterRecovery && data.recoveryKey !== masterPasscode) {
+    if (!matchesRecovery && !matchesMaster) {
       throw new Error("Invalid Master Recovery Key. Password recovery failed.");
     }
 
