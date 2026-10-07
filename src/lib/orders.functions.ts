@@ -508,11 +508,153 @@ export const adminSetPasscode = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
+    const role = await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const credential = parseAdminCredential(data.passcode);
+    
+    // Update admin_access row if user exists
+    const hash = await hashPasscode(data.newPasscode);
+    await supabaseAdmin
+      .from("admin_access")
+      .update({ passcode_hash: hash, updated_at: new Date().toISOString() })
+      .eq("username", credential.username);
+
+    // Also update legacy app_settings key
     const { error } = await supabaseAdmin
       .from("app_settings")
       .upsert({ key: "admin_passcode", value: data.newPasscode, updated_at: new Date().toISOString() }, { onConflict: "key" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export interface UserAccountItem {
+  id: string;
+  username: string;
+  role: AdminRole;
+  active: boolean;
+  createdAt: string;
+}
+
+export const adminListUserAccounts = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ passcode: z.string() }).parse(data))
+  .handler(async ({ data }): Promise<UserAccountItem[]> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("admin_access")
+      .select("id, username, role, active, created_at")
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(error.message);
+    return (rows || []).map((r) => ({
+      id: r.id,
+      username: r.username,
+      role: r.role as AdminRole,
+      active: r.active,
+      createdAt: r.created_at,
+    }));
+  });
+
+export const adminCreateUserAccount = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().trim().min(3).max(50).toLowerCase(),
+      targetPasscode: z.string().trim().min(6).max(60),
+      targetRole: z.enum(["owner", "manager", "staff"]),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const hash = await hashPasscode(data.targetPasscode);
+    const { error } = await supabaseAdmin
+      .from("admin_access")
+      .upsert(
+        {
+          username: data.targetUsername,
+          role: data.targetRole,
+          passcode_hash: hash,
+          active: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "username" },
+      );
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminResetUserPasscode = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().trim().min(1).toLowerCase(),
+      newPasscode: z.string().trim().min(6).max(60),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const hash = await hashPasscode(data.newPasscode);
+    const { error } = await supabaseAdmin
+      .from("admin_access")
+      .update({ passcode_hash: hash, updated_at: new Date().toISOString() })
+      .eq("username", data.targetUsername);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminToggleUserActive = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().trim().min(1).toLowerCase(),
+      active: z.boolean(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    if (data.targetUsername === "owner" || data.targetUsername === "admin") {
+      throw new Error("Cannot deactivate primary Administrator account.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("admin_access")
+      .update({ active: data.active, updated_at: new Date().toISOString() })
+      .eq("username", data.targetUsername);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminRecoverPasscode = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      recoveryKey: z.string().trim().min(4),
+      targetUsername: z.string().trim().min(1).toLowerCase(),
+      newPasscode: z.string().trim().min(6).max(60),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const masterRecovery = process.env.ADMIN_RECOVERY_KEY || "DIGNITY_RECOVERY_2026";
+    const masterPasscode = process.env.ADMIN_PASSCODE || "admin123";
+    
+    if (data.recoveryKey !== masterRecovery && data.recoveryKey !== masterPasscode) {
+      throw new Error("Invalid Master Recovery Key. Password recovery failed.");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const hash = await hashPasscode(data.newPasscode);
+    const { error } = await supabaseAdmin
+      .from("admin_access")
+      .upsert(
+        {
+          username: data.targetUsername,
+          role: "owner",
+          passcode_hash: hash,
+          active: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "username" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true };
   });

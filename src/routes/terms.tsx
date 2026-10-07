@@ -32,6 +32,16 @@ function TermsPage() {
             These Terms of Service govern your use of the Dignity Agro Farms Limited website and your orders with us. By placing an order, you agree to these terms.
           </p>
 
+          <div className="my-6 rounded-2xl bg-amber-50 p-4 border border-amber-200 text-xs sm:text-sm text-amber-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <strong className="block text-amber-900 font-bold">🎄 December Christmas Pre-Orders Policy</strong>
+              <span>For specific Christmas slot reservation, deposit, and holiday delivery rules, please see our dedicated policy.</span>
+            </div>
+            <Link to="/order-policy" className="shrink-0 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white hover:bg-[#3F8F3F]">
+              View Order Policy →
+            </Link>
+          </div>
+
           <h2 className="text-2xl font-semibold text-[#0F3D24]">1. Orders and pricing</h2>
           <p>
             All prices are listed in Nigerian Naira (₦). Prices for live and dressed chicken are per kilogram and are weighed at the farm or before delivery. Eggs are sold by the dozen, half crate or full tray. Delivery within Owerri town is free; deliveries outside Owerri town attract a ₦1,000 delivery fee.

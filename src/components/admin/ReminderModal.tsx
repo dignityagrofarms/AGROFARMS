@@ -10,7 +10,7 @@ import {
   Sparkles,
 } from "lucide-react";
 
-export type ReminderTargetType = "lead" | "preorder" | "general";
+export type ReminderTargetType = "lead" | "preorder" | "order" | "general";
 
 export interface ReminderModalProps {
   isOpen: boolean;
@@ -18,12 +18,13 @@ export interface ReminderModalProps {
   targetType: ReminderTargetType;
   recipientName: string;
   recipientPhone: string;
-  // Optional pre-order details
+  // Optional order / pre-order details
   orderCode?: string;
   productName?: string;
   totalAmount?: number;
   amountPaid?: number;
   balance?: number;
+  notes?: string;
 }
 
 export function ReminderModal({
@@ -37,6 +38,7 @@ export function ReminderModal({
   totalAmount,
   amountPaid,
   balance,
+  notes,
 }: ReminderModalProps) {
   const cleanPhone = (recipientPhone || "").replace(/\D+/g, "");
   const firstName = recipientName ? recipientName.split(" ")[0] : "Customer";
@@ -59,6 +61,26 @@ export function ReminderModal({
           id: "preorder_custom",
           title: "💬 Custom Pre-Order Message",
           text: `Hi ${firstName}, this is Dignity Agro Farms regarding your December Pre-Order ${orderCode || ""}. `,
+        },
+      ];
+    }
+
+    if (targetType === "order") {
+      return [
+        {
+          id: "order_status_update",
+          title: "📦 Order Status & Delivery Alert",
+          text: `Hi ${firstName}, greetings from Dignity Agro Farms! Your order (${orderCode || "DAF-XXXX"}) is being prepared for delivery. Total: ₦${(totalAmount || 0).toLocaleString()}. Tracking details available on our website.`,
+        },
+        {
+          id: "order_thankyou",
+          title: "🙌 Order Thank You & Feedback",
+          text: `Hi ${firstName}, thank you for purchasing from Dignity Agro Farms! Your order ${orderCode || ""} has been completed. We hope you enjoy your farm-fresh produce!`,
+        },
+        {
+          id: "order_custom",
+          title: "💬 Custom Order Message",
+          text: `Hi ${firstName}, this is Dignity Agro Farms regarding your order ${orderCode || ""}. `,
         },
       ];
     }

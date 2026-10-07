@@ -221,8 +221,10 @@ export function preorderCompleteReceiptHtml(o: Preorder, payments: PreorderPayme
   <div><span style="color:#0F3D2499;font-weight:600">Order Total Value</span><span style="font-weight:800">${naira(o.totalAmount)}</span></div>
   <div style="margin-top:4px"><span style="color:#3F8F3F;font-weight:600">Total Amount Paid</span><span style="color:#3F8F3F;font-weight:800">${naira(o.amountPaid)}</span></div>
   <div class="total" style="${o.balance > 0 ? "color:#B06000" : "color:#137333"}"><span>Balance Outstanding</span><span>${naira(o.balance)}</span></div>
-</div>
 <div class="muted" style="margin-top:24px;text-align:center">This summary does not serve as proof of full payment unless all installments are confirmed and fully paid.</div>
+<div style="margin-top:20px;padding:12px;background:#F7F5F0;border-radius:10px;font-size:11px;color:#0F3D24CC;text-align:center;line-height:1.5;border:1px solid #0F3D2415">
+  <strong>Order Policy & Terms Summary:</strong> December Pre-Orders are fulfilled Dec 1st–25th. Slot deposit holds batch reservation. Perishable items inspected at delivery. View complete terms at <a href="https://dignityagrofarms.com/order-policy" style="color:#3F8F3F;font-weight:700;text-decoration:none">dignityagrofarms.com/order-policy</a>.
+</div>
 <footer>Thank you for choosing Dignity Agro Farms.<br/>Farm fresh chicken, straight to your door.</footer>
 </div></div></body></html>`;
 }

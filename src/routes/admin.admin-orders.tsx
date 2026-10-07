@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -15,6 +15,9 @@ import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
 import { ReminderModal } from "@/components/admin/ReminderModal";
+import { UserAccountsPanel } from "@/components/admin/UserAccountsPanel";
+import { PasswordRecoveryModal } from "@/components/admin/PasswordRecoveryModal";
+import { FlyerGeneratorModal, type FlyerOrderData } from "@/components/admin/FlyerGeneratorModal";
 
 export const Route = createFileRoute("/admin/admin-orders")({
   head: () => ({
@@ -180,8 +183,10 @@ function AdminOrders() {
   const [payFilter, setPayFilter] = useState("");
   const [zoneFilter, setZoneFilter] = useState("");
   const [search, setSearch] = useState("");
-  const [reasonFilter, setReasonFilter] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [showFlyerModal, setShowFlyerModal] = useState(false);
+  const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const listFn = useServerFn(adminListOrders);
@@ -345,14 +350,37 @@ function AdminOrders() {
             <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Order Management</h1>
           </div>
           {passcode && (
-            <div className="flex gap-2">
-              <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">
-                <ShieldCheck size={14} /> Passcode
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={async () => {
+                  if (!('Notification' in window)) {
+                    alert("Browser notifications are not supported on this device.");
+                    return;
+                  }
+                  const perm = await Notification.requestPermission();
+                  if (perm === 'granted') {
+                    alert("✅ Phone & Browser Push Notifications Enabled! You will receive live order alerts.");
+                  } else {
+                    alert("Notification permission was denied. Enable notifications in your browser settings.");
+                  }
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-amber-400/20 px-4 py-2 text-xs font-bold text-amber-300 hover:bg-amber-400/30 transition"
+              >
+                <Bell size={14} /> Push Alerts
               </button>
-              <button onClick={() => query.refetch()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">
+              <button
+                onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
+                className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition"
+              >
+                <Sparkles size={14} /> Flyer Generator
+              </button>
+              <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition">
+                <ShieldCheck size={14} /> User Accounts & Passcodes
+              </button>
+              <button onClick={() => query.refetch()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition">
                 <RefreshCw size={14} /> Refresh
               </button>
-              <button onClick={signOut} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20">
+              <button onClick={signOut} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition">
                 <LogOut size={14} /> Sign out
               </button>
             </div>
@@ -362,11 +390,14 @@ function AdminOrders() {
 
       <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         {passcode && showSettings && (
-          <PasscodePanel
+          <UserAccountsPanel
             passcode={passcode}
-            onChanged={(next) => {
-              sessionStorage.setItem(STORAGE_KEY, next);
-              setPasscode(next);
+            role={query.data?.role || "owner"}
+            onPasscodeChanged={(next) => {
+              const u = parseAdminCredential(passcode).username;
+              const credential = JSON.stringify({ username: u, passcode: next, loginAt: Date.now(), lastActive: Date.now() });
+              localStorage.setItem(STORAGE_KEY, credential);
+              setPasscode(credential);
             }}
           />
         )}
@@ -396,7 +427,7 @@ function AdminOrders() {
           <form onSubmit={submitPasscode} className="mx-auto max-w-md rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5">
             <ShieldCheck className="mx-auto text-[#3F8F3F]" size={40} />
             <h2 className="mt-3 text-center text-xl font-semibold">Admin sign in</h2>
-            <p className="mt-1 text-center text-sm text-[#0F3D24]/70">Sign in with your owner or staff username and passcode.</p>
+            <p className="mt-1 text-center text-sm text-[#0F3D24]/70">Sign in with your administrator, manager, or staff account credentials.</p>
             <input
               type="text"
               autoFocus
@@ -419,7 +450,15 @@ function AdminOrders() {
               {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
               {isLoggingIn ? "Signing in..." : "Sign in"}
             </button>
-            <p className="mt-4 text-center text-xs text-[#0F3D24]/55">Owner access can review or change the staff passcode from the Passcode panel.</p>
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={() => setShowRecoveryModal(true)}
+                className="text-xs font-semibold text-[#0F3D24]/70 hover:text-[#3F8F3F] transition underline"
+              >
+                Forgot Passcode / Password?
+              </button>
+            </div>
           </form>
         ) : query.isLoading ? (
           <p className="text-center text-[#0F3D24]/60">Loading orders…</p>
@@ -502,14 +541,48 @@ function AdminOrders() {
                 <VoucherPanel passcode={passcode} />
               ) : activeTab === "december" ? (
                 <DecemberPreorderPanel passcode={passcode} />
+              ) : activeTab === "flyers" ? (
+                <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+                  <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
+                  <h3 className="text-xl font-extrabold text-[#0F3D24]">Digital Promotion & Order Flyers</h3>
+                  <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
+                    Generate branded promotional posters for Christmas specials or single order verification graphics to post on WhatsApp and social media.
+                  </p>
+                  <button
+                    onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
+                    className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
+                  >
+                    Open Digital Flyer Generator
+                  </button>
+                </div>
               ) : (
                 <SocialProofPanel orders={allOrders} />
               )}
-          </>
+            </>
           );
           })()
         ) : null}
       </section>
+
+      {showFlyerModal && (
+        <FlyerGeneratorModal
+          isOpen={showFlyerModal}
+          onClose={() => { setShowFlyerModal(false); setSelectedFlyerOrder(null); }}
+          initialOrderData={selectedFlyerOrder}
+        />
+      )}
+
+      {showRecoveryModal && (
+        <PasswordRecoveryModal
+          isOpen={showRecoveryModal}
+          onClose={() => setShowRecoveryModal(false)}
+          onSuccess={(newPasscode) => {
+            const credential = JSON.stringify({ username: "owner", passcode: newPasscode, loginAt: Date.now(), lastActive: Date.now() });
+            localStorage.setItem(STORAGE_KEY, credential);
+            setPasscode(credential);
+          }}
+        />
+      )}
     </SiteLayout>
   );
 }
@@ -1620,6 +1693,36 @@ export function OrderRow({ order, passcode, role, batches, onSaved }: { order: A
             >
               <MessageCircle size={15} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const cleanPhone = order.phone.replace(/\D+/g, "");
+                const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+                const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
+                const text = `🧾 *Dignity Agro Farms Official Receipt*\n\nCustomer: ${order.customerName}\nOrder Reference: ${order.orderCode}\nTotal Amount: ₦${order.total.toLocaleString()}\nPayment Status: ${(order.paymentStatus || "").toUpperCase()}\n\nView PDF Receipt: ${receiptUrl}\n\nThank you for choosing Dignity Agro Farms!`;
+                window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
+            >
+              <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedFlyerOrder({
+                  orderCode: order.orderCode,
+                  customerName: order.customerName,
+                  location: order.address,
+                  itemsText: order.items.map((i) => `${i.product} × ${i.qty}`).join(", "),
+                  totalAmount: order.total,
+                  paymentStatus: order.paymentStatus,
+                });
+                setShowFlyerModal(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-xs font-bold text-amber-900 ring-1 ring-amber-300 hover:bg-amber-100 transition"
+            >
+              <Sparkles size={14} className="text-amber-600" /> Generate Order Flyer
+            </button>
             <a
               href={waLink(order)}
               target="_blank"
@@ -2185,6 +2288,18 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
           className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 transition"
         >
           <MessageSquare size={16} /> Send SMS / Payment Reminder
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const cleanPhone = preorder.phone.replace(/\D+/g, "");
+            const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+            const text = `🎄 *Dignity Agro Farms December Pre-Order Statement*\n\nCustomer: ${preorder.customerName}\nPre-Order Code: ${preorder.preorderCode}\nProduct: ${preorder.product} × ${preorder.quantity}\nTotal Amount: ₦${preorder.totalAmount.toLocaleString()}\nAmount Paid: ₦${preorder.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${preorder.balance.toLocaleString()}\n\nPayment Bank: Moniepoint MFB · 4006179439\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for pre-ordering with Dignity Agro Farms!`;
+            window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+          }}
+          className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
+        >
+          <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
         </button>
         <a
           href={getWaLink()}

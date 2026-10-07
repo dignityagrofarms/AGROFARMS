@@ -266,6 +266,7 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
   const [customDeposit, setCustomDeposit] = useState("");
   const [form, setForm] = useState({ name: "", phone: "", email: "", state: "", address: "", product: "", qty: "1", notes: "", deliveryDate: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
 
@@ -585,7 +586,25 @@ export function DecemberPreorderForm({ onStateChange }: { onStateChange?: (state
 
               {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
-              <button type="submit" disabled={submitting} className="mt-6 w-full rounded-full bg-[#0F3D24] px-5 py-3.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-60 transition flex items-center justify-center gap-2">
+              <div className="mt-5 rounded-2xl bg-slate-50 p-4 border border-slate-200 text-xs text-slate-700">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={agreedTerms}
+                    onChange={(e) => setAgreedTerms(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#0F3D24] focus:ring-[#3F8F3F]"
+                  />
+                  <span>
+                    I have read and agree to Dignity Agro Farms'{" "}
+                    <a href="/order-policy" target="_blank" rel="noreferrer" className="font-bold text-[#0F3D24] underline hover:text-[#3F8F3F]">
+                      Order Policy & Terms of Service
+                    </a>
+                    {" "}(Fulfillment window Dec 1st–25th, deposits reserve batch slots).
+                  </span>
+                </label>
+              </div>
+
+              <button type="submit" disabled={submitting || !agreedTerms} className="mt-6 w-full rounded-full bg-[#0F3D24] px-5 py-3.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-60 transition flex items-center justify-center gap-2">
                 {submitting ? <><Loader2 size={16} className="animate-spin" /> Processing…</> : reservationType === "free_reservation" ? "Reserve My Slot (Free)" : "Continue to Payment"}
               </button>
             </form>

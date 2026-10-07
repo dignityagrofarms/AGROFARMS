@@ -228,7 +228,7 @@ export const adminCreateBatch = createServerFn({ method: "POST" })
 export const adminUpdateBatch = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => updateBatchSchema.parse(data))
   .handler(async ({ data }): Promise<void> => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await supabaseAdmin
