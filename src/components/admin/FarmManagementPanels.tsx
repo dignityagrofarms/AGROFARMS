@@ -2473,19 +2473,7 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
           isOpen={showActivityImportModal}
           onClose={() => setShowActivityImportModal(false)}
           passcode={passcode}
-          batches={batches.map((b) => ({
-            id: b.id,
-            batch_name: b.batchName,
-            bird_type: b.batchType,
-            initial_headcount: b.initialHeadcount,
-            current_headcount: b.currentHeadcount,
-            start_date: b.startDate,
-            target_harvest_date: b.targetHarvestDate || null,
-            status: b.status,
-            notes: b.notes || null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }))}
+          batches={batches}
           defaultBatchId={selectedBatchId === "all" ? null : selectedBatchId}
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["farm-activities"] });

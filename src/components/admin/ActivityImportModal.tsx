@@ -232,7 +232,7 @@ export function ActivityImportModal({
                     <option value="none">Auto-detect batch from CSV or Default</option>
                     {batches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.batch_name} ({b.bird_type})
+                        {b.batchName} ({b.batchType})
                       </option>
                     ))}
                   </select>

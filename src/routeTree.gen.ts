@@ -22,6 +22,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as TrackOrderRouteImport } from './routes/track-order'
 import { Route as AdminAdminOrdersRouteImport } from './routes/admin.admin-orders'
+import { Route as AdminUserAccountsRouteImport } from './routes/admin.user-accounts'
 import { Route as ReceiptOrderCodeRouteImport } from './routes/receipt.$orderCode'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +90,11 @@ const AdminAdminOrdersRoute = AdminAdminOrdersRouteImport.update({
   path: '/admin/admin-orders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminUserAccountsRoute = AdminUserAccountsRouteImport.update({
+  id: '/admin/user-accounts',
+  path: '/admin/user-accounts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReceiptOrderCodeRoute = ReceiptOrderCodeRouteImport.update({
   id: '/receipt/$orderCode',
   path: '/receipt/$orderCode',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/terms': typeof TermsRoute
   '/track-order': typeof TrackOrderRoute
   '/admin/admin-orders': typeof AdminAdminOrdersRoute
+  '/admin/user-accounts': typeof AdminUserAccountsRoute
   '/receipt/$orderCode': typeof ReceiptOrderCodeRoute
 }
 export interface FileRoutesByTo {
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/terms': typeof TermsRoute
   '/track-order': typeof TrackOrderRoute
   '/admin/admin-orders': typeof AdminAdminOrdersRoute
+  '/admin/user-accounts': typeof AdminUserAccountsRoute
   '/receipt/$orderCode': typeof ReceiptOrderCodeRoute
 }
 export interface FileRoutesById {
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/terms': typeof TermsRoute
   '/track-order': typeof TrackOrderRoute
   '/admin/admin-orders': typeof AdminAdminOrdersRoute
+  '/admin/user-accounts': typeof AdminUserAccountsRoute
   '/receipt/$orderCode': typeof ReceiptOrderCodeRoute
 }
 export interface FileRouteTypes {
@@ -160,6 +169,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/track-order'
     | '/admin/admin-orders'
+    | '/admin/user-accounts'
     | '/receipt/$orderCode'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/track-order'
     | '/admin/admin-orders'
+    | '/admin/user-accounts'
     | '/receipt/$orderCode'
   id:
     | '__root__'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/terms'
     | '/track-order'
     | '/admin/admin-orders'
+    | '/admin/user-accounts'
     | '/receipt/$orderCode'
   fileRoutesById: FileRoutesById
 }
@@ -209,6 +221,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   TrackOrderRoute: typeof TrackOrderRoute
   AdminAdminOrdersRoute: typeof AdminAdminOrdersRoute
+  AdminUserAccountsRoute: typeof AdminUserAccountsRoute
   ReceiptOrderCodeRoute: typeof ReceiptOrderCodeRoute
 }
 
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdminOrdersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/user-accounts': {
+      id: '/admin/user-accounts'
+      path: '/admin/user-accounts'
+      fullPath: '/admin/user-accounts'
+      preLoaderRoute: typeof AdminUserAccountsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/receipt/$orderCode': {
       id: '/receipt/$orderCode'
       path: '/receipt/$orderCode'
@@ -329,18 +349,9 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   TrackOrderRoute: TrackOrderRoute,
   AdminAdminOrdersRoute: AdminAdminOrdersRoute,
+  AdminUserAccountsRoute: AdminUserAccountsRoute,
   ReceiptOrderCodeRoute: ReceiptOrderCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

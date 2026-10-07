@@ -112,8 +112,8 @@ function UserAccountsPage() {
         },
       });
 
-      if (!res.valid) {
-        setAuthError(res.message || "Invalid username or passcode.");
+      if (!res.ok) {
+        setAuthError("Invalid username or passcode.");
         setIsLoggingIn(false);
         return;
       }
@@ -141,14 +141,14 @@ function UserAccountsPage() {
   };
 
   const accounts = accountsQuery.data || [];
-  const pendingCount = (pendingQuery.data?.pendingFinancials?.length || 0) + (pendingQuery.data?.pendingActivities?.length || 0);
+  const pendingCount = (pendingQuery.data?.financials?.length || 0) + (pendingQuery.data?.activities?.length || 0);
 
   const ownerCount = accounts.filter((a) => a.role === "owner").length;
   const managerCount = accounts.filter((a) => a.role === "manager").length;
   const staffCount = accounts.filter((a) => a.role === "staff").length;
 
   return (
-    <SiteLayout activePath="/admin/user-accounts">
+    <SiteLayout>
       <div className="min-h-screen bg-[#FDFBF7] py-8 text-[#0F3D24]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
           {/* Top Bar Header */}
