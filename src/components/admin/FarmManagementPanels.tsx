@@ -418,36 +418,50 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     const roiVal = totalExpense > 0 ? ((netProfit / totalExpense) * 100).toFixed(1) : "0";
 
     const headers = ["Date", "Type", "Category", "Batch", "Description", "Payment Method", "Amount (NGN)"];
-    const rows = filteredFinancials.map((t) => [
-      t.transactionDate || "",
-      t.type ? t.type.toUpperCase() : "",
-      t.category || "",
-      t.batchName || "",
-      `"${(t.description || "").replace(/"/g, '""')}"`,
-      t.paymentMethod || "",
-      t.amount || 0,
-    ]);
+    let calcIncome = 0;
+    let calcExpense = 0;
+
+    const rows = filteredFinancials.map((t) => {
+      const amt = Number(t.amount || 0);
+      if (t.type === "income") calcIncome += amt;
+      if (t.type === "expense") calcExpense += amt;
+
+      return [
+        t.transactionDate ? t.transactionDate.split("T")[0] : "",
+        t.type ? t.type.toUpperCase() : "",
+        t.category || "",
+        t.batchName || "",
+        `"${(t.description || "").replace(/"/g, '""')}"`,
+        t.paymentMethod || "N/A",
+        amt,
+      ];
+    });
 
     const csvLines = [
       `"DIGNITY AGRO FARMS - FINANCIAL & BATCH REPORT"`,
-      `"Report Date: ${new Date().toLocaleString()}"`,
+      `"Report Date: ${new Date().toISOString().replace("T", " ").slice(0, 19)}"`,
       `"View / Batch: ${batchName}"`,
       `"Batch Type: ${batchType}"`,
       `"Live Headcount: ${headcount} birds"`,
       `"Mortality Rate: ${mortality} birds (${mortalityRate}%)"`,
-      `"Total Revenue (Income): NGN ${totalIncome.toLocaleString()}"`,
-      `"Total Expenses: NGN ${totalExpense.toLocaleString()}"`,
-      `"Net Profit/Loss: NGN ${netProfit.toLocaleString()}"`,
+      `"Total Revenue (Income): NGN ${calcIncome.toLocaleString()}"`,
+      `"Total Expenses: NGN ${calcExpense.toLocaleString()}"`,
+      `"Net Profit/Loss: NGN ${(calcIncome - calcExpense).toLocaleString()}"`,
       `"ROI: ${roiVal}%"`,
       "",
       headers.join(","),
       ...rows.map((r) => r.join(",")),
+      "",
+      `"TOTAL REVENUE (INCOME)",,,,,,"${calcIncome}"`,
+      `"TOTAL EXPENSES",,,,,,"${calcExpense}"`,
+      `"NET PROFIT / LOSS",,,,,,"${calcIncome - calcExpense}"`,
     ];
 
-    const csvBlob = new Blob([csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const csvContent = "\uFEFF" + csvLines.join("\n");
+    const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(csvBlob);
-    link.setAttribute("download", `AgroFarms_Report_${batchName}_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `AgroFarms_Report_${batchName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

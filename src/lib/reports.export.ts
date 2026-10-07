@@ -51,13 +51,29 @@ const formatNaira = (val: number) =>
   "₦" + val.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 /**
- * Generate Structured CSV Report
+ * Helper to calculate dynamic auto column widths for SheetJS Worksheets
+ */
+function autoFitColumns(ws: XLSX.WorkSheet, dataRows: (string | number | null | undefined)[][]) {
+  if (!dataRows || dataRows.length === 0) return;
+  const colWidths: number[] = [];
+  dataRows.forEach((row) => {
+    row.forEach((val, colIdx) => {
+      const strVal = val != null ? String(val) : "";
+      const len = strVal.length;
+      colWidths[colIdx] = Math.max(colWidths[colIdx] || 12, len + 4);
+    });
+  });
+  ws["!cols"] = colWidths.map((wch) => ({ wch: Math.min(wch, 60) }));
+}
+
+/**
+ * Generate Structured CSV Report with clean headers and calculated totals
  */
 export function generateCSVReport(options: ExportReportOptions) {
   const lines: string[] = [];
 
   lines.push(`"DIGNITY AGRO FARMS - CUSTOM FARM REPORT"`);
-  lines.push(`"Generated Date: ${new Date().toLocaleString()}"`);
+  lines.push(`"Generated Date: ${new Date().toISOString().replace("T", " ").slice(0, 19)}"`);
   lines.push(`"View / Batch: ${options.batchName}"`);
   lines.push(`"Batch Type: ${options.batchType}"`);
   lines.push(`"Date Range: ${options.dateRangeText}"`);
@@ -77,20 +93,33 @@ export function generateCSVReport(options: ExportReportOptions) {
     lines.push("");
     lines.push(`"=== FINANCIAL LEDGER ==="`);
     lines.push("Date,Type,Category,Batch,Description,Payment Method,Amount (NGN)");
+    
+    let totalInc = 0;
+    let totalExp = 0;
+
     options.financials.forEach((t) => {
       const desc = `"${(t.description || "").replace(/"/g, '""')}"`;
+      const amt = Number(t.amount || 0);
+      if (t.type === "income") totalInc += amt;
+      if (t.type === "expense") totalExp += amt;
+
       lines.push(
         [
-          t.transactionDate,
+          t.transactionDate ? t.transactionDate.split("T")[0] : "",
           t.type ? t.type.toUpperCase() : "",
           t.category || "",
           t.batchName || "",
           desc,
           t.paymentMethod || "N/A",
-          t.amount || 0,
+          amt,
         ].join(",")
       );
     });
+
+    lines.push("");
+    lines.push(`"TOTAL REVENUE (INCOME)",,,,,,"${totalInc}"`);
+    lines.push(`"TOTAL EXPENSES",,,,,,"${totalExp}"`);
+    lines.push(`"NET PROFIT / LOSS",,,,,,"${totalInc - totalExp}"`);
   }
 
   if (options.includeActivities) {
@@ -102,7 +131,7 @@ export function generateCSVReport(options: ExportReportOptions) {
       const notes = `"${(a.notes || "").replace(/"/g, '""')}"`;
       lines.push(
         [
-          a.activityDate,
+          a.activityDate ? a.activityDate.split("T")[0] : "",
           a.activityType || "General",
           a.batchName || "",
           desc,
@@ -120,58 +149,111 @@ export function generateCSVReport(options: ExportReportOptions) {
 }
 
 /**
- * Generate Excel (.xlsx) Report with multi-tabs
+ * Generate Excel (.xlsx) Report with multi-tabs, freeze panes, auto-fit columns & currency formatting
  */
 export function generateExcelReport(options: ExportReportOptions) {
   const wb = XLSX.utils.book_new();
 
-  // Summary Sheet
+  // 1. Executive Summary Sheet
   const summaryRows = [
     ["DIGNITY AGRO FARMS - REPORT SUMMARY"],
-    ["Generated On", new Date().toLocaleString()],
+    ["Generated On", new Date().toLocaleString("en-NG")],
     ["View / Batch", options.batchName],
     ["Batch Type", options.batchType],
     ["Date Filter", options.dateRangeText],
     ["Live Headcount", `${options.headcount} birds`],
     ["Mortality", `${options.mortality} birds (${options.mortalityRate}%)`],
     [],
-    ["FINANCIAL OVERVIEW"],
+    ["FINANCIAL OVERVIEW METRICS"],
     ["Total Revenue (Income)", options.kpis.totalIncome],
     ["Total Expenses", options.kpis.totalExpense],
     ["Net Profit / Loss", options.kpis.netProfit],
     ["ROI / Margin", options.kpis.roi],
   ];
   const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+  summarySheet["!views"] = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
+  autoFitColumns(summarySheet, summaryRows);
+
+  // Format currency rows in summary sheet
+  [9, 10, 11].forEach((rIdx) => {
+    const cellAddr = XLSX.utils.encode_cell({ r: rIdx, c: 1 });
+    if (summarySheet[cellAddr] && typeof summarySheet[cellAddr].v === "number") {
+      summarySheet[cellAddr].z = '"₦"#,##0.00';
+    }
+  });
+
   XLSX.utils.book_append_sheet(wb, summarySheet, "Overview");
 
-  // Financial Ledger Sheet
+  // 2. Financial Ledger Sheet
   if (options.includeFinancials) {
     const finHeader = ["Date", "Type", "Category", "Batch", "Description", "Payment Method", "Amount (NGN)"];
-    const finRows = options.financials.map((t) => [
-      t.transactionDate,
-      t.type ? t.type.toUpperCase() : "",
-      t.category || "",
-      t.batchName || "",
-      t.description || "",
-      t.paymentMethod || "N/A",
-      t.amount || 0,
-    ]);
-    const finSheet = XLSX.utils.aoa_to_sheet([finHeader, ...finRows]);
+    
+    let totalInc = 0;
+    let totalExp = 0;
+
+    const finRows = options.financials.map((t) => {
+      const amt = Number(t.amount || 0);
+      if (t.type === "income") totalInc += amt;
+      if (t.type === "expense") totalExp += amt;
+
+      return [
+        t.transactionDate ? t.transactionDate.split("T")[0] : "",
+        t.type ? t.type.toUpperCase() : "",
+        t.category || "",
+        t.batchName || "",
+        t.description || "",
+        t.paymentMethod || "N/A",
+        amt,
+      ];
+    });
+
+    const totalRows: (string | number)[][] = [
+      [],
+      ["TOTAL REVENUE (INCOME)", "", "", "", "", "", totalInc],
+      ["TOTAL EXPENSES", "", "", "", "", "", totalExp],
+      ["NET PROFIT / LOSS", "", "", "", "", "", totalInc - totalExp],
+    ];
+
+    const allFinData = [finHeader, ...finRows, ...totalRows];
+    const finSheet = XLSX.utils.aoa_to_sheet(allFinData);
+    finSheet["!views"] = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
+    autoFitColumns(finSheet, allFinData);
+
+    // Apply currency format to Amount column (Column G / index 6)
+    for (let r = 1; r < allFinData.length; r++) {
+      const cellAddr = XLSX.utils.encode_cell({ r, c: 6 });
+      if (finSheet[cellAddr] && typeof finSheet[cellAddr].v === "number") {
+        finSheet[cellAddr].z = '"₦"#,##0.00';
+      }
+    }
+
     XLSX.utils.book_append_sheet(wb, finSheet, "Financial Ledger");
   }
 
-  // Farm Activities Log Sheet
+  // 3. Farm Activities Log Sheet
   if (options.includeActivities) {
     const actHeader = ["Date", "Activity Type", "Batch", "Description", "Cost (NGN)", "Notes"];
     const actRows = options.activities.map((a) => [
-      a.activityDate,
+      a.activityDate ? a.activityDate.split("T")[0] : "",
       a.activityType || "General",
       a.batchName || "",
       a.description || "",
       a.cost || 0,
       a.notes || "",
     ]);
-    const actSheet = XLSX.utils.aoa_to_sheet([actHeader, ...actRows]);
+    const allActData = [actHeader, ...actRows];
+    const actSheet = XLSX.utils.aoa_to_sheet(allActData);
+    actSheet["!views"] = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
+    autoFitColumns(actSheet, allActData);
+
+    // Format Cost column (Column E / index 4)
+    for (let r = 1; r < allActData.length; r++) {
+      const cellAddr = XLSX.utils.encode_cell({ r, c: 4 });
+      if (actSheet[cellAddr] && typeof actSheet[cellAddr].v === "number") {
+        actSheet[cellAddr].z = '"₦"#,##0.00';
+      }
+    }
+
     XLSX.utils.book_append_sheet(wb, actSheet, "Farm Activities");
   }
 

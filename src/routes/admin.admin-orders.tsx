@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -1275,33 +1275,173 @@ function ReportsPanel({
   const avg = paidOrders.length ? Math.round(revenue / paidOrders.length) : 0;
 
   const exportCsv = () => {
-    const head = ["Order code", "Date", "Customer", "Phone", "Zone", "Items", "Subtotal", "Delivery fee", "Total", "Order status", "Payment status", "Paid at", "Cancelled by", "Cancel reason", "Cancelled at", "Not completed"];
+    const head = [
+      "Order Code",
+      "Date (ISO)",
+      "Customer Name",
+      "Phone",
+      "Delivery Zone",
+      "Items Breakdown",
+      "Subtotal (NGN)",
+      "Delivery Fee (NGN)",
+      "Total Amount (NGN)",
+      "Order Status",
+      "Payment Status",
+      "Paid At (ISO)",
+      "Cancelled By",
+      "Cancel Reason",
+      "Cancelled At (ISO)",
+      "Not Completed",
+    ];
+
+    let sumSub = 0;
+    let sumFee = 0;
+    let sumTot = 0;
+
     const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-    const rows = orders.map((o) => [
-      o.orderCode,
-      new Date(o.createdAt).toLocaleString(),
-      o.customerName,
-      o.phone,
-      o.deliveryZone === "owerri" ? "Owerri town" : "Outside Owerri",
-      o.items.map((i) => `${i.product} - ${i.option} x${i.qty}`).join("; "),
-      o.subtotal,
-      o.deliveryFee,
-      o.total,
-      STATUS_LABEL[o.status],
-      o.paymentStatus,
-      o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toLocaleString() : "",
-      o.status === "cancelled" ? (o.cancelledBy === "customer" ? "Customer" : "Farm") : "",
-      o.cancelReason ?? "",
-      o.cancelledAt ? new Date(o.cancelledAt).toLocaleString() : "",
-      isNotCompleted(o) ? "Yes" : "",
-    ].map(esc).join(","));
-    const blob = new Blob([[head.map(esc).join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
+    const rows = orders.map((o) => {
+      const sub = Number(o.subtotal || 0);
+      const fee = Number(o.deliveryFee || 0);
+      const tot = Number(o.total || 0);
+
+      sumSub += sub;
+      sumFee += fee;
+      sumTot += tot;
+
+      return [
+        esc(o.orderCode),
+        esc(o.createdAt ? new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 19) : ""),
+        esc(o.customerName),
+        esc(o.phone),
+        esc(o.deliveryZone === "owerri" ? "Owerri Town" : "Outside Owerri"),
+        esc(o.items.map((i) => `${i.product} (${i.option}) x${i.qty}`).join("; ")),
+        sub,
+        fee,
+        tot,
+        esc(STATUS_LABEL[o.status] || o.status),
+        esc(o.paymentStatus ? o.paymentStatus.toUpperCase() : ""),
+        esc(o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19) : ""),
+        esc(o.status === "cancelled" ? (o.cancelledBy === "customer" ? "Customer" : "Farm Admin") : ""),
+        esc(o.cancelReason ?? ""),
+        esc(o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : ""),
+        esc(isNotCompleted(o) ? "Yes" : "No"),
+      ].join(",");
+    });
+
+    const totalsRow = [
+      esc("SUMMARY TOTALS"),
+      esc(""),
+      esc(""),
+      esc(""),
+      esc(""),
+      esc(`${orders.length} Total Orders`),
+      sumSub,
+      sumFee,
+      sumTot,
+      esc(""),
+      esc(""),
+      esc(""),
+      esc(""),
+      esc(""),
+      esc(""),
+      esc(""),
+    ].join(",");
+
+    const csvString = "\uFEFF" + [head.map(esc).join(","), ...rows, "", totalsRow].join("\n");
+    const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `dignity-orders-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportExcel = async () => {
+    const XLSX = (await import("xlsx")).default;
+    const wb = XLSX.utils.book_new();
+
+    const finHeader = [
+      "Order Code",
+      "Date (ISO)",
+      "Customer Name",
+      "Phone",
+      "Delivery Zone",
+      "Items Breakdown",
+      "Subtotal (NGN)",
+      "Delivery Fee (NGN)",
+      "Total Amount (NGN)",
+      "Order Status",
+      "Payment Status",
+      "Paid At",
+      "Cancelled By",
+      "Cancel Reason",
+      "Cancelled At",
+      "Not Completed",
+    ];
+
+    let sumSub = 0;
+    let sumFee = 0;
+    let sumTot = 0;
+
+    const rows = orders.map((o) => {
+      const sub = Number(o.subtotal || 0);
+      const fee = Number(o.deliveryFee || 0);
+      const tot = Number(o.total || 0);
+
+      sumSub += sub;
+      sumFee += fee;
+      sumTot += tot;
+
+      return [
+        o.orderCode,
+        o.createdAt ? new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 19) : "",
+        o.customerName,
+        o.phone,
+        o.deliveryZone === "owerri" ? "Owerri Town" : "Outside Owerri",
+        o.items.map((i) => `${i.product} (${i.option}) x${i.qty}`).join("; "),
+        sub,
+        fee,
+        tot,
+        STATUS_LABEL[o.status] || o.status,
+        o.paymentStatus ? o.paymentStatus.toUpperCase() : "",
+        o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19) : "",
+        o.status === "cancelled" ? (o.cancelledBy === "customer" ? "Customer" : "Farm Admin") : "",
+        o.cancelReason ?? "",
+        o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : "",
+        isNotCompleted(o) ? "Yes" : "No",
+      ];
+    });
+
+    const totalRows: (string | number)[][] = [
+      [],
+      ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`, sumSub, sumFee, sumTot],
+    ];
+
+    const allData = [finHeader, ...rows, ...totalRows];
+    const sheet = XLSX.utils.aoa_to_sheet(allData);
+    sheet["!views"] = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
+
+    const colWidths: number[] = [];
+    allData.forEach((row) => {
+      row.forEach((val, colIdx) => {
+        const strVal = val != null ? String(val) : "";
+        colWidths[colIdx] = Math.max(colWidths[colIdx] || 12, strVal.length + 4);
+      });
+    });
+    sheet["!cols"] = colWidths.map((wch) => ({ wch: Math.min(wch, 60) }));
+
+    for (let r = 1; r < allData.length; r++) {
+      [6, 7, 8].forEach((c) => {
+        const cellAddr = XLSX.utils.encode_cell({ r, c });
+        if (sheet[cellAddr] && typeof sheet[cellAddr].v === "number") {
+          sheet[cellAddr].z = '"₦"#,##0.00';
+        }
+      });
+    }
+
+    XLSX.utils.book_append_sheet(wb, sheet, "Customer Orders");
+    XLSX.writeFile(wb, `dignity-orders-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const byStatus = STATUS_OPTIONS.map((s) => ({ label: s.label, count: orders.filter((o) => o.status === s.value).length }));
@@ -1345,6 +1485,9 @@ function ReportsPanel({
           <QuickBtn onClick={() => onQuickRange("month")}>This month</QuickBtn>
           <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F] px-4 py-2 text-xs font-semibold text-white hover:bg-[#4ea94e]">
             <Download size={14} /> Export CSV
+          </button>
+          <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]">
+            <FileSpreadsheet size={14} /> Export Excel (.xlsx)
           </button>
           <button
             onClick={downloadZip}
