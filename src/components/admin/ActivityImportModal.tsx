@@ -110,10 +110,10 @@ function normalizeActivityType(rawType: string): string {
       const activityType = normalizeActivityType(rawType);
       const batchName = parts[2] || "";
       const mortalityCount = parseInt(parts[3]?.replace(/[^0-9]/g, "") || "0", 10) || 0;
-      const causeOfMortality = parts[4] || "";
-      const feedConsumedKg = parseFloat(parts[5]?.replace(/[^0-9.]/g, "") || "0") || 0;
-      const eggsCollected = parseInt(parts[6]?.replace(/[^0-9]/g, "") || "0", 10) || 0;
-      const medicationGiven = parts[7] || "";
+      const feedConsumedKg = parseFloat(parts[4]?.replace(/[^0-9.]/g, "") || "0") || 0;
+      const eggsCollected = parseInt(parts[5]?.replace(/[^0-9]/g, "") || "0", 10) || 0;
+      const medicationGiven = parts[6] || "";
+      const causeOfMortality = parts[7] || "";
       const notes = parts[8] || "";
 
       rows.push({
