@@ -59,6 +59,9 @@ function FlyerLandingPage() {
           </button>
           
           <p className="mt-6 text-sm text-[#0F3D24]/60">By clicking Order Now, you will be redirected to the main order page.</p>
+          <p className="mt-2 text-xs text-[#0F3D24]/60">
+            By proceeding, you agree to our <Link to="/order-policy" className="font-semibold underline hover:text-[#3F8F3F]">Order Policy</Link>.
+          </p>
         </div>
       </div>
     </SiteLayout>

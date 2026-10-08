@@ -570,6 +570,9 @@ function OrderPage() {
               <button type="submit" disabled={submitting || belowMinimum || isSoldOut} className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-6 py-4 text-sm font-semibold text-white shadow-lg transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#134a2c] hover:shadow-[0_10px_20px_rgba(15,61,36,0.3)] disabled:transform-none disabled:opacity-60 disabled:shadow-none">
                 <ShoppingBag size={16} /> {submitting ? "Sending..." : isSoldOut ? "Currently sold out" : `Place order · ${naira(total)}`}
               </button>
+              <p className="mt-4 text-center text-xs text-[#0F3D24]/70">
+                By placing an order, you agree to our <Link to="/order-policy" className="font-semibold underline hover:text-[#3F8F3F]">Order Policy</Link>.
+              </p>
             </form>
           )}
         </div>

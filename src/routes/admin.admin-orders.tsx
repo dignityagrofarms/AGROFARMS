@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -24,11 +24,34 @@ import { PendingTasksModal } from "@/components/admin/PendingTasksModal";
 import { UnprocessedOrdersBanner } from "@/components/admin/UnprocessedOrdersBanner";
 import { ComplaintsDashboardPanel } from "@/components/admin/ComplaintsDashboardPanel";
 
+// Global context to bypass background autoplay restrictions
+let globalAudioCtx: AudioContext | null = null;
+
+export function initGlobalAudio() {
+  if (typeof window !== "undefined" && !globalAudioCtx) {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioCtx) globalAudioCtx = new AudioCtx();
+  }
+  if (globalAudioCtx && globalAudioCtx.state === "suspended") {
+    globalAudioCtx.resume();
+  }
+}
+
+if (typeof window !== "undefined") {
+  const unlockAudio = () => {
+    initGlobalAudio();
+    document.removeEventListener("click", unlockAudio);
+    document.removeEventListener("touchstart", unlockAudio);
+  };
+  document.addEventListener("click", unlockAudio);
+  document.addEventListener("touchstart", unlockAudio);
+}
+
 function playNewOrderChime() {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    if (!globalAudioCtx) initGlobalAudio();
+    const ctx = globalAudioCtx;
+    if (!ctx) return;
     const now = ctx.currentTime;
     
     const osc1 = ctx.createOscillator();
@@ -262,6 +285,7 @@ function AdminOrders() {
     enabled: !!passcode,
     refetchInterval: 12000,
     retry: 1,
+    placeholderData: keepPreviousData,
   });
 
   // Effect to detect newly arrived orders during polling
@@ -645,7 +669,7 @@ function AdminOrders() {
               <Home size={14} /> <span className="hidden sm:inline">Back to Website</span>
             </Link>
             <button onClick={() => query.refetch()} className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition shadow-sm">
-              <RefreshCw size={14} />
+              <RefreshCw size={14} className={query.isFetching ? "animate-spin text-[#3F8F3F]" : ""} />
             </button>
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3F8F3F] font-bold text-white shadow-sm">
