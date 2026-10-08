@@ -482,17 +482,17 @@ function OrderPage() {
 
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">3. Quantity ({product.unitLabel})</div>
-                <div className="mt-3 flex items-center gap-3">
-                  <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="grid h-10 w-10 place-items-center rounded-full border border-[#0F3D24]/15 text-lg font-bold hover:bg-[#0F3D24] hover:text-white">−</button>
+                <div className="mt-3 flex items-center gap-3 flex-nowrap">
+                  <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} className="shrink-0 grid h-10 w-10 place-items-center rounded-full border border-[#0F3D24]/15 text-lg font-bold hover:bg-[#0F3D24] hover:text-white">−</button>
                   <input
                     type="number"
                     min={1}
                     max={200}
                     value={qty}
                     onChange={(e) => setQty(Math.max(1, Math.min(200, parseInt(e.target.value || "1", 10))))}
-                    className="w-20 rounded-xl border border-[#0F3D24]/15 px-3 py-2 text-center text-sm font-semibold outline-none focus:border-[#3F8F3F]"
+                    className="w-20 shrink-0 rounded-xl border border-[#0F3D24]/15 px-3 py-2 text-center text-sm font-semibold outline-none focus:border-[#3F8F3F]"
                   />
-                  <button type="button" onClick={() => setQty((q) => Math.min(200, q + 1))} className="grid h-10 w-10 place-items-center rounded-full border border-[#0F3D24]/15 text-lg font-bold hover:bg-[#0F3D24] hover:text-white">+</button>
+                  <button type="button" onClick={() => setQty((q) => Math.min(200, q + 1))} className="shrink-0 grid h-10 w-10 place-items-center rounded-full border border-[#0F3D24]/15 text-lg font-bold hover:bg-[#0F3D24] hover:text-white">+</button>
                 </div>
               </div>
 
@@ -576,7 +576,7 @@ function OrderPage() {
       )}
     </div>
 
-        <aside className="h-max rounded-3xl bg-gradient-to-br from-[#0F3D24] to-[#1a5a3a] p-6 text-white shadow-2xl shadow-[#0F3D24]/20 ring-1 ring-white/10 sm:p-8 lg:sticky lg:top-24">
+        <aside className="h-max mb-20 sm:mb-0 rounded-3xl bg-gradient-to-br from-[#0F3D24] to-[#1a5a3a] p-6 text-white shadow-2xl shadow-[#0F3D24]/20 ring-1 ring-white/10 sm:p-8 lg:sticky lg:top-24">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a8e6a8]">Order summary</p>
           <div className="mt-4 space-y-3 text-sm">
             {mode === "december" && decState ? (

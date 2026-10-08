@@ -1027,6 +1027,18 @@ export const adminRejectStaffRecord = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+function normalizeActivityType(rawType: string): string {
+  const lower = (rawType || "").toLowerCase().trim();
+  if (lower.includes("mortality") || lower.includes("death") || lower.includes("die")) return "Mortality Record";
+  if (lower.includes("egg") || lower.includes("crate")) return "Egg Collection";
+  if (lower.includes("feed") || lower.includes("mash") || lower.includes("pellet") || lower.includes("starter") || lower.includes("grower") || lower.includes("finisher")) return "Feeding";
+  if (lower.includes("med") || lower.includes("vac") || lower.includes("health") || lower.includes("drug") || lower.includes("vit") || lower.includes("treat")) return "Medication / Vaccination";
+  if (lower.includes("weight") || lower.includes("kg") || lower.includes("weigh")) return "Weight Check";
+  if (lower.includes("clean") || lower.includes("sanitat") || lower.includes("wash") || lower.includes("disinfect")) return "Cleaning & Sanitation";
+  if (lower.includes("pen") || lower.includes("maint") || lower.includes("repair") || lower.includes("house")) return "Pen Maintenance";
+  return "General Activity";
+}
+
 export const adminImportActivities = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -1072,7 +1084,7 @@ export const adminImportActivities = createServerFn({ method: "POST" })
       insertRows.push({
         batch_id: resolvedBatchId,
         activity_date: item.activityDate || new Date().toISOString().split("T")[0],
-        activity_type: item.activityType || "General Activity",
+        activity_type: normalizeActivityType(item.activityType),
         mortality_count: Math.max(0, Number(item.mortalityCount || 0)),
         cause_of_mortality: item.causeOfMortality || null,
         feed_consumed_kg: Math.max(0, Number(item.feedConsumedKg || 0)),
@@ -1083,6 +1095,7 @@ export const adminImportActivities = createServerFn({ method: "POST" })
         recorded_by: credential.username,
       });
     }
+
 
     if (insertRows.length > 0) {
       const { error } = await supabaseAdmin.from("farm_activities").insert(insertRows);

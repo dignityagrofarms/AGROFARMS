@@ -125,7 +125,7 @@ function ProductsPage() {
               From broiler and layer farming to fresh egg supply, chicken sold by the kilogram, pre-orders and hands-on poultry consultancy. We cover the full poultry value chain.
             </p>
           </div>
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-10 grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {whatWeDo.map(({ icon: Icon, title, body }) => (
               <div key={title} className="group flex flex-col rounded-2xl border border-[#3F8F3F]/15 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
                 <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#0F3D24] text-[#a8e6a8] transition group-hover:bg-[#3F8F3F] group-hover:text-white">
@@ -139,7 +139,7 @@ function ProductsPage() {
         </div>
 
         {/* Product cards auto-generated from PRODUCTS catalog */}
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="grid gap-8 grid-cols-1 md:grid-cols-2">
           {PRODUCTS.map((product) => {
             const lowestPrice = Math.min(...product.options.map((o) => o.price));
             const imgSrc = product.image.startsWith("http")
@@ -196,7 +196,7 @@ function ProductsPage() {
                   </div>
 
                   {/* CTA Buttons */}
-                  <div className="mt-6 flex flex-wrap gap-3 pt-2">
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3 pt-2">
                     <Link
                       to="/order"
                       className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#3F8F3F] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4ea94e]"
@@ -216,7 +216,7 @@ function ProductsPage() {
           })}
         </div>
 
-        <div className="mt-12 grid gap-6 rounded-3xl bg-[#0F3D24] p-8 text-white sm:grid-cols-3">
+        <div className="mt-12 grid gap-6 rounded-3xl bg-[#0F3D24] p-8 text-white grid-cols-1 sm:grid-cols-3">
           <div>
             <div className="text-3xl font-display font-semibold text-[#a8e6a8]">₦/Kg</div>
             <p className="mt-2 text-sm text-white/80">Priced by exact weight, weighed in front of you, no guessing, no overpaying.</p>

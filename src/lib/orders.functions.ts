@@ -615,23 +615,39 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const hash = await hashPasscode(data.targetPasscode);
-    const { error } = await supabaseAdmin
-      .from("admin_access")
-      .upsert(
-        {
-          username: data.targetUsername,
-          role: data.targetRole,
-          passcode_hash: hash,
-          active: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "username" },
-      );
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    try {
+      console.log("[adminCreateUserAccount] Validating access for account creation...");
+      await checkOwner(data.passcode);
+      
+      console.log(`[adminCreateUserAccount] Initializing Supabase to create user: ${data.targetUsername}`);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const hash = await hashPasscode(data.targetPasscode);
+      
+      console.log(`[adminCreateUserAccount] Executing upsert for: ${data.targetUsername}`);
+      const { error } = await supabaseAdmin
+        .from("admin_access")
+        .upsert(
+          {
+            username: data.targetUsername,
+            role: data.targetRole,
+            passcode_hash: hash,
+            active: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "username" },
+        );
+        
+      if (error) {
+        console.error("[adminCreateUserAccount] Supabase upsert error:", error);
+        throw new Error(error.message);
+      }
+      
+      console.log(`[adminCreateUserAccount] Successfully created user: ${data.targetUsername}`);
+      return { ok: true };
+    } catch (err: any) {
+      console.error("[adminCreateUserAccount] Caught exception:", err);
+      throw new Error(err.message || "Failed to create account");
+    }
   });
 
 export const adminDeleteUserAccount = createServerFn({ method: "POST" })
@@ -642,17 +658,25 @@ export const adminDeleteUserAccount = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
-    if (data.targetUsername === "owner" || data.targetUsername === "admin") {
-      throw new Error("Cannot delete primary Administrator account.");
+    try {
+      await checkOwner(data.passcode);
+      if (data.targetUsername === "owner" || data.targetUsername === "admin") {
+        throw new Error("Cannot delete primary Administrator account.");
+      }
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin
+        .from("admin_access")
+        .delete()
+        .eq("username", data.targetUsername);
+      if (error) {
+        console.error("[adminDeleteUserAccount] Supabase error:", error);
+        throw new Error(error.message);
+      }
+      return { ok: true };
+    } catch (err: any) {
+      console.error("[adminDeleteUserAccount] Error:", err);
+      throw new Error(err.message || "Failed to delete account");
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("admin_access")
-      .delete()
-      .eq("username", data.targetUsername);
-    if (error) throw new Error(error.message);
-    return { ok: true };
   });
 
 export const adminResetUserPasscode = createServerFn({ method: "POST" })
@@ -664,15 +688,23 @@ export const adminResetUserPasscode = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const hash = await hashPasscode(data.newPasscode);
-    const { error } = await supabaseAdmin
-      .from("admin_access")
-      .update({ passcode_hash: hash, updated_at: new Date().toISOString() })
-      .eq("username", data.targetUsername);
-    if (error) throw new Error(error.message);
-    return { ok: true };
+    try {
+      await checkOwner(data.passcode);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const hash = await hashPasscode(data.newPasscode);
+      const { error } = await supabaseAdmin
+        .from("admin_access")
+        .update({ passcode_hash: hash, updated_at: new Date().toISOString() })
+        .eq("username", data.targetUsername);
+      if (error) {
+        console.error("[adminResetUserPasscode] Supabase error:", error);
+        throw new Error(error.message);
+      }
+      return { ok: true };
+    } catch (err: any) {
+      console.error("[adminResetUserPasscode] Error:", err);
+      throw new Error(err.message || "Failed to reset passcode");
+    }
   });
 
 export const adminToggleUserActive = createServerFn({ method: "POST" })
@@ -684,17 +716,25 @@ export const adminToggleUserActive = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
-    if (data.targetUsername === "owner" || data.targetUsername === "admin") {
-      throw new Error("Cannot deactivate primary Administrator account.");
+    try {
+      await checkOwner(data.passcode);
+      if (data.targetUsername === "owner" || data.targetUsername === "admin") {
+        throw new Error("Cannot deactivate primary Administrator account.");
+      }
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin
+        .from("admin_access")
+        .update({ active: data.active, updated_at: new Date().toISOString() })
+        .eq("username", data.targetUsername);
+      if (error) {
+        console.error("[adminToggleUserActive] Supabase error:", error);
+        throw new Error(error.message);
+      }
+      return { ok: true };
+    } catch (err: any) {
+      console.error("[adminToggleUserActive] Error:", err);
+      throw new Error(err.message || "Failed to toggle account status");
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("admin_access")
-      .update({ active: data.active, updated_at: new Date().toISOString() })
-      .eq("username", data.targetUsername);
-    if (error) throw new Error(error.message);
-    return { ok: true };
   });
 
 export async function verifyTotpCode(code: string, secretBase32: string): Promise<boolean> {

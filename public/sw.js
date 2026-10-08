@@ -33,7 +33,7 @@ self.addEventListener('fetch', event => {
         }
         return response;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request).then(res => res || new Response("Network error occurred and no cached version is available.", { status: 503 })))
   );
 });
 

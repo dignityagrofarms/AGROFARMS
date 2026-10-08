@@ -535,7 +535,7 @@ function AdminOrders() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8" role="tablist" aria-label="Admin sections">
+            <div className="flex w-full overflow-x-auto gap-2 pb-2 hide-scrollbar snap-x" role="tablist" aria-label="Admin sections">
               <AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders & reports</AdminTab>
               <AdminTab active={activeTab === "financials"} onClick={() => setActiveTab("financials")} icon={<TrendingUp size={15} />}>Batches & Financials</AdminTab>
               <AdminTab active={activeTab === "activities"} onClick={() => setActiveTab("activities")} icon={<Activity size={15} />}>Daily Activities & Mortality</AdminTab>
@@ -667,22 +667,58 @@ function AdminOrders() {
                 ) : activeTab === "december" ? (
                   <DecemberPreorderPanel passcode={passcode} />
                 ) : activeTab === "flyers" ? (
-                  <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
-                    <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
-                    <h3 className="text-xl font-extrabold text-[#0F3D24]">Digital Promotion & Order Flyers</h3>
-                    <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
-                      Generate branded promotional posters for Christmas specials or single order verification graphics to post on WhatsApp and social media.
-                    </p>
-                    <button
-                      onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
-                      className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
-                    >
-                      Open Digital Flyer Generator
-                    </button>
+                  <div className="space-y-6">
+                    <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+                      <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
+                      <h3 className="text-xl font-extrabold text-[#0F3D24]">Digital Promotion & Order Flyers</h3>
+                      <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
+                        Generate branded promotional posters for Christmas specials or single order verification graphics to post on WhatsApp and social media.
+                      </p>
+                      <button
+                        onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
+                        className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
+                      >
+                        Open Digital Flyer Generator
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10">
+                      <h4 className="text-lg font-bold text-[#0F3D24] mb-4">Verified Customer Orders</h4>
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {allOrders.filter(o => o.status !== "cancelled").slice(0, 12).map((order) => (
+                          <div key={order.id} className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5 flex flex-col justify-between gap-4">
+                            <div>
+                              <div className="flex items-center justify-between">
+                                <span className="font-mono text-xs font-bold text-[#3F8F3F]">{order.orderCode}</span>
+                                <span className="text-[10px] font-semibold text-[#0F3D24]/60">{new Date(order.createdAt).toLocaleDateString()}</span>
+                              </div>
+                              <p className="mt-2 text-sm font-bold text-[#0F3D24]">{order.customerName}</p>
+                              <p className="text-xs text-[#0F3D24]/70">{order.items.map((i: any) => `${i.product} × ${i.qty}`).join(", ")}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setSelectedFlyerOrder({
+                                  orderCode: order.orderCode,
+                                  customerName: order.customerName,
+                                  location: order.address || (order.deliveryZone === "owerri" ? "Owerri" : "Outside Owerri"),
+                                  itemsText: order.items.map((i: any) => `${i.product} × ${i.qty}`).join(", "),
+                                  totalAmount: order.total || 0,
+                                  paymentStatus: order.paymentStatus || "pending",
+                                  phone: order.phone,
+                                  orderDate: new Date(order.createdAt).toLocaleDateString(),
+                                });
+                                setShowFlyerModal(true);
+                              }}
+                              className="w-full flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#3F8F3F] hover:text-white hover:ring-transparent transition"
+                            >
+                              <Sparkles size={14} /> Create Social Proof Flyer
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <SocialProofPanel orders={allOrders} />
-                )}
+                ) : null}
               </>
             );
           })()
@@ -806,7 +842,7 @@ function AdminTab({ active, onClick, icon, children }: { active: boolean; onClic
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex w-full items-center justify-center gap-1.5 rounded-2xl px-2.5 py-2.5 text-center text-xs font-semibold transition ${active
+      className={`flex items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-center text-xs font-semibold transition shrink-0 whitespace-nowrap snap-start ${active
         ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
         : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
         }`}
@@ -1296,131 +1332,6 @@ function flyerCaption(order: AdminOrder, stage: FlyerStage): string {
     : `Thank you for choosing Dignity Agro Farms. Order ${order.orderCode} has been received and is being prepared.`;
 }
 
-function SocialProofPanel({ orders }: { orders: AdminOrder[] }) {
-  const [search, setSearch] = useState("");
-  const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
-  const filteredOrders = orders.filter((order) => {
-    const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return [order.orderCode, order.customerName, order.phone, order.status].some((value) => value.toLowerCase().includes(query));
-  });
-
-  return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-[#3F8F3F]"><Sparkles size={18} /><span className="text-xs font-semibold uppercase tracking-widest">Social proof flyers</span></div>
-          <h2 className="mt-2 text-2xl font-semibold text-[#0F3D24]">Thank you flyers</h2>
-          <p className="mt-1 max-w-2xl text-sm text-[#0F3D24]/65">Turn an order into a shareable thank you graphic. Customer names and phone numbers are automatically kept private.</p>
-        </div>
-        <div className="rounded-2xl bg-[#F7F5F0] px-4 py-3 text-right ring-1 ring-[#0F3D24]/5">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Orders available</div>
-          <div className="mt-1 text-xl font-semibold text-[#0F3D24]">{orders.length}</div>
-        </div>
-      </div>
-
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Find an order by code or customer"
-          className="min-w-0 flex-1 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
-        />
-        <span className="inline-flex items-center justify-center rounded-xl bg-[#F7F5F0] px-4 py-3 text-xs font-semibold text-[#0F3D24]/65 ring-1 ring-[#0F3D24]/10">Select an order below</span>
-      </div>
-
-      {filteredOrders.length === 0 ? (
-        <p className="py-10 text-center text-sm text-[#0F3D24]/60">No orders match this search.</p>
-      ) : (
-        <div className="mt-6 overflow-x-auto rounded-2xl ring-1 ring-[#0F3D24]/10">
-          <table className="w-full min-w-[700px] text-left text-sm">
-            <thead className="bg-[#F7F5F0] text-[10px] uppercase tracking-widest text-[#0F3D24]/60"><tr><th className="px-4 py-3">Order</th><th className="px-4 py-3">Customer</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Action</th></tr></thead>
-            <tbody className="divide-y divide-[#0F3D24]/10">
-              {filteredOrders.map((order) => (
-                <tr key={order.id}>
-                  <td className="px-4 py-4 font-mono font-semibold text-[#3F8F3F]">{order.orderCode}</td>
-                  <td className="px-4 py-4"><div className="font-semibold text-[#0F3D24]">{order.customerName}</div><div className="text-xs text-[#0F3D24]/55">{order.phone}</div></td>
-                  <td className="px-4 py-4 text-xs font-semibold text-[#0F3D24]">{STATUS_LABEL[order.status]}</td>
-                  <td className="px-4 py-4 text-xs text-[#0F3D24]/65">{new Date(order.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-4"><button type="button" onClick={() => setSelectedOrder(order)} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]"><Sparkles size={14} /> Create flyer</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {selectedOrder && <ThankYouFlyerModal order={selectedOrder} onClose={() => setSelectedOrder(null)} />}
-    </div>
-  );
-}
-
-function ThankYouFlyerModal({ order, onClose }: { order: AdminOrder; onClose: () => void }) {
-  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    if (!canvas) return;
-    drawSocialProofFlyerCanvas(canvas, {
-      customerName: order.customerName,
-      phone: order.phone,
-      orderDate: new Date(order.createdAt).toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      itemsText: order.items.map((i) => `${i.product} × ${i.qty}`).join(", "),
-      address: order.address || "Owerri, Imo State",
-      orderCode: order.orderCode,
-      maskData: true,
-    }).catch(console.error);
-  }, [canvas, order]);
-
-  const download = () => {
-    if (!canvas) return;
-    const link = document.createElement("a");
-    link.download = `dignity-social-proof-${order.orderCode}.png`;
-    link.href = canvas.toDataURL("image/png", 1.0);
-    link.click();
-  };
-
-  const share = async () => {
-    if (!canvas) return;
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
-    const file = blob ? new File([blob], `dignity-social-proof-${order.orderCode}.png`, { type: "image/png" }) : null;
-    const caption = `📦 *Order Confirmed & Verified!*\nOrder Ref: #${order.orderCode}\nItems: ${order.items
-      .map((i) => `${i.product} × ${i.qty}`)
-      .join(", ")}\n\nOrder farm-fresh poultry at https://dignityagrofarms.com`;
-
-    if (file && navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
-      await navigator.share({ title: "Dignity Agro Farms Order Proof", text: caption, files: [file] });
-      return;
-    }
-    await navigator.clipboard?.writeText(caption);
-    window.open(`https://wa.me/?text=${encodeURIComponent(caption)}`, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-[#0F3D24]/70 p-4" role="dialog" aria-modal="true" aria-label="Thank you flyer">
-      <div className="max-h-[95vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-7">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Official Brand Poster Preview</div>
-            <h3 className="mt-1 text-2xl font-semibold text-[#0F3D24]">Social Proof Order Graphic</h3>
-            <p className="mt-1 text-sm text-[#0F3D24]/60">Customer details are automatically masked with ***** to protect identity.</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close flyer preview" title="Close" className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#F7F5F0] text-[#0F3D24] hover:bg-[#e9e6de]"><X size={17} /></button>
-        </div>
-        <div className="mt-4 flex flex-col items-center justify-center bg-slate-100 p-4 rounded-2xl border border-slate-200">
-          <canvas ref={setCanvas} className="w-full max-w-[420px] aspect-[1067/1280] rounded-2xl bg-white shadow-md border border-slate-300" />
-        </div>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <button type="button" onClick={download} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]"><ImageDown size={16} /> Download High-Res PNG</button>
-          <button type="button" onClick={() => void share()} className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1eb856]"><Share2 size={16} /> Share to WhatsApp</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function FilterBtn({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
   return (

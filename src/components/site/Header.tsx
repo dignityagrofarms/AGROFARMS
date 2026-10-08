@@ -34,7 +34,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40">
-      <div className="bg-[#3F8F3F] px-4 py-2 text-center text-xs sm:text-sm font-medium text-white shadow-inner flex items-center justify-center gap-2 flex-wrap">
+      <div className="bg-[#3F8F3F] px-2 sm:px-4 py-2 text-center text-[11px] sm:text-xs font-medium text-white shadow-inner flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2">
         <span>🎄 <strong>December Pre-Order Sales</strong> are now open!</span>
         <Link to="/order" search={{ mode: "december" }} className="inline-block bg-white/20 hover:bg-white/30 text-white rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold transition">
           Learn More &rarr;
@@ -97,8 +97,8 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="xl:hidden border-t border-white/10 bg-[#0F3D24] px-4 py-3">
-          <nav className="flex flex-col gap-1">
+        <div className="xl:hidden border-t border-white/10 bg-[#0F3D24] px-4 py-3 pb-safe-area transition-all animate-in slide-in-from-top-2">
+          <nav className="flex flex-col gap-1 pb-8 sm:pb-3">
             {nav.map((n) => (
               <Link
                 key={n.to}

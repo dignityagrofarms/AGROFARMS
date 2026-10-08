@@ -72,6 +72,18 @@ export function ActivityImportModal({
     document.body.removeChild(link);
   };
 
+function normalizeActivityType(rawType: string): string {
+  const lower = (rawType || "").toLowerCase().trim();
+  if (lower.includes("mortality") || lower.includes("death") || lower.includes("die")) return "Mortality Record";
+  if (lower.includes("egg") || lower.includes("crate")) return "Egg Collection";
+  if (lower.includes("feed") || lower.includes("mash") || lower.includes("pellet") || lower.includes("starter") || lower.includes("grower") || lower.includes("finisher")) return "Feeding";
+  if (lower.includes("med") || lower.includes("vac") || lower.includes("health") || lower.includes("drug") || lower.includes("vit") || lower.includes("treat")) return "Medication / Vaccination";
+  if (lower.includes("weight") || lower.includes("kg") || lower.includes("weigh")) return "Weight Check";
+  if (lower.includes("clean") || lower.includes("sanitat") || lower.includes("wash") || lower.includes("disinfect")) return "Cleaning & Sanitation";
+  if (lower.includes("pen") || lower.includes("maint") || lower.includes("repair") || lower.includes("house")) return "Pen Maintenance";
+  return "General Activity";
+}
+
   const parseCsvText = (text: string) => {
     setErrorMsg(null);
     const lines = text
@@ -94,7 +106,8 @@ export function ActivityImportModal({
       if (parts.length < 2) continue;
 
       const activityDate = parts[0] || new Date().toISOString().split("T")[0];
-      const activityType = parts[1] || "Daily Activity";
+      const rawType = parts[1] || "General Activity";
+      const activityType = normalizeActivityType(rawType);
       const batchName = parts[2] || "";
       const mortalityCount = parseInt(parts[3]?.replace(/[^0-9]/g, "") || "0", 10) || 0;
       const causeOfMortality = parts[4] || "";
@@ -115,6 +128,7 @@ export function ActivityImportModal({
         notes,
       });
     }
+
 
     if (rows.length === 0) {
       setErrorMsg("Could not parse any valid rows. Please check format.");

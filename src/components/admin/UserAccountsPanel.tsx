@@ -73,22 +73,34 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
   });
 
   const createAccountMut = useMutation({
-    mutationFn: () =>
-      createAccountFn({
-        data: {
-          passcode,
-          targetUsername: newUsername.trim(),
-          targetPasscode: newPassword.trim(),
-          targetRole: newRole,
-        },
-      }),
+    mutationFn: async () => {
+      try {
+        console.log("[UserAccountsPanel] Calling createAccountFn...");
+        const result = await createAccountFn({
+          data: {
+            passcode,
+            targetUsername: newUsername.trim(),
+            targetPasscode: newPassword.trim(),
+            targetRole: newRole,
+          },
+        });
+        console.log("[UserAccountsPanel] createAccountFn success:", result);
+        return result;
+      } catch (err) {
+        console.error("[UserAccountsPanel] createAccountFn thrown error:", err);
+        throw err;
+      }
+    },
     onSuccess: () => {
-      setCreateMsg(`Account "${newUsername.trim()}" created successfully!`);
+      setCreateMsg(`Success: Account "${newUsername.trim()}" created successfully!`);
       setNewUsername("");
       setNewPassword("");
       accountsQuery.refetch();
     },
-    onError: (e: Error) => setCreateMsg("Error: " + e.message),
+    onError: (e: Error) => {
+      console.error("[UserAccountsPanel] Mutation onError:", e);
+      setCreateMsg("Error: " + (e.message || "Unknown error occurred"));
+    },
   });
 
   const resetPasscodeMut = useMutation({
@@ -215,7 +227,11 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
             >
               {createAccountMut.isPending ? "Creating..." : "Create Account"}
             </button>
-            {createMsg && <p className="text-xs font-medium text-[#0F3D24]">{createMsg}</p>}
+            {createMsg && (
+              <div className={`mt-2 p-3 rounded-lg text-xs font-semibold ${createMsg.startsWith("Error:") ? "bg-red-50 text-red-600 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
+                {createMsg}
+              </div>
+            )}
           </div>
 
           {/* Accounts List Table */}

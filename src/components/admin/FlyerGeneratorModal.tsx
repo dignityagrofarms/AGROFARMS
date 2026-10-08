@@ -247,67 +247,8 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
           <div className="space-y-4 text-xs">
             {mode === "social_proof" ? (
               <>
-                {/* 1-Click Order Selection Section */}
-                <div className="bg-[#F7F5F0] p-3.5 rounded-2xl border border-[#0F3D24]/15 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-xs text-[#0F3D24] flex items-center gap-1.5">
-                      <ShoppingBag size={15} className="text-[#3F8F3F]" />
-                      Auto-Fill From Verified Customer Orders
-                    </span>
-                    {availableOrders.length > 0 && (
-                      <span className="text-[10px] bg-[#0F3D24]/10 text-[#0F3D24] font-extrabold px-2 py-0.5 rounded-full">
-                        {availableOrders.length} Orders
-                      </span>
-                    )}
-                  </div>
 
-                  {availableOrders.length > 0 ? (
-                    <div className="space-y-2">
-                      <select
-                        onChange={(e) => {
-                          const found = availableOrders.find((o) => o.orderCode === e.target.value);
-                          if (found) applyOrderToFlyer(found);
-                        }}
-                        value={orderCode}
-                        className="w-full bg-white border border-[#0F3D24]/20 rounded-xl px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
-                      >
-                        <option value="">-- Choose Customer Order to Auto-Fill --</option>
-                        {availableOrders.map((ord) => (
-                          <option key={ord.id} value={ord.orderCode}>
-                            #{ord.orderCode} • {ord.customerName} ({ord.items.map((i) => `${i.product} × ${i.qty}`).join(", ")})
-                          </option>
-                        ))}
-                      </select>
 
-                      {/* Mini Scrollable Order Cards List */}
-                      <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1 divide-y divide-[#0F3D24]/10 border-t border-[#0F3D24]/10 pt-2">
-                        {availableOrders.slice(0, 5).map((ord) => (
-                          <div
-                            key={ord.id}
-                            className="flex items-center justify-between py-1.5 text-xs gap-2 group hover:bg-white/60 p-1 rounded-lg transition"
-                          >
-                            <div className="truncate">
-                              <span className="font-mono font-bold text-[#3F8F3F] text-[11px]">#{ord.orderCode}</span>
-                              <span className="font-semibold text-[#0F3D24] ml-1.5 truncate">{ord.customerName}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => applyOrderToFlyer(ord)}
-                              className="shrink-0 bg-[#0F3D24] hover:bg-[#134a2c] text-white px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 transition"
-                            >
-                              <span>Create Flyer</span>
-                              <ChevronRight size={12} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-[11px] text-[#0F3D24]/70">
-                      You can enter order details manually below, or select from verified store orders.
-                    </p>
-                  )}
-                </div>
 
                 {/* Privacy Masking Toggle */}
                 <div className="flex items-center justify-between bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200/80 shadow-sm">

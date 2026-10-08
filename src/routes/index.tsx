@@ -82,11 +82,11 @@ const featured = [
               <p className="mt-6 max-w-xl text-lg text-white/90 drop-shadow-md animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300 fill-mode-both">
                 Healthy live broilers sold by the kilogram at farm price, farm-fresh eggs, and quick home delivery, straight from Dignity Agro Farms to your kitchen.
               </p>
-              <div className="mt-8 flex flex-wrap gap-3 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 fill-mode-both">
-                <Link to="/order" className="inline-flex items-center rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(63,143,63,0.4)] transition-all hover:bg-[#4ea94e] hover:shadow-[0_0_25px_rgba(63,143,63,0.6)] hover:-translate-y-0.5">
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-500 fill-mode-both">
+                <Link to="/order" className="w-full sm:w-auto justify-center inline-flex items-center rounded-full bg-[#3F8F3F] px-6 py-3 text-sm font-semibold text-white shadow-[0_0_20px_rgba(63,143,63,0.4)] transition-all hover:bg-[#4ea94e] hover:shadow-[0_0_25px_rgba(63,143,63,0.6)] hover:-translate-y-0.5">
                   Order Now
                 </Link>
-                <a href="tel:+2348167099492" className="inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition-all hover:bg-white/15 hover:-translate-y-0.5">
+                <a href="tel:+2348167099492" className="w-full sm:w-auto justify-center inline-flex items-center gap-2 rounded-full border border-white/40 bg-white/5 px-6 py-3 text-sm font-semibold text-white backdrop-blur transition-all hover:bg-white/15 hover:-translate-y-0.5">
                   <PhoneCall size={16} /> Call 081 6709 9492
                 </a>
               </div>
@@ -169,7 +169,7 @@ const featured = [
                           <button
                             key={s}
                             onClick={() => setSelected((prev) => ({ ...prev, [p.id]: s }))}
-                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                            className={`rounded-full px-4 py-2 text-xs font-semibold transition min-h-[44px] ${
                               active
                                 ? "bg-[#3F8F3F] text-white shadow"
                                 : "border border-[#0F3D24]/15 bg-white text-[#0F3D24] hover:border-[#3F8F3F] hover:text-[#3F8F3F]"
@@ -184,7 +184,7 @@ const featured = [
 
                   <Link
                     to="/order"
-                    className="mt-6 inline-flex items-center justify-center rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c]"
+                    className="mt-6 inline-flex items-center justify-center rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c] min-h-[44px]"
                   >
                     {chosen ? `Order · ${chosen}` : "Enquire / Order"} →
                   </Link>
