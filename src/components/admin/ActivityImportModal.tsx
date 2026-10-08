@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { X, Upload, FileSpreadsheet, Download, CheckCircle2, AlertCircle, Copy, Check } from "lucide-react";
+import * as XLSX from "xlsx";
 import { adminImportActivities, type FarmBatch } from "@/lib/farm.functions";
 
 interface ActivityImportModalProps {
@@ -141,14 +142,79 @@ function normalizeActivityType(rawType: string): string {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setErrorMsg(null);
+
+    const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setRawText(content);
-      parseCsvText(content);
+      try {
+        const buffer = event.target?.result;
+        const wb = XLSX.read(buffer, { type: isExcel ? "array" : "binary" });
+        const firstSheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[firstSheetName];
+        
+        // Convert sheet to JSON objects with default empty strings
+        const rawJson: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+        if (!rawJson || rawJson.length === 0) {
+          setErrorMsg("Uploaded spreadsheet is empty. Please check the file.");
+          return;
+        }
+
+        const rows: ParsedActivityRow[] = rawJson.map((r) => {
+          // Normalize header key lookup
+          const getVal = (...keys: string[]) => {
+            for (const key of Object.keys(r)) {
+              const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+              if (keys.some((k) => cleanKey.includes(k.toLowerCase().replace(/[^a-z0-9]/g, "")))) {
+                return String(r[key]).trim();
+              }
+            }
+            return "";
+          };
+
+          const activityDate = getVal("date", "activitydate") || new Date().toISOString().split("T")[0];
+          const rawType = getVal("type", "activitytype") || "General Activity";
+          const activityType = normalizeActivityType(rawType);
+          const batchName = getVal("batch", "batchname") || "";
+          const mortalityCount = parseInt(getVal("mortality", "mortalitycount").replace(/[^0-9]/g, "") || "0", 10) || 0;
+          const feedConsumedKg = parseFloat(getVal("feed", "feedconsumedkg").replace(/[^0-9.]/g, "") || "0") || 0;
+          const eggsCollected = parseInt(getVal("eggs", "eggscollected").replace(/[^0-9]/g, "") || "0", 10) || 0;
+          const medicationGiven = getVal("medication", "medicationgiven");
+          const causeOfMortality = getVal("cause", "causeofmortality");
+          const notes = getVal("notes", "remark", "comment");
+
+          return {
+            activityDate,
+            activityType,
+            batchName,
+            mortalityCount,
+            causeOfMortality,
+            feedConsumedKg,
+            eggsCollected,
+            medicationGiven,
+            notes,
+          };
+        });
+
+        if (rows.length === 0) {
+          setErrorMsg("Could not parse any valid rows. Please check file layout.");
+          return;
+        }
+
+        setParsedRows(rows);
+        setRawText(`File loaded: ${file.name} (${rows.length} valid rows found)`);
+      } catch (err: any) {
+        setErrorMsg("Failed to parse file. Please ensure it is a valid CSV or Excel (.xlsx) file.");
+      }
     };
-    reader.readAsText(file);
+
+    if (isExcel) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
   };
 
   const handleImportSubmit = async () => {

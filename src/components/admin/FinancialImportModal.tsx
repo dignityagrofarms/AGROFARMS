@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { X, Upload, FileSpreadsheet, Download, CheckCircle2, AlertCircle, Copy, Check } from "lucide-react";
+import * as XLSX from "xlsx";
 import { adminImportFinancialsWithAutoMatch, type FarmBatch } from "@/lib/farm.functions";
 
 interface FinancialImportModalProps {
@@ -142,13 +143,79 @@ export function FinancialImportModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setErrorMsg(null);
+
+    const isExcel = file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+
     const reader = new FileReader();
     reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setRawText(text);
-      parseCsvText(text);
+      try {
+        const buffer = event.target?.result;
+        const wb = XLSX.read(buffer, { type: isExcel ? "array" : "binary" });
+        const firstSheetName = wb.SheetNames[0];
+        const ws = wb.Sheets[firstSheetName];
+        
+        const rawJson: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+        if (!rawJson || rawJson.length === 0) {
+          setErrorMsg("Uploaded spreadsheet is empty.");
+          return;
+        }
+
+        const rows: ParsedFinancialRow[] = rawJson.map((r) => {
+          const getVal = (...keys: string[]) => {
+            for (const key of Object.keys(r)) {
+              const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+              if (keys.some((k) => cleanKey.includes(k.toLowerCase().replace(/[^a-z0-9]/g, "")))) {
+                return String(r[key]).trim();
+              }
+            }
+            return "";
+          };
+
+          const rawType = getVal("type", "kind", "transactiontype").toLowerCase();
+          const category = getVal("category", "item", "classification") || "General";
+          const amount = parseFloat(getVal("amount", "total", "price", "cost").replace(/[^0-9.]/g, "") || "0") || 0;
+          const description = getVal("description", "notes", "detail", "desc") || `${category} transaction`;
+          const paymentMethod = getVal("paymentmethod", "method", "paymethod") || "Bank Transfer";
+          const transactionDate = getVal("date", "transactiondate") || new Date().toISOString().split("T")[0];
+          const customerName = getVal("customername", "name", "client") || undefined;
+          const customerPhone = getVal("customerphone", "phone", "contact") || undefined;
+
+          let typeVal: "income" | "expense" = "expense";
+          if (rawType.includes("income") || rawType.includes("sale") || category.toLowerCase().includes("sale") || category.toLowerCase().includes("income")) {
+            typeVal = "income";
+          }
+
+          return {
+            type: typeVal,
+            category,
+            amount,
+            description,
+            paymentMethod,
+            transactionDate,
+            customerName,
+            customerPhone,
+          };
+        }).filter((r) => r.amount > 0);
+
+        if (rows.length === 0) {
+          setErrorMsg("Could not parse valid transaction rows. Please check file layout.");
+          return;
+        }
+
+        setParsedRows(rows);
+        setRawText(`File loaded: ${file.name} (${rows.length} valid rows found)`);
+      } catch (err: any) {
+        setErrorMsg("Failed to parse file. Please ensure it is a valid CSV or Excel (.xlsx) file.");
+      }
     };
-    reader.readAsText(file);
+
+    if (isExcel) {
+      reader.readAsArrayBuffer(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
   };
 
   const handleExecuteImport = async () => {

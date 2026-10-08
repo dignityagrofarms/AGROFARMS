@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
@@ -20,6 +20,10 @@ import { PendingApprovalsPanel } from "@/components/admin/PendingApprovalsPanel"
 import { PasswordRecoveryModal } from "@/components/admin/PasswordRecoveryModal";
 import { FlyerGeneratorModal, type FlyerOrderData } from "@/components/admin/FlyerGeneratorModal";
 import { drawSocialProofFlyerCanvas } from "@/lib/flyer-generator";
+import { StaffTasksPanel } from "@/components/admin/StaffTasksPanel";
+import { PendingTasksModal } from "@/components/admin/PendingTasksModal";
+import { UnprocessedOrdersBanner } from "@/components/admin/UnprocessedOrdersBanner";
+import { ComplaintsDashboardPanel } from "@/components/admin/ComplaintsDashboardPanel";
 
 function playNewOrderChime() {
   try {
@@ -237,8 +241,10 @@ function AdminOrders() {
   const [showFlyerModal, setShowFlyerModal] = useState(false);
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+  
+  const currentUsername = passcode ? (parseAdminCredential(passcode).username || "owner") : "owner";
   
   // Real-time Order Alerts & SMS Target state
   const [orderSmsTarget, setOrderSmsTarget] = useState<AdminOrder | null>(null);
@@ -488,32 +494,15 @@ function AdminOrders() {
           );
           if (unprocessedOrders.length === 0) return null;
           return (
-            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-amber-500/15 p-4 text-[#0F3D24] ring-2 ring-amber-500/40 animate-pulse">
-              <div className="flex items-center gap-3">
-                <div className="rounded-xl bg-amber-500 p-2 text-white shadow-md">
-                  <Bell size={20} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-sm">
-                    ⚠️ ATTENTION: {unprocessedOrders.length} New Unprocessed Order(s) Awaiting Review!
-                  </h4>
-                  <p className="text-xs text-[#0F3D24]/80">
-                    Latest order from <span className="font-bold">{unprocessedOrders[0].customerName}</span> ({unprocessedOrders[0].orderCode}) - ₦{unprocessedOrders[0].total.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setActiveTab("orders");
-                  setFilter("all");
-                  setStatusFilter("");
-                  setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
-                }}
-                className="rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white hover:bg-[#134a2c] transition shadow-sm"
-              >
-                View New Orders Now
-              </button>
-            </div>
+            <UnprocessedOrdersBanner
+              unprocessedOrders={unprocessedOrders}
+              onViewOrders={() => {
+                setActiveTab("orders");
+                setFilter("all");
+                setStatusFilter("");
+                setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+              }}
+            />
           );
         })()}
         {passcode && (
@@ -544,6 +533,8 @@ function AdminOrders() {
               <AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab>
               <AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab>
               <AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<Gift size={15} />}>December Pre-Orders</AdminTab>
+              <AdminTab active={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} icon={<CheckCircle2 size={15} />}>Staff Tasks</AdminTab>
+              <AdminTab active={activeTab === "complaints"} onClick={() => setActiveTab("complaints")} icon={<ShieldAlert size={15} />}>Customer Complaints</AdminTab>
             </div>
           </div>
         )}
@@ -718,6 +709,10 @@ function AdminOrders() {
                       </div>
                     </div>
                   </div>
+                ) : activeTab === "tasks" ? (
+                  <StaffTasksPanel passcode={passcode!} role={query.data.role} username={currentUsername} />
+                ) : activeTab === "complaints" ? (
+                  <ComplaintsDashboardPanel passcode={passcode!} />
                 ) : null}
               </>
             );
@@ -830,6 +825,11 @@ function AdminOrders() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Staff Pending Tasks Notification on load */}
+      {query.data?.role !== "owner" && currentUsername && passcode && (
+        <PendingTasksModal passcode={passcode} username={currentUsername} />
       )}
     </SiteLayout>
   );

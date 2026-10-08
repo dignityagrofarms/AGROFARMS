@@ -2,11 +2,12 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { PackageSearch, CheckCircle2, Truck, Home, Clock, XCircle, RefreshCw, CreditCard, AlertTriangle, FileText, Ban, CalendarClock, Leaf } from "lucide-react";
+import { PackageSearch, CheckCircle2, Truck, Home, Clock, XCircle, RefreshCw, CreditCard, AlertTriangle, FileText, Ban, CalendarClock, Leaf, ShieldAlert } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/site/Layout";
 import { trackUnified, cancelOrderByCustomer, recoverCodesByPhone, type TrackedOrder, type TrackedPreorder } from "@/lib/orders.functions";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
+import { ComplaintModal } from "@/components/site/ComplaintModal";
 
 export const Route = createFileRoute("/track-order")({
   head: () => ({
@@ -37,6 +38,7 @@ function stageIndex(status: TrackedOrder["status"]) {
 function TrackOrder() {
   const [codeInput, setCodeInput] = useState("");
   const [activeCode, setActiveCode] = useState<string | null>(null);
+  const [isComplaintOpen, setIsComplaintOpen] = useState(false);
   const trackFn = useServerFn(trackUnified);
 
   const query = useQuery({
@@ -49,6 +51,7 @@ function TrackOrder() {
   });
 
   const [phoneMode, setPhoneMode] = useState(false);
+  const [complaintModalMode, setComplaintModalMode] = useState<"submit" | "track">("submit");
   const recoverFn = useServerFn(recoverCodesByPhone);
   const phoneMutation = useMutation({
     mutationFn: (p: string) => recoverFn({ data: { phone: p } }),
@@ -58,6 +61,13 @@ function TrackOrder() {
     e.preventDefault();
     const p = codeInput.trim().toUpperCase();
     if (!p) return;
+
+    if (p.startsWith("CMP-")) {
+      setComplaintModalMode("track");
+      setIsComplaintOpen(true);
+      return;
+    }
+
     // If it looks like a phone number (digits only, or starts with 0/+), do phone lookup
     const isPhone = /^[0-9+\s]{7,}$/.test(codeInput.trim());
     if (isPhone) {
@@ -272,7 +282,14 @@ function TrackOrder() {
                       <CancelBox order={order} onDone={() => query.refetch()} />
                     )}
 
-                    <div className="mt-4 flex justify-end border-t border-[#0F3D24]/10 pt-4 gap-3">
+                    <div className="mt-4 flex flex-wrap justify-end border-t border-[#0F3D24]/10 pt-4 gap-3">
+                      <button
+                        onClick={() => setIsComplaintOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-500/30 px-4 py-2.5 text-sm font-semibold text-amber-950 hover:bg-amber-500/30 transition"
+                      >
+                        <ShieldAlert size={16} /> Report an Issue / Complaint
+                      </button>
+
                       <Link
                         to="/receipt/$orderCode"
                         params={{ orderCode: order.orderCode }}
@@ -295,6 +312,13 @@ function TrackOrder() {
           </p>
         </div>
       </section>
+
+      <ComplaintModal
+        isOpen={isComplaintOpen}
+        onClose={() => setIsComplaintOpen(false)}
+        defaultOrderCode={activeCode || ""}
+        initialMode={complaintModalMode}
+      />
     </SiteLayout>
   );
 }

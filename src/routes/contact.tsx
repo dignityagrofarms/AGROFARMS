@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Phone, Mail, MapPin, Clock, Instagram, Facebook, CheckCircle2, ShoppingCart, MessageCircle } from "lucide-react";
+import { Phone, Mail, MapPin, Clock, Instagram, Facebook, CheckCircle2, ShoppingCart, MessageCircle, ShieldAlert } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
+import { ComplaintModal } from "@/components/site/ComplaintModal";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/contact")({
 
 function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [isComplaintOpen, setIsComplaintOpen] = useState(false);
   const [form, setForm] = useState({ name: "", phone: "", email: "", topic: "General enquiry", message: "" });
 
   const onSubmit = (e: React.FormEvent) => {
@@ -42,7 +44,7 @@ function ContactPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 pt-10 sm:px-6 lg:px-8 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-[#3F8F3F] p-6 text-white shadow-sm">
           <div>
             <p className="text-lg font-semibold">Want to buy chicken or eggs?</p>
@@ -51,6 +53,25 @@ function ContactPage() {
           <Link to="/order" className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#0F3D24] hover:bg-[#F7F5F0]">
             <ShoppingCart size={16} /> Place your order
           </Link>
+        </div>
+
+        {/* Customer Complaint / Issue Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-amber-500/15 p-6 text-amber-950 ring-1 ring-amber-500/30 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-amber-500 p-3 text-white shadow-sm">
+              <ShieldAlert size={24} />
+            </div>
+            <div>
+              <p className="text-base font-bold text-amber-950">Have a complaint or issue with your order?</p>
+              <p className="text-xs text-amber-900/80">Log your complaint directly to our management team for fast resolution & WhatsApp follow-up.</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIsComplaintOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full bg-amber-600 px-6 py-3 text-sm font-bold text-white hover:bg-amber-700 transition shadow-sm"
+          >
+            <ShieldAlert size={16} /> Log a Complaint Now
+          </button>
         </div>
       </section>
 
@@ -131,6 +152,8 @@ function ContactPage() {
           />
         </div>
       </section>
+
+      <ComplaintModal isOpen={isComplaintOpen} onClose={() => setIsComplaintOpen(false)} />
     </SiteLayout>
   );
 }
