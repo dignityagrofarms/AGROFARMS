@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Christmas Flyer Preview</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['"Playfair Display"', 'serif'],
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        green: {
+                            900: '#143b23',
+                            800: '#1b4f30',
+                        },
+                        gold: {
+                            500: '#d4af37',
+                            400: '#e5c158',
+                            300: '#f5db89',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gold-gradient {
+            background: linear-gradient(135deg, #f5db89 0%, #d4af37 50%, #b38b22 100%);
+        }
+        .gold-text-gradient {
+            background: linear-gradient(135deg, #d4af37 0%, #b38b22 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .pattern-bg {
+            background-color: #fdfbf7;
+            background-image: radial-gradient(#d4af37 0.5px, transparent 0.5px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gray-200 p-8">
+    
+    <!-- Flyer Container (Instagram Portrait Ratio approx 4:5 or standard flyer) -->
+    <div class="relative w-[800px] h-[1000px] pattern-bg overflow-hidden shadow-2xl rounded-sm">
+        
+        <!-- Corner Decorations (Pine branches & Baubles placeholder) -->
+        <div class="absolute top-0 left-0 w-48 h-48 bg-gradient-to-br from-green-900/20 to-transparent rounded-br-full blur-2xl"></div>
+        <div class="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-green-900/20 to-transparent rounded-bl-full blur-2xl"></div>
+        <div class="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-green-900/20 to-transparent rounded-tr-full blur-2xl"></div>
+        <div class="absolute bottom-0 right-0 w-48 h-48 bg-gradient-to-tl from-green-900/20 to-transparent rounded-tl-full blur-2xl"></div>
+        
+        <div class="absolute top-4 right-8 text-[80px]">🎄</div>
+        <div class="absolute bottom-4 left-4 text-[80px]">🎄</div>
+
+        <!-- Inner Padding -->
+        <div class="p-16 h-full flex flex-col relative z-10">
+            
+            <!-- Header Section -->
+            <div class="flex justify-between items-start">
+                <!-- Logo & Brand Name -->
+                <div class="flex gap-6 items-center">
+                    <div class="w-28 h-28 rounded-full bg-green-900 ring-4 ring-gold-400 flex items-center justify-center shadow-lg">
+                        <span class="text-white font-display font-bold text-xl">Dignity</span>
+                    </div>
+                    <div>
+                        <h1 class="text-green-900 font-display font-bold text-4xl leading-tight uppercase">Dignity Agro<br/>Farms</h1>
+                        <p class="text-green-900 text-lg font-medium mt-2 tracking-wide">QUALITY POULTRY & FARM</p>
+                        <p class="text-green-900 text-lg font-medium tracking-wide">PRODUCE</p>
+                    </div>
+                </div>
+                <!-- Official Deal Badge -->
+                <div class="gold-gradient px-6 py-2 rounded-full shadow-lg shadow-gold-500/30">
+                    <span class="text-green-900 font-bold tracking-wider">OFFICIAL DEAL</span>
+                </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="w-full h-[1px] bg-gold-400/50 mt-12 mb-10"></div>
+
+            <!-- Mid Section -->
+            <div class="flex flex-col gap-4">
+                <!-- Lock In Badge -->
+                <div class="bg-green-900 border-2 border-gold-400 rounded-full px-6 py-2 w-max shadow-md">
+                    <span class="text-gold-400 font-bold tracking-wider text-sm">LOCK IN YOUR PRICE NOW</span>
+                </div>
+
+                <!-- Main Title -->
+                <h2 class="text-green-900 font-display font-bold text-6xl leading-[1.1] mt-2">
+                    <span class="text-[50px]">🎄</span> Christmas & Holiday<br/>Poultry Special <span class="text-gold-400 text-4xl">✨</span>
+                </h2>
+                <p class="text-green-900 text-2xl font-medium mt-2">Reserve Your Farm-Fresh Broilers & Eggs Early</p>
+            </div>
+
+            <!-- Main Offer Card -->
+            <div class="mt-12 bg-white rounded-3xl border-[3px] border-gold-400 p-8 flex justify-between items-center shadow-xl shadow-gold-500/10 relative overflow-hidden">
+                <div class="z-10">
+                    <p class="text-gold-500 font-bold tracking-widest text-sm uppercase">Featured Holiday Deal</p>
+                    <h3 class="text-green-900 font-bold text-3xl mt-2">Jumbo Dressed Broiler Chicken</h3>
+                    <div class="mt-4 flex items-baseline gap-2">
+                        <span class="gold-text-gradient font-bold text-7xl">₦6,000</span>
+                        <span class="gold-text-gradient font-bold text-3xl">/ per bird</span>
+                    </div>
+                </div>
+                <div class="w-64 h-64 bg-red-50 rounded-full flex items-center justify-center relative z-10 border-4 border-white shadow-inner text-[100px]">
+                    🍗
+                </div>
+                <!-- Card background accent -->
+                <div class="absolute right-0 top-0 w-1/2 h-full bg-gradient-to-l from-gold-50/50 to-transparent z-0"></div>
+            </div>
+
+            <!-- Footer / Contact Info -->
+            <div class="mt-auto border-t-[1px] border-gold-400/50 pt-8 flex justify-between items-center text-green-900">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">📲</span>
+                    <div>
+                        <p class="font-medium text-lg">Call / WhatsApp:</p>
+                        <p class="font-bold text-2xl">08167099492</p>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 font-medium text-lg">
+                    <div class="flex items-center gap-2">
+                        <span>🌐</span>
+                        <span>dignityagrofarms.com</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span>📸</span>
+                        <span>@dignityagrofarms</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 font-medium text-lg">
+                    <span class="text-gold-500">📍</span>
+                    <span>Owerri, Imo State</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

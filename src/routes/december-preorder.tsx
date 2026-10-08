@@ -26,11 +26,11 @@ function FlyerLandingPage() {
     <SiteLayout>
       <div className="bg-white min-h-[calc(100vh-80px)] py-12">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6 lg:px-8">
-          
+
           <div className="relative mx-auto overflow-hidden rounded-3xl shadow-2xl ring-4 ring-[#3F8F3F]/30 bg-[#3F8F3F]/10 max-w-lg mb-8">
-            <img 
-              src="/assets/december-flyer.png" 
-              alt="December Pre-order Flyer" 
+            <img
+              src="/assets/december-flyer.png"
+              alt="December Pre-order Flyer"
               fetchPriority="high"
               loading="eager"
               className="block w-full h-auto"
@@ -50,14 +50,14 @@ function FlyerLandingPage() {
 
           <h1 className="mb-4 text-3xl font-bold text-[#0F3D24] sm:text-4xl font-display">You Can Preorder Your Christmas Chicken Now</h1>
           <p className="mb-8 text-lg text-[#0F3D24]/80">Pay small small, secure your slots, and enjoy free delivery within Owerri Municipal.</p>
-          
-          <button 
-            onClick={() => navigate({ to: "/order", search: { mode: "december" } })} 
+
+          <button
+            onClick={() => navigate({ to: "/order", search: { mode: "december" } })}
             className="inline-flex items-center justify-center gap-3 rounded-full bg-red-600 px-8 py-5 text-lg font-bold uppercase tracking-widest text-white shadow-lg transition hover:bg-red-500 hover:shadow-red-500/25 hover:-translate-y-1"
           >
             Order Now <ArrowRight size={24} />
           </button>
-          
+
           <p className="mt-6 text-sm text-[#0F3D24]/60">By clicking Order Now, you will be redirected to the main order page.</p>
           <p className="mt-2 text-xs text-[#0F3D24]/60">
             By proceeding, you agree to our <Link to="/order-policy" className="font-semibold underline hover:text-[#3F8F3F]">Order Policy</Link>.

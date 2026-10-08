@@ -399,70 +399,201 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
                 <canvas ref={canvasRef} className="w-full h-full object-contain block" />
               </div>
             ) : (
-              /* UPGRADED WHITE LUXURY HOLIDAY PROMO FLYER DESIGN */
+              /* LUXURY CHRISTMAS PROMO FLYER DESIGN (MATCHES IMAGE 2) */
               <div
                 ref={promoRef}
-                className="w-full max-w-[290px] sm:max-w-[340px] aspect-[4/5] bg-white border-4 border-[#0F3D24]/20 rounded-3xl p-5 sm:p-6 text-[#0F3D24] shadow-2xl flex flex-col justify-between relative overflow-hidden ring-4 ring-amber-400/40"
+                className="w-full max-w-[320px] sm:max-w-[370px] aspect-[4/5] bg-[#FAF8F3] border-[3px] border-[#D4AF37] rounded-3xl p-4 sm:p-5 text-[#0F3D24] shadow-2xl flex flex-col justify-between relative overflow-hidden ring-4 ring-[#D4AF37]/20"
+                style={{
+                  backgroundImage: "radial-gradient(#D4AF37 0.5px, transparent 0.5px)",
+                  backgroundSize: "18px 18px",
+                }}
               >
-                {/* Decorative Festive Top Bar */}
-                <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-400 via-[#3F8F3F] to-amber-500" />
+                {/* SVG Corner Decorations: Pine Branches, Holly Berries & Hanging Gold Baubles */}
+                <svg className="absolute inset-0 w-full h-full pointer-events-none z-0 overflow-visible">
+                  <defs>
+                    <radialGradient id="goldSphere1" cx="35%" cy="35%" r="65%">
+                      <stop offset="0%" stopColor="#FFF4B8" />
+                      <stop offset="35%" stopColor="#F3D278" />
+                      <stop offset="70%" stopColor="#D4AF37" />
+                      <stop offset="100%" stopColor="#876611" />
+                    </radialGradient>
+                    <radialGradient id="goldSphere2" cx="35%" cy="35%" r="65%">
+                      <stop offset="0%" stopColor="#FFF8D6" />
+                      <stop offset="40%" stopColor="#E5C158" />
+                      <stop offset="80%" stopColor="#B38B22" />
+                      <stop offset="100%" stopColor="#664D0A" />
+                    </radialGradient>
+                    <filter id="goldGlow" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+                  </defs>
 
-                {/* Header: Logo, Title, Official Badge */}
-                <div className="flex items-center justify-between border-b border-[#0F3D24]/15 pb-3 relative z-10">
-                  <div className="flex items-center gap-2.5">
-                    <img
-                      src={logo}
-                      alt="Dignity Agro Farms"
-                      className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover ring-2 ring-[#0F3D24] shadow-sm shrink-0"
-                    />
+                  {/* Top-Left Pine Foliage & Red Holly Berries */}
+                  <g transform="translate(-10, -10)">
+                    <path d="M0,0 Q30,10 60,40 Q30,50 0,60 Z" fill="#143B23" opacity="0.85" />
+                    <path d="M10,-5 Q50,20 80,25 Q40,45 10,40 Z" fill="#1B4F30" opacity="0.9" />
+                    <path d="M-5,15 Q35,35 50,75 Q20,60 -5,45 Z" fill="#0F3D24" opacity="0.85" />
+                    {/* Red Holly Berries */}
+                    <circle cx="45" cy="35" r="4.5" fill="#D32F2F" />
+                    <circle cx="53" cy="30" r="4" fill="#B71C1C" />
+                    <circle cx="48" cy="42" r="4" fill="#E53935" />
+                    <circle cx="46" cy="34" r="1.5" fill="#FFEBEE" opacity="0.8" />
+                  </g>
+
+                  {/* Top-Right Pine Foliage & 2 Hanging Golden Xmas Ornament Baubles */}
+                  <g transform="translate(100%, 0) scale(-1, 1)" style={{ transformOrigin: "top right" }}>
+                    <path d="M-10,-10 Q30,10 70,35 Q40,55 -10,70 Z" fill="#143B23" opacity="0.85" />
+                    <path d="M0,5 Q50,25 90,30 Q40,60 0,45 Z" fill="#1B4F30" opacity="0.9" />
+                    {/* Red Holly Berries */}
+                    <circle cx="50" cy="30" r="4.5" fill="#D32F2F" />
+                    <circle cx="58" cy="25" r="4" fill="#B71C1C" />
+                  </g>
+
+                  {/* Top-Right Hanging Gold Baubles (rendered rightwards correctly) */}
+                  <g className="absolute top-0 right-0">
+                    {/* Bauble 1 (Larger, Left) */}
+                    <line x1="82%" y1="0" x2="82%" y2="48" stroke="#D4AF37" strokeWidth="1.2" />
+                    <rect x="80.5%" y="46" width="3%" height="4" fill="#B38B22" rx="1" />
+                    <circle cx="82%" cy="64" r="16" fill="url(#goldSphere1)" filter="url(#goldGlow)" />
+                    {/* Bauble 2 (Smaller, Right, Suspended lower) */}
+                    <line x1="93%" y1="0" x2="93%" y2="85" stroke="#D4AF37" strokeWidth="1" />
+                    <rect x="91.8%" y="83" width="2.4%" height="3.5" fill="#B38B22" rx="1" />
+                    <circle cx="93%" cy="98" r="12" fill="url(#goldSphere2)" filter="url(#goldGlow)" />
+                  </g>
+
+                  {/* Bottom-Left Pine Branch */}
+                  <g transform="translate(0, 100%) scale(1, -1)" style={{ transformOrigin: "bottom left" }}>
+                    <path d="M-10,-10 Q30,15 65,45 Q25,60 -10,65 Z" fill="#143B23" opacity="0.85" />
+                    <circle cx="45" cy="35" r="4" fill="#D32F2F" />
+                    <circle cx="52" cy="30" r="3.5" fill="#B71C1C" />
+                  </g>
+
+                  {/* Bottom-Right Pine Branch */}
+                  <g transform="translate(100%, 100%) scale(-1, -1)" style={{ transformOrigin: "bottom right" }}>
+                    <path d="M-10,-10 Q30,15 65,45 Q25,60 -10,65 Z" fill="#143B23" opacity="0.85" />
+                    <circle cx="45" cy="35" r="4" fill="#D32F2F" />
+                    <circle cx="52" cy="30" r="3.5" fill="#B71C1C" />
+                  </g>
+
+                  {/* Floating Gold Sparkle Stars */}
+                  <g fill="#D4AF37">
+                    <path d="M120,40 L122,46 L128,48 L122,50 L120,56 L118,50 L112,48 L118,46 Z" opacity="0.7" />
+                    <path d="M220,90 L221.5,95 L226.5,96.5 L221.5,98 L220,103 L218.5,98 L213.5,96.5 L218.5,95 Z" opacity="0.8" />
+                    <path d="M60,190 L61.5,195 L66.5,196.5 L61.5,198 L60,203 L58.5,198 L53.5,196.5 L58.5,195 Z" opacity="0.6" />
+                    <path d="M270,220 L271.5,225 L276.5,226.5 L271.5,228 L270,233 L268.5,228 L263.5,226.5 L268.5,225 Z" opacity="0.75" />
+                  </g>
+                </svg>
+
+                {/* Header: Logo, Title & Official Deal Badge */}
+                <div className="flex items-center justify-between relative z-10 pt-1 pb-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3">
+                    <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-full bg-[#0F3D24] p-0.5 border-2 border-[#D4AF37] ring-2 ring-[#F5DB89]/80 shadow-md flex items-center justify-center shrink-0">
+                      <img
+                        src={logo}
+                        alt="Dignity Agro Farms"
+                        className="h-full w-full rounded-full object-cover"
+                      />
+                    </div>
                     <div>
-                      <h4 className="font-black text-xs sm:text-sm tracking-tight leading-none text-[#0F3D24]">
-                        DIGNITY AGRO FARMS
+                      <h4 className="font-serif font-black text-xs sm:text-sm tracking-tight text-[#0F3D24] uppercase leading-tight">
+                        DIGNITY AGRO<br />FARMS
                       </h4>
-                      <span className="text-[8px] sm:text-[9px] text-[#3F8F3F] font-black uppercase tracking-wider">
+                      <span className="text-[7.5px] sm:text-[8.5px] text-[#1B4F30] font-extrabold uppercase tracking-wider block mt-0.5">
                         QUALITY POULTRY & FARM PRODUCE
                       </span>
                     </div>
                   </div>
-                  <span className="text-[8px] sm:text-[9px] font-black uppercase bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full shadow-xs shrink-0 border border-amber-500/30">
+                  <span className="text-[8px] sm:text-[9.5px] font-black uppercase bg-gradient-to-r from-[#F5DB89] via-[#D4AF37] to-[#B38B22] text-[#0F3D24] px-2.5 py-1 rounded-full shadow-md border border-[#FFF5D1] tracking-wider shrink-0">
                     OFFICIAL DEAL
                   </span>
                 </div>
 
-                {/* Middle Body */}
-                <div className="my-auto py-3 space-y-2.5 relative z-10">
-                  <div className="inline-block rounded-full bg-[#0F3D24] px-3 py-1 text-[9px] sm:text-[10px] font-black text-amber-300 shadow-sm">
+                {/* Gold Horizontal Line Divider */}
+                <div className="w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent my-1.5 relative z-10" />
+
+                {/* Middle Content */}
+                <div className="my-auto py-1 space-y-2 relative z-10">
+                  <div className="inline-block rounded-full bg-[#0F3D24] border-2 border-[#D4AF37] px-3 py-1 text-[8.5px] sm:text-[9.5px] font-extrabold text-[#F5DB89] tracking-wider shadow-sm">
                     {badgeText}
                   </div>
-                  
-                  <h2 className="text-lg sm:text-xl font-black leading-tight text-[#0F3D24] drop-shadow-xs">
-                    {promoTitle}
+
+                  <h2 className="text-base sm:text-xl font-serif font-black leading-tight text-[#0F3D24] drop-shadow-xs">
+                    🎄 {promoTitle.replace(/^🎄\s*/, "")} ✨
                   </h2>
-                  <p className="text-xs text-slate-700 font-semibold leading-snug">{promoSubtitle}</p>
-                  
-                  {/* Featured Deal White/Gold Card */}
-                  <div className="rounded-2xl bg-gradient-to-br from-amber-50/90 to-emerald-50/80 border-2 border-amber-400/80 p-3.5 shadow-sm space-y-0.5">
-                    <span className="text-[9px] text-[#0F3D24]/80 block uppercase font-black tracking-wider">
-                      FEATURED HOLIDAY DEAL
-                    </span>
-                    <div className="font-black text-xs sm:text-sm text-[#0F3D24]">{productName}</div>
-                    <div className="text-base sm:text-lg font-black text-amber-600">{promoPrice}</div>
+                  <p className="text-[11px] sm:text-xs text-[#143B23] font-semibold leading-snug">{promoSubtitle}</p>
+
+                  {/* Featured Holiday Deal Luxury Card (With Dressed Chicken & Egg Graphic) */}
+                  <div className="rounded-2xl bg-gradient-to-r from-white via-[#FFFDF8] to-[#FFF9ED] border-2 border-[#D4AF37] p-3 sm:p-3.5 shadow-xl shadow-amber-500/10 flex items-center justify-between relative overflow-hidden">
+                    <div className="z-10 max-w-[62%]">
+                      <span className="text-[8px] sm:text-[9px] text-[#B38B22] block uppercase font-black tracking-widest">
+                        FEATURED HOLIDAY DEAL
+                      </span>
+                      <div className="font-extrabold text-xs sm:text-sm text-[#0F3D24] leading-snug mt-0.5">
+                        {productName}
+                      </div>
+                      <div className="text-sm sm:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#D4AF37] via-[#E67E22] to-[#B38B22] mt-1 font-mono">
+                        {promoPrice}
+                      </div>
+                    </div>
+
+                    {/* Right Graphic: Whole Dressed Chicken & Basket of Eggs */}
+                    <div className="relative z-10 w-20 h-20 sm:w-24 sm:h-24 shrink-0 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-br from-amber-100 to-amber-200/50 border-2 border-[#D4AF37]/60 shadow-inner" />
+                      <img
+                        src="/assets/dressed-chicken.jpg"
+                        alt="Dressed Chicken & Eggs"
+                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover relative z-10 border border-white shadow-md"
+                        onError={(e) => {
+                          // Fallback icon visual if image fails
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                        }}
+                      />
+                      {/* Festive Holly & Egg Basket Accent Overlay */}
+                      <span className="absolute -bottom-1 -right-1 text-base sm:text-lg z-20 drop-shadow-md">
+                        🧺🥚
+                      </span>
+                      <span className="absolute -top-1 -left-1 text-xs sm:text-sm z-20 drop-shadow-md">
+                        🎀
+                      </span>
+                    </div>
+
+                    {/* Subtle Card Background Accent */}
+                    <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-[#F5DB89]/15 to-transparent z-0 pointer-events-none" />
                   </div>
                 </div>
 
-                {/* Footer: Phone, Social Handles & Website */}
-                <div className="border-t border-[#0F3D24]/15 pt-2.5 flex items-center justify-between text-[10px] text-[#0F3D24] relative z-10 font-bold">
-                  <div>
-                    <span className="block font-semibold text-[9px] text-[#0F3D24]/70">📲 Call / WhatsApp:</span>
-                    <span className="font-mono text-amber-700 text-[11px] font-black">{contactPhone}</span>
-                  </div>
-                  <div className="text-center">
-                    <span className="block font-semibold text-[9px] text-[#0F3D24]/70">🌐 Social Handles:</span>
-                    <span className="text-[#3F8F3F] font-black text-[10px]">@dignityagrofarms</span>
-                  </div>
-                  <div className="text-right">
-                    <span className="block font-semibold text-[#0F3D24]">dignityagrofarms.com</span>
-                    <span className="text-[9px] text-[#3F8F3F] block font-bold">Owerri, Imo State</span>
+                {/* Footer: Gold Line, Phone, Social Handles & Website */}
+                <div className="relative z-10 pt-1">
+                  <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[#D4AF37]/60 to-transparent mb-2" />
+                  <div className="flex items-center justify-between text-[9px] sm:text-[10px] text-[#0F3D24] font-bold">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs sm:text-sm">📲</span>
+                      <div>
+                        <span className="block font-semibold text-[8px] text-[#0F3D24]/70 leading-none">Call / WhatsApp:</span>
+                        <span className="font-mono text-[#B38B22] text-[10px] sm:text-[11px] font-black">{contactPhone}</span>
+                      </div>
+                    </div>
+
+                    <div className="text-center">
+                      <div className="flex items-center gap-0.5 justify-center">
+                        <span className="text-[9px]">🌐</span>
+                        <span className="text-[#0F3D24] font-bold text-[9px]">Social Handles:</span>
+                      </div>
+                      <span className="text-[#3F8F3F] font-black text-[9.5px] block">@dignityagrofarms</span>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 justify-end">
+                        <span className="text-[9px]">🌐</span>
+                        <span className="font-bold text-[#0F3D24] text-[9.5px]">dignityagrofarms.com</span>
+                      </div>
+                      <div className="flex items-center gap-0.5 justify-end text-[#B38B22] text-[8.5px] font-bold">
+                        <span>📍</span>
+                        <span>Owerri, Imo State</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
