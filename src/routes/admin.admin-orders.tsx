@@ -2,9 +2,8 @@ import { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { SiteLayout } from "@/components/site/Layout";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
@@ -243,6 +242,8 @@ function AdminOrders() {
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   
   const currentUsername = passcode ? (parseAdminCredential(passcode).username || "owner") : "owner";
   
@@ -439,145 +440,252 @@ function AdminOrders() {
     }
   };
 
-  return (
-    <SiteLayout>
-      {passcode && <PwaInstallPrompt />}
-      <section className="bg-[#0F3D24] py-12 text-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-[0.25em] text-[#a8e6a8]">Owner and staff portal</span>
-            <h1 className="mt-2 text-3xl font-semibold sm:text-4xl">Order Management</h1>
+  if (!passcode) {
+    return (
+      <div className="min-h-screen bg-[#F7F5F0] flex flex-col items-center justify-center p-4 relative">
+        <Link to="/" className="absolute top-6 left-6 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#0F3D24] shadow-sm hover:bg-gray-50 transition">
+          <Home size={16} /> Back to Website
+        </Link>
+        <form onSubmit={submitPasscode} className="mx-auto max-w-md w-full rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5">
+          <ShieldCheck className="mx-auto text-[#3F8F3F]" size={40} />
+          <h2 className="mt-3 text-center text-xl font-semibold">Admin sign in</h2>
+          <p className="mt-1 text-center text-sm text-[#0F3D24]/70">Sign in with your administrator, manager, or staff account credentials.</p>
+          <input
+            type="text"
+            autoFocus
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Username"
+            autoComplete="username"
+            className="mt-6 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
+          />
+          <input
+            type="password"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Passcode"
+            autoComplete="current-password"
+            className="mt-3 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
+          />
+          {authError && <p className="mt-2 text-sm text-red-600">{authError}</p>}
+          <button type="submit" disabled={isLoggingIn} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#134a2c] disabled:opacity-75">
+            {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
+            {isLoggingIn ? "Signing in..." : "Sign in"}
+          </button>
+          <div className="mt-4 text-center">
+            <button
+              type="button"
+              onClick={() => setShowRecoveryModal(true)}
+              className="text-xs font-semibold text-[#0F3D24]/70 hover:text-[#3F8F3F] transition underline"
+            >
+              Forgot Passcode / Password?
+            </button>
           </div>
-          {passcode && (
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={async () => {
-                  if (!('Notification' in window)) {
-                    alert("Browser notifications are not supported on this device.");
-                    return;
-                  }
-                  const perm = await Notification.requestPermission();
-                  if (perm === 'granted') {
-                    alert("✅ Phone & Browser Push Notifications Enabled! You will receive live order alerts.");
-                  } else {
-                    alert("Notification permission was denied. Enable notifications in your browser settings.");
-                  }
-                }}
-                className="inline-flex items-center gap-2 rounded-full bg-amber-400/20 px-4 py-2 text-xs font-bold text-amber-300 hover:bg-amber-400/30 transition"
-              >
-                <Bell size={14} /> Push Alerts
-              </button>
-              <button
-                onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
-                className="inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-2 text-xs font-bold text-emerald-300 hover:bg-emerald-500/30 transition"
-              >
-                <Sparkles size={14} /> Flyer Generator
-              </button>
-              <button onClick={() => setShowSettings((v) => !v)} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition">
-                <ShieldCheck size={14} /> User Accounts & Passcodes
-              </button>
-              <button onClick={() => query.refetch()} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition">
-                <RefreshCw size={14} /> Refresh
-              </button>
-              <button onClick={signOut} className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-xs font-semibold hover:bg-white/20 transition">
-                <LogOut size={14} /> Sign out
-              </button>
-            </div>
-          )}
-        </div>
-      </section>
+        </form>
+      </div>
+    );
+  }
 
-      <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        {passcode && (() => {
-          const unprocessedOrders = (query.data?.orders || []).filter(
-            (o) => o.status === "received" || o.paymentStatus === "pending" || o.paymentStatus === "submitted"
-          );
-          if (unprocessedOrders.length === 0) return null;
-          return (
-            <UnprocessedOrdersBanner
-              unprocessedOrders={unprocessedOrders}
-              onViewOrders={() => {
-                setActiveTab("orders");
-                setFilter("all");
-                setStatusFilter("");
-                setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
-              }}
-            />
-          );
-        })()}
-        {passcode && (
-          <div className="mb-6 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">Admin Navigation & Controls</span>
-              <div className="flex items-center gap-2">
-                <Link
-                  to="/admin/user-accounts"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-3 py-1 text-xs font-bold text-white hover:bg-[#134a2c] transition shadow-sm"
-                >
-                  <Users size={13} />
-                  <span>User Accounts & Roles</span>
-                </Link>
-                {query.data?.role && (
-                  <span className="inline-flex items-center rounded-full bg-[#3F8F3F]/10 px-3 py-1 text-xs font-bold text-[#0F3D24]">
-                    Signed in as {query.data.role}
-                  </span>
-                )}
+  return (
+    <div className="flex h-screen bg-[#f4f7f5] overflow-hidden text-[#0F3D24]">
+      <PwaInstallPrompt />
+      
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      
+      {/* Sidebar Navigation */}
+      <aside 
+        className={`fixed inset-y-0 left-0 z-50 transform bg-[#0F3D24] text-white transition-all duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-xl ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        } ${isSidebarCollapsed ? "w-20" : "w-64"}`}
+      >
+        {/* Logo Area */}
+        <div className="flex h-20 items-center justify-between px-4 border-b border-white/10 shrink-0">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 shrink-0 rounded-full bg-white p-0.5 shadow flex items-center justify-center overflow-hidden">
+              <img src="/favicon.png" alt="Logo" className="w-full h-full object-cover" />
+            </div>
+            {!isSidebarCollapsed && (
+              <div className="whitespace-nowrap">
+                <h1 className="font-bold text-lg leading-tight">Dignity</h1>
+                <p className="text-[10px] text-white/60 tracking-widest uppercase">Agro Farms</p>
+              </div>
+            )}
+          </div>
+          <button 
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+            className="hidden md:flex p-1 text-white/50 hover:text-white transition rounded-full hover:bg-white/10"
+          >
+            {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          </button>
+        </div>
+
+        {/* Navigation Links */}
+        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 custom-scrollbar">
+          {/* Sales & CRM */}
+          <div>
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
+            <ul className="space-y-1">
+              <li>
+                <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <FileText size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Orders & Reports</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("december"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <Gift size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Dec Pre-Orders</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("clients"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <Users size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Order Clients</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("leads"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <UserPlus size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Customer Leads</span>}
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Farm Operations */}
+          <div>
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Farm Operations</h3>}
+            <ul className="space-y-1">
+              <li>
+                <button onClick={() => { setActiveTab("financials"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <TrendingUp size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Batches & Finances</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("activities"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "activities" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <Activity size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Daily Activity</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("tasks"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "tasks" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <CheckCircle2 size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Staff Tasks</span>}
+                </button>
+              </li>
+            </ul>
+          </div>
+
+          {/* Tools & Support */}
+          <div>
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Tools & Support</h3>}
+            <ul className="space-y-1">
+              <li>
+                <button onClick={() => { setActiveTab("complaints"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "complaints" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <ShieldAlert size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Complaints</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("vouchers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "vouchers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <TicketPercent size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Discount Vouchers</span>}
+                </button>
+              </li>
+              <li>
+                <button onClick={() => { setActiveTab("flyers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "flyers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <Sparkles size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Social Flyers</span>}
+                </button>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        {/* Bottom Profile / Logout */}
+        <div className="border-t border-white/10 p-3 shrink-0">
+          <div className="flex flex-col gap-2">
+            <Link to="/admin/user-accounts" className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition text-white/80 hover:text-white">
+              <ShieldCheck size={18} className="shrink-0" />
+              {!isSidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">Settings & Roles</span>}
+            </Link>
+            <button onClick={signOut} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition text-white/80 hover:text-white w-full">
+              <LogOut size={18} className="shrink-0" />
+              {!isSidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">Sign Out</span>}
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex flex-1 flex-col overflow-y-auto">
+        {/* Top Header */}
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-4 shadow-sm backdrop-blur-md md:px-8 sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setIsMobileMenuOpen(true)} 
+              className="mr-2 text-gray-500 hover:text-[#0F3D24] md:hidden"
+            >
+              <Menu size={24} />
+            </button>
+            <h2 className="text-lg font-bold text-gray-800 capitalize hidden sm:block">
+              {activeTab.replace("-", " ")} Dashboard
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Link to="/" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition">
+              <Home size={14} /> <span className="hidden sm:inline">Back to Website</span>
+            </Link>
+            <button onClick={() => query.refetch()} className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition shadow-sm">
+              <RefreshCw size={14} />
+            </button>
+            <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3F8F3F] font-bold text-white shadow-sm">
+                {currentUsername.charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden flex-col md:flex">
+                <span className="text-xs font-bold leading-tight text-gray-800">{currentUsername}</span>
+                <span className="text-[10px] font-medium text-gray-500">{query.data?.role || "Admin"}</span>
               </div>
             </div>
-            <div className="flex w-full overflow-x-auto gap-2 pb-2 hide-scrollbar snap-x" role="tablist" aria-label="Admin sections">
-              <AdminTab active={activeTab === "orders"} onClick={() => setActiveTab("orders")} icon={<FileText size={15} />}>Orders & reports</AdminTab>
-              <AdminTab active={activeTab === "financials"} onClick={() => setActiveTab("financials")} icon={<TrendingUp size={15} />}>Batches & Financials</AdminTab>
-              <AdminTab active={activeTab === "activities"} onClick={() => setActiveTab("activities")} icon={<Activity size={15} />}>Daily Activities & Mortality</AdminTab>
-              <AdminTab active={activeTab === "clients"} onClick={() => setActiveTab("clients")} icon={<Users size={15} />}>Order Clients</AdminTab>
-              <AdminTab active={activeTab === "leads"} onClick={() => setActiveTab("leads")} icon={<UserPlus size={15} />}>Customer Leads CRM</AdminTab>
-              <AdminTab active={activeTab === "vouchers"} onClick={() => setActiveTab("vouchers")} icon={<TicketPercent size={15} />}>Discount vouchers</AdminTab>
-              <AdminTab active={activeTab === "flyers"} onClick={() => setActiveTab("flyers")} icon={<Sparkles size={15} />}>Social proof flyers</AdminTab>
-              <AdminTab active={activeTab === "december"} onClick={() => setActiveTab("december")} icon={<Gift size={15} />}>December Pre-Orders</AdminTab>
-              <AdminTab active={activeTab === "tasks"} onClick={() => setActiveTab("tasks")} icon={<CheckCircle2 size={15} />}>Staff Tasks</AdminTab>
-              <AdminTab active={activeTab === "complaints"} onClick={() => setActiveTab("complaints")} icon={<ShieldAlert size={15} />}>Customer Complaints</AdminTab>
-            </div>
           </div>
-        )}
-        {!passcode ? (
-          <form onSubmit={submitPasscode} className="mx-auto max-w-md rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5">
-            <ShieldCheck className="mx-auto text-[#3F8F3F]" size={40} />
-            <h2 className="mt-3 text-center text-xl font-semibold">Admin sign in</h2>
-            <p className="mt-1 text-center text-sm text-[#0F3D24]/70">Sign in with your administrator, manager, or staff account credentials.</p>
-            <input
-              type="text"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Username"
-              autoComplete="username"
-              className="mt-6 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
-            />
-            <input
-              type="password"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Passcode"
-              autoComplete="current-password"
-              className="mt-3 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
-            />
-            {authError && <p className="mt-2 text-sm text-red-600">{authError}</p>}
-            <button type="submit" disabled={isLoggingIn} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#134a2c] disabled:opacity-75">
-              {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
-              {isLoggingIn ? "Signing in..." : "Sign in"}
-            </button>
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => setShowRecoveryModal(true)}
-                className="text-xs font-semibold text-[#0F3D24]/70 hover:text-[#3F8F3F] transition underline"
-              >
-                Forgot Passcode / Password?
-              </button>
+        </header>
+
+        {/* Content Body */}
+        <div className="flex-1 p-4 md:p-8">
+          {(() => {
+            const unprocessedOrders = (query.data?.orders || []).filter(
+              (o) => o.status === "received" || o.paymentStatus === "pending" || o.paymentStatus === "submitted"
+            );
+            if (unprocessedOrders.length === 0) return null;
+            return (
+              <div className="mb-6">
+                <UnprocessedOrdersBanner
+                  unprocessedOrders={unprocessedOrders}
+                  onViewOrders={() => {
+                    setActiveTab("orders");
+                    setFilter("all");
+                    setStatusFilter("");
+                    setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+                  }}
+                />
+              </div>
+            );
+          })()}
+
+          {query.isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-center text-[#0F3D24]/60 font-medium">Loading data…</p>
             </div>
-          </form>
-        ) : query.isLoading ? (
-          <p className="text-center text-[#0F3D24]/60">Loading orders…</p>
-        ) : query.data ? (
+          ) : query.data ? (
           (() => {
             const allOrders = query.data.orders;
             const role = query.data.role;
@@ -718,7 +826,7 @@ function AdminOrders() {
             );
           })()
         ) : null}
-      </section>
+      </div>
 
       {showFlyerModal && (
         <FlyerGeneratorModal
@@ -831,7 +939,8 @@ function AdminOrders() {
       {query.data?.role !== "owner" && currentUsername && passcode && (
         <PendingTasksModal passcode={passcode} username={currentUsername} />
       )}
-    </SiteLayout>
+        </div>
+      </div>
   );
 }
 

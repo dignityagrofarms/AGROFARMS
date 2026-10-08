@@ -60,6 +60,8 @@ import {
   adminCreateLead,
   adminUpdateLead,
   adminDeleteLead,
+  adminLogLeadCommunication,
+  type LeadCommunication,
   adminListActivities,
   adminCreateActivity,
   adminDeleteActivity,
@@ -1418,10 +1420,20 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const [commTargetLead, setCommTargetLead] = useState<CrmLead | null>(null);
+  const [historyTargetLead, setHistoryTargetLead] = useState<CrmLead | null>(null);
+  const [commForm, setCommForm] = useState({
+    activityType: "WhatsApp Message",
+    templateKey: "december_preorder",
+    messageSummary: "December Pre-Order Sales Promo",
+    content: "",
+  });
+
   const listLeadsFn = useServerFn(adminListLeads);
   const createLeadFn = useServerFn(adminCreateLead);
   const updateLeadFn = useServerFn(adminUpdateLead);
   const deleteLeadFn = useServerFn(adminDeleteLead);
+  const logCommFn = useServerFn(adminLogLeadCommunication);
 
   const leadsQuery = useQuery({
     queryKey: ["crm-leads", passcode],
@@ -1497,6 +1509,38 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
       setFeedback("Lead record deleted.");
     },
     onError: (e: Error) => setFeedback("Delete error: " + e.message),
+  });
+
+  const logCommMut = useMutation({
+    mutationFn: async (sendToWhatsapp: boolean) => {
+      if (!commTargetLead) return;
+      const contentText = commForm.content || commForm.messageSummary;
+
+      await logCommFn({
+        data: {
+          passcode,
+          leadId: commTargetLead.id,
+          activityType: commForm.activityType,
+          messageSummary: commForm.messageSummary,
+          content: contentText,
+          sentBy: "Admin",
+          updateStatusToContacted: true,
+        },
+      });
+
+      if (sendToWhatsapp) {
+        const digits = commTargetLead.phone.replace(/\D+/g, "");
+        const formattedDigits = digits.startsWith("0") ? "234" + digits.slice(1) : digits;
+        const text = encodeURIComponent(contentText);
+        window.open(`https://wa.me/${formattedDigits}?text=${text}`, "_blank");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
+      setFeedback(`Communication successfully logged for ${commTargetLead?.fullName}`);
+      setCommTargetLead(null);
+    },
+    onError: (e: Error) => setFeedback("Log error: " + e.message),
   });
 
   const resetLeadForm = () => {
@@ -1761,18 +1805,40 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
                       "{lead.notes}"
                     </div>
                   )}
+
+                  {/* Communication History Summary Badge */}
+                  <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-stone-100 p-2 text-[11px] text-[#0F3D24]/80">
+                    <span className="font-semibold flex items-center gap-1">
+                      <MessageSquare size={12} className="text-[#3F8F3F]" />
+                      <span>{lead.totalMessagesCount || 0} messages logged</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setHistoryTargetLead(lead)}
+                      className="font-bold text-[#3F8F3F] hover:underline flex items-center gap-0.5"
+                    >
+                      History Timeline <ChevronRight size={12} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-5 flex items-center justify-between border-t border-[#0F3D24]/10 pt-3">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#0F3D24]/10 pt-3">
                 <button
                   type="button"
-                  onClick={() => setReminderTarget({ name: lead.fullName, phone: lead.phone })}
-                  className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition"
-                  title="Send SMS or WhatsApp reminder to lead"
+                  onClick={() => {
+                    setCommTargetLead(lead);
+                    setCommForm({
+                      activityType: "WhatsApp Message",
+                      templateKey: "december_preorder",
+                      messageSummary: "December Pre-Order Sales Promo",
+                      content: `Hi ${lead.fullName.split(" ")[0]}, December pre-orders for live broilers & dressed chicken at Dignity Agro Farms are officially open! Reserve your batch early to lock in farm prices. Visit dignityagrofarms.com/december-preorder`,
+                    });
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs"
                 >
-                  <MessageSquare size={14} className="text-emerald-600" /> Send SMS / Reminder
+                  <MessageSquare size={13} /> Send & Log Message
                 </button>
 
                 <div className="flex items-center gap-2">

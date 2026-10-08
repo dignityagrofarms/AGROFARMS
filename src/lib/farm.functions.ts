@@ -34,6 +34,16 @@ export type FarmFinancial = {
   createdAt: string;
 };
 
+export type LeadCommunication = {
+  id: string;
+  leadId: string;
+  activityType: string;
+  messageSummary: string;
+  content: string | null;
+  sentBy: string | null;
+  createdAt: string;
+};
+
 export type CrmLead = {
   id: string;
   fullName: string;
@@ -46,6 +56,9 @@ export type CrmLead = {
   estimatedValue: number;
   notes: string | null;
   followUpDate: string | null;
+  communications?: LeadCommunication[];
+  lastContactedAt?: string | null;
+  totalMessagesCount?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -525,21 +538,100 @@ export const adminListLeads = createServerFn({ method: "POST" })
       return [];
     }
 
-    return (rows || []).map((r: any) => ({
-      id: r.id,
-      fullName: r.full_name,
-      phone: r.phone,
-      email: r.email ?? null,
-      location: r.location ?? null,
-      leadSource: r.lead_source,
-      interestedIn: r.interested_in ?? null,
-      status: r.status,
-      estimatedValue: Number(r.estimated_value || 0),
-      notes: r.notes ?? null,
-      followUpDate: r.follow_up_date ?? null,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    }));
+    // Fetch activities/communication logs
+    let activitiesByLead: Record<string, LeadCommunication[]> = {};
+    try {
+      const { data: actRows } = await supabaseAdmin
+        .from("crm_lead_activities")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (actRows) {
+        for (const act of actRows) {
+          const leadId = act.lead_id;
+          if (!activitiesByLead[leadId]) activitiesByLead[leadId] = [];
+          activitiesByLead[leadId].push({
+            id: act.id,
+            leadId: act.lead_id,
+            activityType: act.activity_type,
+            messageSummary: act.message_summary,
+            content: act.content ?? null,
+            sentBy: act.sent_by ?? "Admin",
+            createdAt: act.created_at,
+          });
+        }
+      }
+    } catch (e) {
+      // Ignore if table not yet created
+    }
+
+    return (rows || []).map((r: any) => {
+      const comms = activitiesByLead[r.id] || [];
+      const lastContactedAt = comms.length > 0 ? comms[0].createdAt : null;
+
+      return {
+        id: r.id,
+        fullName: r.full_name,
+        phone: r.phone,
+        email: r.email ?? null,
+        location: r.location ?? null,
+        leadSource: r.lead_source,
+        interestedIn: r.interested_in ?? null,
+        status: r.status,
+        estimatedValue: Number(r.estimated_value || 0),
+        notes: r.notes ?? null,
+        followUpDate: r.follow_up_date ?? null,
+        communications: comms,
+        lastContactedAt,
+        totalMessagesCount: comms.length,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      };
+    });
+  });
+
+export const adminLogLeadCommunication = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        leadId: z.string().uuid(),
+        activityType: z.string().default("WhatsApp Message"),
+        messageSummary: z.string().min(1),
+        content: z.string().optional().nullable(),
+        sentBy: z.string().optional().nullable(),
+        updateStatusToContacted: z.boolean().default(true),
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }): Promise<{ success: boolean }> => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    try {
+      await supabaseAdmin.from("crm_lead_activities").insert({
+        lead_id: data.leadId,
+        activity_type: data.activityType,
+        message_summary: data.messageSummary,
+        content: data.content || null,
+        sent_by: data.sentBy || "Admin",
+      });
+
+      if (data.updateStatusToContacted) {
+        await supabaseAdmin
+          .from("crm_leads")
+          .update({
+            status: "Contacted",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", data.leadId)
+          .eq("status", "New Lead");
+      }
+    } catch (err) {
+      console.error("Failed to log lead communication:", err);
+    }
+
+    return { success: true };
   });
 
 export const adminCreateLead = createServerFn({ method: "POST" })
