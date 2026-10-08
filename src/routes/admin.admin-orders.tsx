@@ -507,8 +507,8 @@ function AdminOrders() {
         {/* Logo Area */}
         <div className="flex h-20 items-center justify-between px-4 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-10 h-10 shrink-0 rounded-full bg-white p-0.5 shadow flex items-center justify-center overflow-hidden">
-              <img src="/favicon.png" alt="Logo" className="w-full h-full object-cover" />
+            <div className="w-10 h-10 shrink-0 rounded-full shadow flex items-center justify-center overflow-hidden border border-white/10">
+              <img src="/favicon.png" alt="Logo" className="w-full h-full object-cover scale-110" />
             </div>
             {!isSidebarCollapsed && (
               <div className="whitespace-nowrap">
