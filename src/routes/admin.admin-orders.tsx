@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
@@ -2283,6 +2283,8 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
     placeholderData: (previousData) => previousData,
   });
 
+  const [selectedPendingPayment, setSelectedPendingPayment] = useState<{ payment: any; preorder: any } | null>(null);
+
   return (
     <div className="space-y-6">
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
@@ -2298,12 +2300,22 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
               {pendingQuery.data.map(({ payment, preorder }) => (
                 <div key={payment.id} className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100">
                   <div>
-                    <span className="font-bold text-[#0F3D24]">{preorder.preorderCode}</span> · ₦{payment.amount.toLocaleString()}
-                    <span className="block text-xs text-slate-500">Ref: {payment.paymentReference} · {preorder.customerName}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-extrabold text-[#3F8F3F] text-base">{preorder.preorderCode}</span>
+                      <span className="font-bold text-[#0F3D24]">· ₦{payment.amount.toLocaleString()}</span>
+                    </div>
+                    <span className="block text-xs text-slate-600 font-semibold">{preorder.customerName} · {preorder.product} × {preorder.quantity}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition">Approve</button>
-                    <button onClick={async () => { if (confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-50 px-4 py-2 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition">Reject</button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPendingPayment({ payment, preorder })}
+                      className="rounded-full bg-[#F7F5F0] px-3.5 py-1.5 text-xs font-bold text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-white transition flex items-center gap-1.5"
+                    >
+                      <Eye size={13} /> View Details
+                    </button>
+                    <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition">Approve</button>
+                    <button onClick={async () => { if (confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-50 px-3.5 py-1.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition">Reject</button>
                   </div>
                 </div>
               ))}
@@ -2311,6 +2323,16 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           </div>
         )}
       </div>
+
+      {selectedPendingPayment && (
+        <PendingPaymentDetailsModal
+          item={selectedPendingPayment}
+          passcode={passcode}
+          onClose={() => setSelectedPendingPayment(null)}
+          onApproved={() => { pendingQuery.refetch(); query.refetch(); }}
+          onRejected={() => { pendingQuery.refetch(); query.refetch(); }}
+        />
+      )}
 
       <div className="flex flex-col gap-4">
         <form onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }} className="flex gap-2 w-full sm:max-w-md">
@@ -2678,15 +2700,29 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             </button>
             <button
               type="button"
-              onClick={() => {
-                const cleanPhone = preorder.phone.replace(/\D+/g, "");
-                const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
-                const text = `🎄 *Dignity Agro Farms December Pre-Order Statement*\n\nCustomer: ${preorder.customerName}\nPre-Order Code: ${preorder.preorderCode}\nProduct: ${preorder.product} × ${preorder.quantity}\nTotal Amount: ₦${preorder.totalAmount.toLocaleString()}\nAmount Paid: ₦${preorder.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${preorder.balance.toLocaleString()}\n\nPayment Bank: Moniepoint MFB · 4006179439\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for pre-ordering with Dignity Agro Farms!`;
-                window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+              onClick={async () => {
+                try {
+                  setDownloadingPdf("complete");
+                  const confirmedPayments = preorder.payments?.filter((p: any) => p.confirmedByAdmin) || [];
+                  await downloadPdf(preorderCompleteReceiptHtml(preorder, confirmedPayments), `receipt_${preorder.preorderCode}.pdf`);
+
+                  const cleanPhone = preorder.phone.replace(/\D+/g, "");
+                  const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+                  const receiptUrl = `${window.location.origin}/receipt/${preorder.preorderCode}?code=${preorder.preorderCode}`;
+                  const text = `🧾 *Dignity Agro Farms Official Pre-Order Receipt*\n\nCustomer: ${preorder.customerName}\nPre-Order Code: ${preorder.preorderCode}\nProduct: ${preorder.product} × ${preorder.quantity}\nTotal Amount: ₦${preorder.totalAmount.toLocaleString()}\nAmount Paid: ₦${preorder.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${preorder.balance.toLocaleString()}\n\n📄 *View & Print Web PDF Receipt:* ${receiptUrl}\n\nThank you for pre-ordering with Dignity Agro Farms! Happy Holidays! 🎄`;
+
+                  window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                } catch (err: any) {
+                  alert("Failed to generate PDF receipt: " + (err?.message || String(err)));
+                } finally {
+                  setDownloadingPdf(null);
+                }
               }}
-              className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
+              disabled={downloadingPdf === "complete"}
+              className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 disabled:opacity-50 transition"
             >
-              <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
+              {downloadingPdf === "complete" ? <Loader2 size={14} className="animate-spin text-[#25D366]" /> : <Share2 size={14} className="text-[#25D366]" />}
+              {downloadingPdf === "complete" ? "Generating PDF Receipt..." : "Share Receipt to WhatsApp"}
             </button>
             <a
               href={getWaLink()}
@@ -2765,6 +2801,175 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
           notes={preorder.notes}
         />
       )}
+    </div>
+  );
+}
+
+function PendingPaymentDetailsModal({
+  item,
+  passcode,
+  onClose,
+  onApproved,
+  onRejected,
+}: {
+  item: { payment: any; preorder: any };
+  passcode: string;
+  onClose: () => void;
+  onApproved: () => void;
+  onRejected: () => void;
+}) {
+  const { payment, preorder } = item;
+  const confirmPaymentFn = useServerFn(adminConfirmPreorderPayment);
+  const deletePaymentFn = useServerFn(adminDeletePreorderPayment);
+  const [loading, setLoading] = useState(false);
+
+  const handleApprove = async () => {
+    setLoading(true);
+    try {
+      await confirmPaymentFn({ data: { passcode, paymentId: payment.id } });
+      onApproved();
+      onClose();
+    } catch (err: any) {
+      alert("Failed to approve payment: " + (err?.message || String(err)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!confirm(`Reject payment of ₦${payment.amount.toLocaleString()} for order ${preorder.preorderCode}?`)) return;
+    setLoading(true);
+    try {
+      await deletePaymentFn({ data: { passcode, paymentId: payment.id } });
+      onRejected();
+      onClose();
+    } catch (err: any) {
+      alert("Failed to reject payment: " + (err?.message || String(err)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cleanPhone = preorder.phone ? preorder.phone.replace(/\D+/g, "") : "";
+  const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="bg-[#0F3D24] px-6 py-4 text-white flex items-center justify-between shrink-0">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-lg font-bold text-amber-300">{preorder.preorderCode}</span>
+              <span className="rounded-full bg-amber-400/20 px-2.5 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/30">
+                Awaiting Payment Approval
+              </span>
+            </div>
+            <p className="text-xs text-white/70 mt-0.5">Pre-Order Payment Verification</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-2 text-white/70 hover:bg-white/10 hover:text-white transition"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 space-y-5 overflow-y-auto text-sm">
+          {/* Pending Payment Card Banner */}
+          <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200 border-l-4 border-amber-500 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block">Payment Submitted</span>
+              <span className="text-xl font-extrabold text-[#0F3D24]">₦{payment.amount?.toLocaleString()}</span>
+              <span className="block text-xs text-amber-900/70 mt-0.5">
+                Submitted on {new Date(payment.paymentDate || Date.now()).toLocaleDateString()}
+              </span>
+            </div>
+            <span className="rounded-xl bg-amber-200/80 text-amber-900 px-3 py-1 text-xs font-extrabold uppercase">
+              Pending Admin Approval
+            </span>
+          </div>
+
+          {/* Customer Details */}
+          <div className="rounded-2xl bg-[#F7F5F0] p-4 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-[#0F3D24]/60">Customer Information</h4>
+            <div className="font-bold text-[#0F3D24] text-base">{preorder.customerName}</div>
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <a href={`tel:${preorder.phone}`} className="inline-flex items-center gap-1 font-mono font-bold text-[#3F8F3F] hover:underline">
+                <Phone size={13} /> {preorder.phone}
+              </a>
+              {waPhone && (
+                <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[#25D366] hover:underline">
+                  <MessageCircle size={13} /> Chat on WhatsApp
+                </a>
+              )}
+            </div>
+            <div className="text-xs text-slate-600 pt-1 border-t border-[#0F3D24]/5">
+              <span className="font-semibold text-[#0F3D24]">Delivery Address:</span> {preorder.address || "Owerri, Imo State"}
+            </div>
+            {preorder.notes && (
+              <div className="text-xs italic text-slate-500">
+                "{preorder.notes}"
+              </div>
+            )}
+          </div>
+
+          {/* Order Summary */}
+          <div className="rounded-2xl bg-white p-4 ring-1 ring-[#0F3D24]/10 space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-[#0F3D24]/60">Order Summary</h4>
+            <div className="flex justify-between items-center font-bold text-[#0F3D24]">
+              <span>{preorder.product} × {preorder.quantity}</span>
+              <span>₦{(preorder.unitPrice ? preorder.unitPrice * preorder.quantity : preorder.totalAmount).toLocaleString()}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs text-center font-medium">
+              <div className="p-2 rounded-xl bg-slate-50">
+                <span className="block text-[10px] text-slate-500 uppercase">Total Order</span>
+                <span className="font-bold text-[#0F3D24]">₦{preorder.totalAmount?.toLocaleString()}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800">
+                <span className="block text-[10px] text-emerald-600 uppercase">Paid So Far</span>
+                <span className="font-bold">₦{preorder.amountPaid?.toLocaleString()}</span>
+              </div>
+              <div className="p-2 rounded-xl bg-red-50 text-red-700">
+                <span className="block text-[10px] text-red-500 uppercase">Balance Due</span>
+                <span className="font-bold">₦{preorder.balance?.toLocaleString()}</span>
+              </div>
+            </div>
+            {preorder.preferredDeliveryDate && (
+              <div className="text-xs text-slate-500 pt-2 flex justify-between border-t border-slate-100 mt-2">
+                <span>Preferred Delivery Date:</span>
+                <span className="font-semibold text-[#0F3D24]">{new Date(preorder.preferredDeliveryDate).toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Payment System Reference */}
+          <div className="text-xs text-slate-500 px-1">
+            <span className="font-semibold text-slate-700">Bank Payment Reference:</span>{" "}
+            <span className="font-mono text-[11px] text-slate-600">{payment.paymentReference}</span>
+          </div>
+        </div>
+
+        {/* Modal Action Footer */}
+        <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-3 shrink-0">
+          <button
+            onClick={handleReject}
+            disabled={loading}
+            className="rounded-full bg-red-50 px-5 py-2.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50 transition"
+          >
+            Reject Payment
+          </button>
+          <button
+            onClick={handleApprove}
+            disabled={loading}
+            className="rounded-full bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-md disabled:opacity-50 transition flex items-center gap-2"
+          >
+            {loading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            <span>Approve Payment</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
