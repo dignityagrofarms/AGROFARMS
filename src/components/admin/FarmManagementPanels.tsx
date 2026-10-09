@@ -1527,13 +1527,6 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
           updateStatusToContacted: true,
         },
       });
-
-      if (sendToWhatsapp) {
-        const digits = commTargetLead.phone.replace(/\D+/g, "");
-        const formattedDigits = digits.startsWith("0") ? "234" + digits.slice(1) : digits;
-        const text = encodeURIComponent(contentText);
-        window.open(`https://wa.me/${formattedDigits}?text=${text}`, "_blank");
-      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
@@ -2206,7 +2199,14 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
               <button
                 type="button"
                 disabled={logCommMut.isPending}
-                onClick={() => logCommMut.mutate(true)}
+                onClick={() => {
+                  const contentText = commForm.content || commForm.messageSummary;
+                  const digits = commTargetLead.phone.replace(/\D+/g, "");
+                  const formattedDigits = digits.startsWith("0") ? "234" + digits.slice(1) : digits;
+                  const text = encodeURIComponent(contentText);
+                  window.open(`https://wa.me/${formattedDigits}?text=${text}`, "_blank");
+                  logCommMut.mutate(true);
+                }}
                 className="inline-flex items-center gap-1.5 rounded-full bg-[#3F8F3F] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#0F3D24] disabled:opacity-50 transition"
               >
                 <MessageSquare size={14} /> {logCommMut.isPending ? "Processing..." : "Send on WhatsApp & Log Record"}
