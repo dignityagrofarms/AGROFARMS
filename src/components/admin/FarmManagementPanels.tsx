@@ -2097,6 +2097,190 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
           recipientPhone={reminderTarget.phone}
         />
       )}
+
+      {/* Send & Log Communication Modal */}
+      {commTargetLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-[#0F3D24]">
+                  Send & Log Communication
+                </h3>
+                <p className="text-xs text-[#0F3D24]/70">
+                  Recipient: <span className="font-bold text-[#3F8F3F]">{commTargetLead.fullName}</span> ({commTargetLead.phone})
+                </p>
+              </div>
+              <button
+                onClick={() => setCommTargetLead(null)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Communication Channel / Type</label>
+                <select
+                  value={commForm.activityType}
+                  onChange={(e) => setCommForm({ ...commForm, activityType: e.target.value })}
+                  className="w-full rounded-xl border border-[#0F3D24]/15 px-3.5 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                >
+                  <option value="WhatsApp Message">WhatsApp Message</option>
+                  <option value="Phone Call">Phone Call</option>
+                  <option value="SMS / Text">SMS / Text Message</option>
+                  <option value="Email">Email</option>
+                  <option value="In-Person Visit">In-Person Farm Visit</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Quick Message Template</label>
+                <select
+                  value={commForm.templateKey}
+                  onChange={(e) => {
+                    const key = e.target.value;
+                    let summary = "";
+                    let content = "";
+                    if (key === "december_preorder") {
+                      summary = "December Pre-Order Sales Promo";
+                      content = `Hi ${commTargetLead.fullName.split(" ")[0]}, December pre-orders for live broilers & dressed chicken at Dignity Agro Farms are officially open! Reserve your batch early to lock in farm prices. Visit dignityagrofarms.com/december-preorder`;
+                    } else if (key === "followup") {
+                      summary = "General Sales Follow-up";
+                      content = `Hi ${commTargetLead.fullName.split(" ")[0]}, checking in from Dignity Agro Farms regarding your poultry inquiry. We have fresh healthy stock available for dispatch. Let us know how we can serve you today!`;
+                    } else if (key === "order_inquiry") {
+                      summary = "Poultry Availability & Pricing";
+                      content = `Hi ${commTargetLead.fullName.split(" ")[0]}, thanks for reaching out to Dignity Agro Farms! Our live broilers (3kg+) and jumbo eggs are ready. Contact us directly on 08167099492 or order online at dignityagrofarms.com`;
+                    }
+                    setCommForm({ ...commForm, templateKey: key, messageSummary: summary || commForm.messageSummary, content: content || commForm.content });
+                  }}
+                  className="w-full rounded-xl border border-[#0F3D24]/15 px-3.5 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                >
+                  <option value="december_preorder">December Pre-Order Sales Promo</option>
+                  <option value="followup">General Sales Follow-up</option>
+                  <option value="order_inquiry">Poultry Availability & Pricing</option>
+                  <option value="custom">Custom Message</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Subject / Summary</label>
+                <input
+                  type="text"
+                  value={commForm.messageSummary}
+                  onChange={(e) => setCommForm({ ...commForm, messageSummary: e.target.value })}
+                  placeholder="e.g. December Pre-Order Promo"
+                  className="w-full rounded-xl border border-[#0F3D24]/15 px-3.5 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Message Content / Notes</label>
+                <textarea
+                  rows={4}
+                  value={commForm.content}
+                  onChange={(e) => setCommForm({ ...commForm, content: e.target.value })}
+                  placeholder="Type the message or call summary..."
+                  className="w-full rounded-xl border border-[#0F3D24]/15 px-3.5 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-stone-100">
+              <button
+                type="button"
+                onClick={() => setCommTargetLead(null)}
+                className="rounded-full bg-stone-100 px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={logCommMut.isPending}
+                onClick={() => logCommMut.mutate(false)}
+                className="rounded-full bg-stone-800 px-4 py-2 text-xs font-semibold text-white hover:bg-stone-900 disabled:opacity-50"
+              >
+                {logCommMut.isPending ? "Logging..." : "Log Record Only"}
+              </button>
+              <button
+                type="button"
+                disabled={logCommMut.isPending}
+                onClick={() => logCommMut.mutate(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#3F8F3F] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#0F3D24] disabled:opacity-50 transition"
+              >
+                <MessageSquare size={14} /> {logCommMut.isPending ? "Processing..." : "Send on WhatsApp & Log Record"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Timeline Modal */}
+      {historyTargetLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b pb-3 shrink-0">
+              <div>
+                <h3 className="text-lg font-bold text-[#0F3D24]">
+                  Communication History Timeline
+                </h3>
+                <p className="text-xs text-[#0F3D24]/70">
+                  Lead: <span className="font-bold text-[#3F8F3F]">{historyTargetLead.fullName}</span> ({historyTargetLead.phone})
+                </p>
+              </div>
+              <button
+                onClick={() => setHistoryTargetLead(null)}
+                className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1">
+              {(!historyTargetLead.communications || historyTargetLead.communications.length === 0) ? (
+                <div className="rounded-2xl bg-stone-50 p-8 text-center text-xs text-stone-500">
+                  <MessageSquare size={32} className="mx-auto mb-2 text-stone-300" />
+                  <p className="font-semibold text-stone-700">No message activity logged yet</p>
+                  <p className="mt-1">Use "Send & Log Message" to send WhatsApp promos or record follow-ups.</p>
+                </div>
+              ) : (
+                historyTargetLead.communications.map((c) => (
+                  <div key={c.id} className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-[#0F3D24] inline-flex items-center gap-1">
+                        <MessageSquare size={13} className="text-[#3F8F3F]" />
+                        {c.activityType}
+                      </span>
+                      <span className="text-[11px] text-stone-400 font-medium">
+                        {new Date(c.createdAt).toLocaleDateString()} {new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold text-stone-800">{c.messageSummary}</p>
+                    {c.content && (
+                      <p className="text-xs text-stone-600 bg-white p-2.5 rounded-xl border border-stone-100 leading-relaxed mt-1">
+                        {c.content}
+                      </p>
+                    )}
+                    <div className="text-[10px] text-stone-400 pt-1">
+                      Logged by: <span className="font-semibold">{c.sentBy || "Admin"}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t shrink-0">
+              <button
+                onClick={() => setHistoryTargetLead(null)}
+                className="rounded-full bg-stone-800 px-5 py-2 text-xs font-semibold text-white hover:bg-stone-900"
+              >
+                Close Timeline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
