@@ -687,7 +687,7 @@ function AdminOrders() {
         <div className="flex-1 p-4 md:p-8">
           {(() => {
             const unprocessedOrders = (query.data?.orders || []).filter(
-              (o) => o.status === "received" || o.paymentStatus === "pending" || o.paymentStatus === "submitted"
+              (o) => (!o.status || o.status === "received") && (o.paymentStatus === "pending" || o.paymentStatus === "submitted" || !o.paymentStatus)
             );
             if (unprocessedOrders.length === 0) return null;
             return (

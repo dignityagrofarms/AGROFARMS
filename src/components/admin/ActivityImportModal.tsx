@@ -73,6 +73,25 @@ export function ActivityImportModal({
     document.body.removeChild(link);
   };
 
+function parseExcelDateSerial(val: any): string {
+  if (val === null || val === undefined || val === "") {
+    return new Date().toISOString().split("T")[0];
+  }
+  const str = String(val).trim();
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 70000 && !str.includes("-") && !str.includes("/")) {
+    const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+    if (!isNaN(dateObj.getTime())) {
+      return dateObj.toISOString().split("T")[0];
+    }
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split("T")[0];
+  }
+  return new Date().toISOString().split("T")[0];
+}
+
 function normalizeActivityType(rawType: string): string {
   const lower = (rawType || "").toLowerCase().trim();
   if (lower.includes("mortality") || lower.includes("death") || lower.includes("die")) return "Mortality Record";
@@ -106,7 +125,7 @@ function normalizeActivityType(rawType: string): string {
       const parts = lines[i].split(",").map((p) => p.trim());
       if (parts.length < 2) continue;
 
-      const activityDate = parts[0] || new Date().toISOString().split("T")[0];
+      const activityDate = parseExcelDateSerial(parts[0]);
       const rawType = parts[1] || "General Activity";
       const activityType = normalizeActivityType(rawType);
       const batchName = parts[2] || "";
@@ -174,7 +193,7 @@ function normalizeActivityType(rawType: string): string {
             return "";
           };
 
-          const activityDate = getVal("date", "activitydate") || new Date().toISOString().split("T")[0];
+          const activityDate = parseExcelDateSerial(getVal("date", "activitydate"));
           const rawType = getVal("type", "activitytype") || "General Activity";
           const activityType = normalizeActivityType(rawType);
           const batchName = getVal("batch", "batchname") || "";

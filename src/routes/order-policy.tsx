@@ -140,7 +140,7 @@ function OrderPolicyPage() {
           <div className="rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-[#0F3D24]/10">
             <p className="text-xs text-[#0F3D24]/70">
               Questions regarding our Order Policy? Contact Dignity Agro Farms customer care at{" "}
-              <a href="tel:09071934173" className="font-bold text-[#3F8F3F] underline">09071934173</a> or via WhatsApp.
+              <a href="tel:08167099492" className="font-bold text-[#3F8F3F] underline">08167099492</a> or via WhatsApp.
             </p>
           </div>
         </div>

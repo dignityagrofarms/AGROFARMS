@@ -500,6 +500,7 @@ export const adminGetBatchReport = createServerFn({ method: "POST" })
 
     const mortalityRatePercentage =
       batch.initialHeadcount > 0 ? (totalMortality / batch.initialHeadcount) * 100 : 0;
+    batch.currentHeadcount = Math.max(0, batch.initialHeadcount - totalMortality);
 
     return {
       batch,
@@ -1266,17 +1267,24 @@ export const adminImportActivities = createServerFn({ method: "POST" })
     (batchRows ?? []).forEach((b) => batchMap.set(b.batch_name.toLowerCase().trim(), b.id));
 
     const insertRows = [];
+    const mortalityByBatch = new Map<string, number>();
+
     for (const item of data.activities) {
       let resolvedBatchId = data.batchId || null;
       if (!resolvedBatchId && item.batchName) {
         resolvedBatchId = batchMap.get(item.batchName.toLowerCase().trim()) || null;
       }
 
+      const mort = Math.max(0, Number(item.mortalityCount || 0));
+      if (resolvedBatchId && mort > 0 && isOwner) {
+        mortalityByBatch.set(resolvedBatchId, (mortalityByBatch.get(resolvedBatchId) || 0) + mort);
+      }
+
       insertRows.push({
         batch_id: resolvedBatchId,
-        activity_date: item.activityDate || new Date().toISOString().split("T")[0],
+        activity_date: parseExcelDateSerial(item.activityDate),
         activity_type: normalizeActivityType(item.activityType),
-        mortality_count: Math.max(0, Number(item.mortalityCount || 0)),
+        mortality_count: mort,
         cause_of_mortality: item.causeOfMortality || null,
         feed_consumed_kg: Math.max(0, Number(item.feedConsumedKg || 0)),
         eggs_collected: Math.max(0, Number(item.eggsCollected || 0)),
@@ -1287,12 +1295,45 @@ export const adminImportActivities = createServerFn({ method: "POST" })
       });
     }
 
-
     if (insertRows.length > 0) {
       const { error } = await supabaseAdmin.from("farm_activities").insert(insertRows);
       if (error) throw new Error(error.message);
+
+      // Deduct mortality from batch current_headcount
+      for (const [bId, mortCount] of mortalityByBatch.entries()) {
+        const { data: b } = await supabaseAdmin
+          .from("farm_batches")
+          .select("current_headcount")
+          .eq("id", bId)
+          .single();
+        if (b) {
+          const nextCount = Math.max(0, Number(b.current_headcount || 0) - mortCount);
+          await supabaseAdmin
+            .from("farm_batches")
+            .update({ current_headcount: nextCount, updated_at: new Date().toISOString() })
+            .eq("id", bId);
+        }
+      }
     }
 
     return { importedCount: insertRows.length };
   });
 
+function parseExcelDateSerial(val: any): string {
+  if (val === null || val === undefined || val === "") {
+    return new Date().toISOString().split("T")[0];
+  }
+  const str = String(val).trim();
+  const num = Number(str);
+  if (!isNaN(num) && num > 30000 && num < 70000 && !str.includes("-") && !str.includes("/")) {
+    const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+    if (!isNaN(dateObj.getTime())) {
+      return dateObj.toISOString().split("T")[0];
+    }
+  }
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split("T")[0];
+  }
+  return new Date().toISOString().split("T")[0];
+}
