@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -1267,6 +1267,7 @@ function ClientFollowUpModal({
 function VoucherPanel({ passcode }: { passcode: string }) {
   const [form, setForm] = useState({ code: "", displayName: "", discountType: "percent" as AdminVoucher["discountType"], discountValue: "", recipientName: "", recipientPhone: "", note: "", expiresAt: "", maxUses: "" });
   const [editingVoucher, setEditingVoucher] = useState<AdminVoucher | null>(null);
+  const [expandedVoucher, setExpandedVoucher] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const listFn = useServerFn(adminListVouchers);
   const createFn = useServerFn(adminCreateVoucher);
@@ -1403,7 +1404,8 @@ function VoucherPanel({ passcode }: { passcode: string }) {
             </thead>
             <tbody className="divide-y divide-[#0F3D24]/10">
               {vouchers.map((voucher) => (
-                <tr key={voucher.id}>
+                <React.Fragment key={voucher.id}>
+                <tr>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2 font-mono font-semibold text-[#3F8F3F]">
                       {voucher.code}
@@ -1422,7 +1424,18 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                     {voucher.recipientPhone && <span className="block text-xs">{voucher.recipientPhone}</span>}
                   </td>
                   <td className="px-4 py-4 text-[#0F3D24]/70">
-                    {voucher.usesCount}{voucher.maxUses ? ` / ${voucher.maxUses}` : " / unlimited"}
+                    <div className="flex items-center gap-2">
+                      <span>{voucher.usesCount}{voucher.maxUses ? ` / ${voucher.maxUses}` : " / unlimited"}</span>
+                      {voucher.usedByOrders && voucher.usedByOrders.length > 0 && (
+                        <button
+                          onClick={() => setExpandedVoucher(expandedVoucher === voucher.id ? null : voucher.id)}
+                          className="p-1 rounded-full text-[#3F8F3F] hover:bg-[#3F8F3F]/10 transition"
+                          title="View orders"
+                        >
+                          {expandedVoucher === voucher.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-4 text-[#0F3D24]/70">
                     {voucher.expiresAt ? new Date(voucher.expiresAt).toLocaleDateString() : "No expiry"}
@@ -1463,8 +1476,49 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                     </div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+                {expandedVoucher === voucher.id && voucher.usedByOrders && voucher.usedByOrders.length > 0 && (
+                  <tr key={`${voucher.id}-orders`} className="bg-[#F7F5F0]/50 border-t border-[#0F3D24]/5">
+                    <td colSpan={7} className="px-8 py-4">
+                      <div className="rounded-xl border border-[#0F3D24]/10 bg-white overflow-hidden shadow-sm">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-[#0F3D24]/5 text-[#0F3D24]/60 uppercase tracking-widest font-semibold">
+                            <tr>
+                              <th className="px-4 py-2">Order Code</th>
+                              <th className="px-4 py-2">Customer</th>
+                              <th className="px-4 py-2">Date</th>
+                              <th className="px-4 py-2">Status</th>
+                              <th className="px-4 py-2 text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#0F3D24]/5">
+                            {voucher.usedByOrders.map((order) => (
+                              <tr key={order.orderCode} className="hover:bg-[#F7F5F0]/50 transition">
+                                <td className="px-4 py-2.5 font-mono font-bold text-[#3F8F3F]">{order.orderCode}</td>
+                                <td className="px-4 py-2.5 font-semibold text-[#0F3D24]">{order.customerName}</td>
+                                <td className="px-4 py-2.5 text-[#0F3D24]/70">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                <td className="px-4 py-2.5">
+                                  <span className={`px-2 py-0.5 rounded-full font-bold ${
+                                    order.status === 'received' ? 'bg-amber-100 text-amber-800' :
+                                    order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                    order.status === 'dispatched' ? 'bg-purple-100 text-purple-800' :
+                                    order.status === 'delivered' ? 'bg-[#3F8F3F]/10 text-[#0F3D24]' :
+                                    'bg-rose-100 text-rose-800'
+                                  }`}>
+                                    {order.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-bold text-[#0F3D24]">{naira(order.total)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
           </table>
         </div>
       )}

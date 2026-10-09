@@ -1191,6 +1191,13 @@ export type AdminVoucher = {
   usesCount: number;
   active: boolean;
   createdAt: string;
+  usedByOrders?: {
+    orderCode: string;
+    customerName: string;
+    total: number;
+    createdAt: string;
+    status: string;
+  }[];
 };
 
 const adminVoucherBase = z.object({ passcode: z.string().min(1).max(200) });
@@ -1220,7 +1227,37 @@ export const adminListVouchers = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: rows, error } = await supabaseAdmin.from("discount_vouchers").select("*").order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { vouchers: (rows ?? []).map((row) => mapVoucher(row as Record<string, unknown>)) };
+    
+    const vouchers = (rows ?? []).map((row) => mapVoucher(row as Record<string, unknown>));
+    const voucherCodes = vouchers.map(v => v.code);
+    
+    const usageMap = new Map<string, AdminVoucher["usedByOrders"]>();
+    if (voucherCodes.length > 0) {
+      const { data: ordersRows } = await supabaseAdmin
+        .from("orders")
+        .select("order_code, customer_name, total, created_at, status, voucher_code")
+        .in("voucher_code", voucherCodes)
+        .order("created_at", { ascending: false });
+
+      for (const order of ordersRows ?? []) {
+        if (!order.voucher_code) continue;
+        if (!usageMap.has(order.voucher_code)) usageMap.set(order.voucher_code, []);
+        usageMap.get(order.voucher_code)!.push({
+          orderCode: String(order.order_code),
+          customerName: String(order.customer_name),
+          total: Number(order.total),
+          createdAt: String(order.created_at),
+          status: String(order.status),
+        });
+      }
+    }
+
+    return { 
+      vouchers: vouchers.map(v => ({
+        ...v,
+        usedByOrders: usageMap.get(v.code) || []
+      })) 
+    };
   });
 
 const createVoucherSchema = adminVoucherBase.extend({
