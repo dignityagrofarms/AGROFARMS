@@ -578,7 +578,7 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
 
     const { data: rows, error } = await supabaseAdmin
       .from("admin_access")
-      .select("id, username, role, active, created_at, last_login_at")
+      .select("*")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     const items: UserAccountItem[] = (rows || []).map((r: any) => ({

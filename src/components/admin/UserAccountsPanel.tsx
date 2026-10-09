@@ -243,6 +243,10 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
               <div className="py-6 text-center text-xs text-[#0F3D24]/50">
                 <Loader2 size={18} className="animate-spin mx-auto mb-1" /> Loading accounts...
               </div>
+            ) : accountsQuery.isError ? (
+              <div className="py-6 text-center text-xs text-red-600 font-semibold bg-red-50 rounded-2xl border border-red-200">
+                Error loading accounts: {accountsQuery.error?.message}
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-2xl border border-[#0F3D24]/10 shadow-sm">
                 <table className="w-full text-left text-xs min-w-[600px]">
