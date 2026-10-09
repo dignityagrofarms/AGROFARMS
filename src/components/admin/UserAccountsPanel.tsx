@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import {
@@ -60,6 +60,12 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
     queryFn: () => listAccountsFn({ data: { passcode } }),
     enabled: role === "owner" && Boolean(passcode),
   });
+
+  useEffect(() => {
+    if (accountsQuery.isError && accountsQuery.error) {
+      console.error("[UserAccountsPanel] Error fetching accounts:", accountsQuery.error);
+    }
+  }, [accountsQuery.isError, accountsQuery.error]);
 
   const saveOwnPasscode = useMutation({
     mutationFn: () => setPasscodeFn({ data: { passcode, newPasscode: nextPasscode.trim() } }),
