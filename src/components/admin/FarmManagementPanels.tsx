@@ -816,7 +816,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                               <Pencil size={15} />
                             </button>
                           )}
-                          {role !== "staff" && (
+                          {role === "owner" && (
                             <button
                               onClick={() => {
                                 if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
@@ -1408,7 +1408,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
 // ─── 2. CRM / CUSTOMER LEADS PANEL ───────────────────────────────────────────
 
-export function LeadCrmPanel({ passcode }: { passcode: string }) {
+export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; role?: AdminRole }) {
   const queryClient = useQueryClient();
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -1842,15 +1842,17 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
                   >
                     <Pencil size={15} />
                   </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Delete lead record for ${lead.fullName}?`)) deleteLeadMut.mutate(lead.id);
-                    }}
-                    className="p-1.5 text-rose-600 hover:text-rose-800 transition"
-                    title="Delete Lead"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {role === "owner" && (
+                    <button
+                      onClick={() => {
+                        if (confirm(`Delete lead record for ${lead.fullName}?`)) deleteLeadMut.mutate(lead.id);
+                      }}
+                      className="p-1.5 text-rose-600 hover:text-rose-800 transition"
+                      title="Delete Lead"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1919,15 +1921,17 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
                       >
                         <Pencil size={14} />
                       </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`Delete lead record for ${lead.fullName}?`)) deleteLeadMut.mutate(lead.id);
-                        }}
-                        className="p-2 text-rose-600 hover:text-rose-800 transition"
-                        title="Delete Lead"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      {role === "owner" && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`Delete lead record for ${lead.fullName}?`)) deleteLeadMut.mutate(lead.id);
+                          }}
+                          className="p-2 text-rose-600 hover:text-rose-800 transition"
+                          title="Delete Lead"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -2287,7 +2291,7 @@ export function LeadCrmPanel({ passcode }: { passcode: string }) {
 
 // ─── 3. FARM DAILY ACTIVITIES & MORTALITY LOG PANEL ─────────────────────────
 
-export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
+export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: string; role?: AdminRole }) {
   const queryClient = useQueryClient();
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showActivityModal, setShowActivityModal] = useState(false);
@@ -2550,15 +2554,17 @@ export function DailyActivitiesPanel({ passcode }: { passcode: string }) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    if (confirm("Delete this activity log?")) deleteActMut.mutate(act.id);
-                  }}
-                  className="p-1 text-rose-600 hover:text-rose-800 transition"
-                  title="Delete record"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {role === "owner" && (
+                  <button
+                    onClick={() => {
+                      if (confirm("Delete this activity log?")) deleteActMut.mutate(act.id);
+                    }}
+                    className="p-1 text-rose-600 hover:text-rose-800 transition"
+                    title="Delete record"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

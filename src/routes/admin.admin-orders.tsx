@@ -288,6 +288,16 @@ function AdminOrders() {
     placeholderData: keepPreviousData,
   });
 
+  const role = (query.data?.role as AdminRole) || "owner";
+
+  useEffect(() => {
+    if (role === "staff") {
+      if (["orders", "december", "clients", "leads", "complaints", "vouchers", "flyers"].includes(activeTab)) {
+        setActiveTab("tasks");
+      }
+    }
+  }, [role, activeTab]);
+
   // Effect to detect newly arrived orders during polling
   useEffect(() => {
     const orders = query.data?.orders;
@@ -552,35 +562,37 @@ function AdminOrders() {
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 custom-scrollbar">
           {/* Sales & CRM */}
-          <div>
-            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
-            <ul className="space-y-1">
-              <li>
-                <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <FileText size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Orders & Reports</span>}
-                </button>
-              </li>
-              <li>
-                <button onClick={() => { setActiveTab("december"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <Gift size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Dec Pre-Orders</span>}
-                </button>
-              </li>
-              <li>
-                <button onClick={() => { setActiveTab("clients"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <Users size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Order Clients</span>}
-                </button>
-              </li>
-              <li>
-                <button onClick={() => { setActiveTab("leads"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <UserPlus size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Customer Leads</span>}
-                </button>
-              </li>
-            </ul>
-          </div>
+          {(role === "owner" || role === "manager") && (
+            <div>
+              {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
+              <ul className="space-y-1">
+                <li>
+                  <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <FileText size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Orders & Reports</span>}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => { setActiveTab("december"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <Gift size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Dec Pre-Orders</span>}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => { setActiveTab("clients"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <Users size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Order Clients</span>}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => { setActiveTab("leads"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <UserPlus size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Customer Leads</span>}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
 
           {/* Farm Operations */}
           <div>
@@ -608,29 +620,31 @@ function AdminOrders() {
           </div>
 
           {/* Tools & Support */}
-          <div>
-            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Tools & Support</h3>}
-            <ul className="space-y-1">
-              <li>
-                <button onClick={() => { setActiveTab("complaints"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "complaints" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <ShieldAlert size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Complaints</span>}
-                </button>
-              </li>
-              <li>
-                <button onClick={() => { setActiveTab("vouchers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "vouchers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <TicketPercent size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Discount Vouchers</span>}
-                </button>
-              </li>
-              <li>
-                <button onClick={() => { setActiveTab("flyers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "flyers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <Sparkles size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Social Flyers</span>}
-                </button>
-              </li>
-            </ul>
-          </div>
+          {role === "owner" && (
+            <div>
+              {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Tools & Support</h3>}
+              <ul className="space-y-1">
+                <li>
+                  <button onClick={() => { setActiveTab("complaints"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "complaints" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <ShieldAlert size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Complaints</span>}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => { setActiveTab("vouchers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "vouchers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <TicketPercent size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Discount Vouchers</span>}
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => { setActiveTab("flyers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "flyers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <Sparkles size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Social Flyers</span>}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
         </nav>
 
         {/* Bottom Profile / Logout */}
@@ -712,7 +726,6 @@ function AdminOrders() {
           ) : query.data ? (
           (() => {
             const allOrders = query.data.orders;
-            const role = query.data.role;
             const reasonOptions = Array.from(
               new Set(allOrders.map((o) => (o.cancelReason ?? "").trim()).filter(Boolean)),
             ).sort();
@@ -778,13 +791,13 @@ function AdminOrders() {
                     </div>
                   </>
                 ) : activeTab === "financials" ? (
-                  <BatchFinancialsPanel passcode={passcode} />
+                  <BatchFinancialsPanel passcode={passcode} role={role} />
                 ) : activeTab === "activities" ? (
-                  <DailyActivitiesPanel passcode={passcode} />
+                  <DailyActivitiesPanel passcode={passcode} role={role} />
                 ) : activeTab === "clients" ? (
                   <ClientCrmPanel passcode={passcode} />
                 ) : activeTab === "leads" ? (
-                  <LeadCrmPanel passcode={passcode} />
+                  <LeadCrmPanel passcode={passcode} role={role} />
                 ) : activeTab === "vouchers" ? (
                   <VoucherPanel passcode={passcode} />
                 ) : activeTab === "december" ? (
