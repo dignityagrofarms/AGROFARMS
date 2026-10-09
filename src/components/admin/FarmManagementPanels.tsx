@@ -2200,21 +2200,54 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
               >
                 {logCommMut.isPending ? "Logging..." : "Log Record Only"}
               </button>
-              <button
-                type="button"
-                disabled={logCommMut.isPending}
-                onClick={() => {
-                  const contentText = commForm.content || commForm.messageSummary;
-                  const digits = commTargetLead.phone.replace(/\D+/g, "");
-                  const formattedDigits = digits.startsWith("0") ? "234" + digits.slice(1) : digits;
-                  const text = encodeURIComponent(contentText);
-                  window.open(`https://wa.me/${formattedDigits}?text=${text}`, "_blank");
-                  logCommMut.mutate(true);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#3F8F3F] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#0F3D24] disabled:opacity-50 transition"
-              >
-                <MessageSquare size={14} /> {logCommMut.isPending ? "Processing..." : "Send on WhatsApp & Log Record"}
-              </button>
+              {(() => {
+                const contentText = commForm.content || commForm.messageSummary;
+                const text = encodeURIComponent(contentText);
+                const digits = commTargetLead.phone.replace(/\D+/g, "");
+                const formattedDigits = digits.startsWith("0") ? "234" + digits.slice(1) : digits;
+
+                let CtaIcon = MessageSquare;
+                let ctaText = "Send on WhatsApp & Log";
+                let actionUrl = `https://wa.me/${formattedDigits}?text=${text}`;
+                let target = "_blank";
+
+                if (commForm.activityType === "Phone Call") {
+                  CtaIcon = Phone;
+                  ctaText = "Call & Log Record";
+                  actionUrl = `tel:${commTargetLead.phone}`;
+                  target = "_self";
+                } else if (commForm.activityType === "SMS / Text") {
+                  CtaIcon = MessageSquare;
+                  ctaText = "Send SMS & Log Record";
+                  actionUrl = `sms:${commTargetLead.phone}?body=${text}`;
+                  target = "_self";
+                } else if (commForm.activityType === "Email") {
+                  CtaIcon = Mail;
+                  ctaText = "Send Email & Log Record";
+                  actionUrl = `mailto:${commTargetLead.email || ''}?subject=${encodeURIComponent(commForm.messageSummary)}&body=${text}`;
+                  target = "_blank";
+                } else if (commForm.activityType === "In-Person Visit") {
+                  CtaIcon = MapPin;
+                  ctaText = "Log Visit Record";
+                  actionUrl = "";
+                }
+
+                return (
+                  <button
+                    type="button"
+                    disabled={logCommMut.isPending}
+                    onClick={() => {
+                      if (actionUrl) {
+                        window.open(actionUrl, target);
+                      }
+                      logCommMut.mutate(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#3F8F3F] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#0F3D24] disabled:opacity-50 transition"
+                  >
+                    <CtaIcon size={14} /> {logCommMut.isPending ? "Processing..." : ctaText}
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </div>
