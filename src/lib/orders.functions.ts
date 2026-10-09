@@ -1064,6 +1064,8 @@ export const adminListClients = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ clients: ClientRecord[] }> => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 1. Regular Orders
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
       .select("customer_name, phone, address, order_code, created_at, total, payment_status, status, discount_amount, voucher_code")
@@ -1071,10 +1073,20 @@ export const adminListClients = createServerFn({ method: "POST" })
       .limit(5000);
     if (error) throw new Error(error.message);
 
+    // 2. December Pre-Orders
+    const { data: preRows } = await supabaseAdmin
+      .from("preorders")
+      .select("customer_name, phone, address, preorder_code, created_at, total_amount, amount_paid, payment_status, delivery_status")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+
     const grouped = new Map<string, ClientRecord>();
+
+    // Process Regular Orders
     for (const row of rows ?? []) {
-      const phone = row.phone;
-      const key = phone || row.customer_name.trim().toLowerCase();
+      const phone = row.phone || "";
+      const key = phone ? phone.replace(/\D/g, "") : row.customer_name.trim().toLowerCase();
+      if (!key) continue;
       const existing = grouped.get(key);
       const order: ClientOrderSummary = {
         orderCode: row.order_code,
@@ -1095,7 +1107,7 @@ export const adminListClients = createServerFn({ method: "POST" })
         grouped.set(key, {
           key,
           customerName: row.customer_name,
-          phone,
+          phone: row.phone,
           address: row.address,
           totalOrders: 1,
           approvedOrders: row.payment_status === "approved" ? 1 : 0,
@@ -1105,6 +1117,52 @@ export const adminListClients = createServerFn({ method: "POST" })
           lastOrderCode: row.order_code,
           lastStatus: row.status as AdminOrder["status"],
           orders: [order],
+        });
+      }
+    }
+
+    // Process December Pre-Orders
+    for (const prow of preRows ?? []) {
+      const phone = prow.phone || "";
+      const key = phone ? phone.replace(/\D/g, "") : prow.customer_name.trim().toLowerCase();
+      if (!key) continue;
+      const existing = grouped.get(key);
+      const isPaid = prow.payment_status === "fully_paid" || prow.payment_status === "partially_paid";
+      const preorderSummary: ClientOrderSummary = {
+        orderCode: prow.preorder_code,
+        createdAt: prow.created_at,
+        total: prow.total_amount || 0,
+        paymentStatus: (isPaid ? "approved" : "submitted") as AdminOrder["paymentStatus"],
+        status: (prow.delivery_status === "delivered" ? "delivered" : "processing") as AdminOrder["status"],
+        discountAmount: 0,
+        voucherCode: null,
+      };
+
+      if (existing) {
+        existing.totalOrders += 1;
+        if (isPaid) existing.approvedOrders += 1;
+        existing.amountPaid += prow.amount_paid ?? 0;
+        existing.amountOrdered += prow.total_amount ?? 0;
+        existing.orders.push(preorderSummary);
+        if (new Date(prow.created_at).getTime() > new Date(existing.lastOrderAt).getTime()) {
+          existing.lastOrderAt = prow.created_at;
+          existing.lastOrderCode = prow.preorder_code;
+          existing.lastStatus = (prow.delivery_status === "delivered" ? "delivered" : "processing") as AdminOrder["status"];
+        }
+      } else {
+        grouped.set(key, {
+          key,
+          customerName: prow.customer_name,
+          phone: prow.phone,
+          address: prow.address,
+          totalOrders: 1,
+          approvedOrders: isPaid ? 1 : 0,
+          amountPaid: prow.amount_paid ?? 0,
+          amountOrdered: prow.total_amount ?? 0,
+          lastOrderAt: prow.created_at,
+          lastOrderCode: prow.preorder_code,
+          lastStatus: (prow.delivery_status === "delivered" ? "delivered" : "processing") as AdminOrder["status"],
+          orders: [preorderSummary],
         });
       }
     }

@@ -9,7 +9,7 @@ import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, ADMIN_STORAGE_KEY, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
-import { adminListBatches, type FarmBatch } from "@/lib/farm.functions";
+import { adminListBatches, adminEnsureLeadAndLogComm, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
@@ -1071,7 +1071,7 @@ function ClientCrmPanel({ passcode }: { passcode: string }) {
                         <span className="px-4 py-4 text-xs text-[#0F3D24]/70"><span className="font-mono font-semibold text-[#3F8F3F]">{client.lastOrderCode}</span><span className="mt-1 block">{new Date(client.lastOrderAt).toLocaleDateString()}</span></span>
                         <span className="px-4 py-4 text-xs font-semibold text-[#0F3D24]">{STATUS_LABEL[client.lastStatus]}</span>
                       </button>
-                      {expanded && <ClientDetails client={client} />}
+                      {expanded && <ClientDetails client={client} passcode={passcode} />}
                     </td>
                   </tr>
                 );
@@ -1084,14 +1084,26 @@ function ClientCrmPanel({ passcode }: { passcode: string }) {
   );
 }
 
-function ClientDetails({ client }: { client: ClientRecord }) {
+function ClientDetails({ client, passcode }: { client: ClientRecord; passcode: string }) {
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+
   return (
-    <div className="border-t border-[#0F3D24]/10 bg-[#F7F5F0]/65 px-4 py-5">
-      <div className="grid gap-3 text-sm sm:grid-cols-3">
-        <div><div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Phone</div><a href={`tel:${client.phone}`} className="mt-1 block font-semibold text-[#3F8F3F]">{client.phone}</a></div>
-        <div className="sm:col-span-2"><div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Latest address</div><div className="mt-1 font-semibold text-[#0F3D24]">{client.address}</div></div>
+    <div className="border-t border-[#0F3D24]/10 bg-[#F7F5F0]/65 px-4 py-5 space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div className="grid gap-3 sm:grid-cols-3 flex-1">
+          <div><div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Phone</div><a href={`tel:${client.phone}`} className="mt-1 block font-semibold text-[#3F8F3F]">{client.phone}</a></div>
+          <div className="sm:col-span-2"><div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Latest address</div><div className="mt-1 font-semibold text-[#0F3D24]">{client.address}</div></div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowFollowUpModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#1ebf59] transition"
+        >
+          <MessageCircle size={14} /> Send WhatsApp Follow-Up
+        </button>
       </div>
-      <div className="mt-5 overflow-x-auto rounded-xl bg-white ring-1 ring-[#0F3D24]/10">
+
+      <div className="overflow-x-auto rounded-xl bg-white ring-1 ring-[#0F3D24]/10">
         <table className="w-full min-w-[700px] text-left text-xs">
           <thead className="border-b border-[#0F3D24]/10 text-[10px] uppercase tracking-widest text-[#0F3D24]/55"><tr><th className="px-3 py-2">Order</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Total</th><th className="px-3 py-2">Discount</th><th className="px-3 py-2">Payment</th><th className="px-3 py-2">Status</th></tr></thead>
           <tbody className="divide-y divide-[#0F3D24]/10">
@@ -1107,6 +1119,133 @@ function ClientDetails({ client }: { client: ClientRecord }) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {showFollowUpModal && (
+        <ClientFollowUpModal
+          client={client}
+          passcode={passcode}
+          onClose={() => setShowFollowUpModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ClientFollowUpModal({
+  client,
+  passcode,
+  onClose,
+}: {
+  client: ClientRecord;
+  passcode: string;
+  onClose: () => void;
+}) {
+  const logCommFn = useServerFn(adminEnsureLeadAndLogComm);
+  const [templateKey, setTemplateKey] = useState("balance_reminder");
+  const [messageText, setMessageText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    const first = client.customerName.split(" ")[0];
+    const totalBal = client.amountOrdered - client.amountPaid;
+    if (templateKey === "balance_reminder") {
+      setMessageText(
+        `Hi ${first}, friendly update from Dignity Agro Farms regarding your order/reservation (${client.lastOrderCode}).\nTotal Amount: ₦${client.amountOrdered.toLocaleString()}\nAmount Paid: ₦${client.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${totalBal.toLocaleString()}\n\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for choosing Dignity Agro Farms!`
+      );
+    } else if (templateKey === "delivery_check") {
+      setMessageText(
+        `Hi ${first}, update regarding your order (${client.lastOrderCode}) with Dignity Agro Farms: we are preparing your farm-fresh produce! Please let us know if you have specific delivery time preferences.`
+      );
+    } else if (templateKey === "holiday_promo") {
+      setMessageText(
+        `Hi ${first}, Christmas & Holiday poultry pre-orders are currently active at Dignity Agro Farms! Reserve farm-fresh broilers and eggs early: https://dignityagrofarms.com/december-preorder`
+      );
+    }
+  }, [templateKey, client]);
+
+  const handleSendAndLog = async () => {
+    setSending(true);
+    try {
+      await logCommFn({
+        data: {
+          passcode,
+          fullName: client.customerName,
+          phone: client.phone,
+          location: client.address,
+          activityType: "WhatsApp Follow-Up",
+          messageSummary: templateKey.replace(/_/g, " ").toUpperCase(),
+          content: messageText,
+        },
+      });
+
+      const cleanP = client.phone.replace(/\D+/g, "");
+      const waPhone = cleanP.startsWith("0") ? "234" + cleanP.slice(1) : cleanP;
+      window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(messageText)}`, "_blank", "noopener,noreferrer");
+      onClose();
+    } catch (err: any) {
+      alert("Error logging communication: " + (err?.message || String(err)));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col text-left">
+        {/* Header */}
+        <div className="bg-[#0F3D24] px-6 py-4 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageCircle size={18} className="text-[#25D366]" />
+            <h3 className="font-bold text-sm">Send WhatsApp Follow-Up</h3>
+          </div>
+          <button onClick={onClose} className="rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 text-xs">
+          <div className="bg-[#F7F5F0] p-3 rounded-2xl">
+            <span className="block font-semibold text-[#0F3D24]">{client.customerName}</span>
+            <span className="text-[11px] text-slate-600 font-mono">{client.phone}</span>
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Select Follow-Up Message Template</label>
+            <select
+              value={templateKey}
+              onChange={(e) => setTemplateKey(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+            >
+              <option value="balance_reminder">Balance Payment & Pre-Order Reminder</option>
+              <option value="delivery_check">Delivery Readiness & Location Check</option>
+              <option value="holiday_promo">Holiday Special & Christmas Pre-Order Promotion</option>
+              <option value="custom">Custom Message</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Message Content (Editable)</label>
+            <textarea
+              rows={5}
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-800 outline-none focus:border-[#3F8F3F] leading-relaxed"
+            />
+          </div>
+        </div>
+
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="rounded-full bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-700">Cancel</button>
+          <button
+            onClick={handleSendAndLog}
+            disabled={sending || !messageText.trim()}
+            className="rounded-full bg-[#25D366] px-5 py-2 text-xs font-bold text-white shadow-md hover:bg-[#1ebf59] disabled:opacity-50 transition flex items-center gap-1.5"
+          >
+            {sending ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} />}
+            <span>Open WhatsApp & Log CRM Activity</span>
+          </button>
+        </div>
       </div>
     </div>
   );

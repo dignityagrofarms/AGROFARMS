@@ -528,10 +528,48 @@ export const adminListLeads = createServerFn({ method: "POST" })
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: rows, error } = await supabaseAdmin
+    let { data: rows, error } = await supabaseAdmin
       .from("crm_leads")
       .select("*")
       .order("created_at", { ascending: false });
+
+    // Auto-sync Pre-Orders into crm_leads if missing
+    try {
+      const { data: preorders } = await supabaseAdmin
+        .from("preorders")
+        .select("customer_name, phone, address, product, total_amount, payment_status, notes")
+        .limit(2000);
+
+      if (preorders && preorders.length > 0) {
+        const existingPhones = new Set((rows || []).map((r: any) => r.phone?.replace(/\D/g, "")).filter(Boolean));
+        const newLeads: any[] = [];
+        for (const po of preorders) {
+          const cleanP = po.phone ? po.phone.replace(/\D/g, "") : "";
+          if (!cleanP || existingPhones.has(cleanP)) continue;
+          existingPhones.add(cleanP);
+          newLeads.push({
+            full_name: po.customer_name,
+            phone: po.phone,
+            location: po.address || "Owerri, Imo State",
+            lead_source: "December Pre-Order",
+            interested_in: po.product || "Live Broiler Chicken",
+            status: po.payment_status === "fully_paid" ? "Customer (Converted)" : "December Pre-Order",
+            estimated_value: po.total_amount || 0,
+            notes: po.notes || "Pre-order reservation customer",
+          });
+        }
+        if (newLeads.length > 0) {
+          await supabaseAdmin.from("crm_leads").insert(newLeads);
+          const { data: updatedRows } = await supabaseAdmin
+            .from("crm_leads")
+            .select("*")
+            .order("created_at", { ascending: false });
+          if (updatedRows) rows = updatedRows;
+        }
+      }
+    } catch (e) {
+      console.warn("Preorder to CRM sync warning:", e);
+    }
 
     if (error) {
       console.warn("crm_leads query warning:", error.message);
@@ -632,6 +670,67 @@ export const adminLogLeadCommunication = createServerFn({ method: "POST" })
     }
 
     return { success: true };
+  });
+
+export const adminEnsureLeadAndLogComm = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        fullName: z.string(),
+        phone: z.string(),
+        location: z.string().optional().nullable(),
+        activityType: z.string().default("WhatsApp Message"),
+        messageSummary: z.string().min(1),
+        content: z.string().optional().nullable(),
+        sentBy: z.string().optional().nullable(),
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }): Promise<{ success: boolean; leadId: string }> => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const cleanP = data.phone.replace(/\D/g, "");
+    let leadId = "";
+
+    try {
+      const { data: existingLeads } = await supabaseAdmin
+        .from("crm_leads")
+        .select("id, phone")
+        .limit(1000);
+
+      const match = (existingLeads || []).find((l: any) => l.phone?.replace(/\D/g, "") === cleanP);
+      if (match) {
+        leadId = match.id;
+      } else {
+        const { data: newLead, error } = await supabaseAdmin
+          .from("crm_leads")
+          .insert({
+            full_name: data.fullName,
+            phone: data.phone,
+            location: data.location || "Owerri, Imo State",
+            lead_source: "Client Follow-up",
+            status: "Contacted",
+          })
+          .select("id")
+          .single();
+        if (error) throw new Error(error.message);
+        leadId = newLead.id;
+      }
+
+      await supabaseAdmin.from("crm_lead_activities").insert({
+        lead_id: leadId,
+        activity_type: data.activityType,
+        message_summary: data.messageSummary,
+        content: data.content || null,
+        sent_by: data.sentBy || "Admin",
+      });
+    } catch (e) {
+      console.warn("Client follow-up log warning:", e);
+    }
+
+    return { success: true, leadId };
   });
 
 export const adminCreateLead = createServerFn({ method: "POST" })
