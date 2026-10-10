@@ -568,6 +568,15 @@ export interface UserAccountItem {
   active: boolean;
   createdAt: string;
   lastLoginAt?: string | null;
+  fullName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  department?: string | null;
+  status?: "active" | "suspended" | "on_leave" | "terminated";
+  joinDate?: string | null;
+  emergencyContact?: string | null;
+  notes?: string | null;
 }
 
 export const adminListUserAccounts = createServerFn({ method: "POST" })
@@ -588,6 +597,15 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
       active: r.active,
       createdAt: r.created_at,
       lastLoginAt: r.last_login_at ?? null,
+      fullName: r.full_name ?? null,
+      phone: r.phone ?? null,
+      email: r.email ?? null,
+      address: r.address ?? null,
+      department: r.department ?? "Farm Operations",
+      status: r.status ?? (r.active ? "active" : "suspended"),
+      joinDate: r.join_date ?? r.created_at?.split("T")[0] ?? null,
+      emergencyContact: r.emergency_contact ?? null,
+      notes: r.notes ?? null,
     }));
 
     const masterUser = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
@@ -599,6 +617,9 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
         active: true,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
+        fullName: "Dignity Owner",
+        department: "Management",
+        status: "active",
       });
     }
 
@@ -612,6 +633,13 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
       targetUsername: z.string().trim().min(3).max(50).toLowerCase(),
       targetPasscode: z.string().trim().min(6).max(60),
       targetRole: z.enum(["owner", "manager", "staff"]),
+      fullName: z.string().optional().nullable(),
+      phone: z.string().optional().nullable(),
+      email: z.string().optional().nullable(),
+      address: z.string().optional().nullable(),
+      department: z.string().optional().nullable(),
+      emergencyContact: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
     }).parse(data),
   )
   .handler(async ({ data }) => {
@@ -624,14 +652,22 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
       const hash = await hashPasscode(data.targetPasscode);
       
       console.log(`[adminCreateUserAccount] Executing upsert for: ${data.targetUsername}`);
-      const { error } = await supabaseAdmin
-        .from("admin_access")
+      const { error } = await (supabaseAdmin
+        .from("admin_access" as any) as any)
         .upsert(
           {
             username: data.targetUsername,
             role: data.targetRole,
             passcode_hash: hash,
             active: true,
+            full_name: data.fullName ?? null,
+            phone: data.phone ?? null,
+            email: data.email ?? null,
+            address: data.address ?? null,
+            department: data.department ?? "Farm Operations",
+            status: "active",
+            emergency_contact: data.emergencyContact ?? null,
+            notes: data.notes ?? null,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "username" },
@@ -1502,6 +1538,372 @@ export const adminDecidePayment = createServerFn({ method: "POST" })
         payment_approved_at: data.decision === "approved" ? new Date().toISOString() : null,
       })
       .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ─── HR MANAGEMENT SERVER FUNCTIONS ──────────────────────────────────────────
+
+export const adminUpdateStaffMember = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().trim().min(1).toLowerCase(),
+      fullName: z.string().optional().nullable(),
+      phone: z.string().optional().nullable(),
+      email: z.string().optional().nullable(),
+      address: z.string().optional().nullable(),
+      department: z.string().optional().nullable(),
+      status: z.enum(["active", "suspended", "on_leave", "terminated"]).optional(),
+      emergencyContact: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const updatePayload: any = { updated_at: new Date().toISOString() };
+    if (data.fullName !== undefined) updatePayload.full_name = data.fullName;
+    if (data.phone !== undefined) updatePayload.phone = data.phone;
+    if (data.email !== undefined) updatePayload.email = data.email;
+    if (data.address !== undefined) updatePayload.address = data.address;
+    if (data.department !== undefined) updatePayload.department = data.department;
+    if (data.status !== undefined) {
+      updatePayload.status = data.status;
+      updatePayload.active = data.status === "active";
+    }
+    if (data.emergencyContact !== undefined) updatePayload.emergency_contact = data.emergencyContact;
+    if (data.notes !== undefined) updatePayload.notes = data.notes;
+
+    const { error } = await (supabaseAdmin
+      .from("admin_access" as any) as any)
+      .update(updatePayload)
+      .eq("username", data.targetUsername);
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminRecordSuspension = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      staffUsername: z.string().trim().min(1).toLowerCase(),
+      reason: z.string().trim().min(3),
+      startDate: z.string().optional(),
+      endDate: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Insert suspension record
+    const { error: insertErr } = await (supabaseAdmin.from("staff_suspensions" as any) as any).insert({
+      staff_username: data.staffUsername,
+      reason: data.reason,
+      start_date: data.startDate || new Date().toISOString().split("T")[0],
+      end_date: data.endDate || null,
+      status: "active",
+      recorded_by: "HR/Owner",
+      notes: data.notes || null,
+    });
+    if (insertErr) throw new Error(insertErr.message);
+
+    // Update staff account status to suspended
+    await (supabaseAdmin
+      .from("admin_access" as any) as any)
+      .update({ status: "suspended", active: false, updated_at: new Date().toISOString() })
+      .eq("username", data.staffUsername);
+
+    return { ok: true };
+  });
+
+export const adminListSuspensions = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => z.object({ passcode: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: rows, error } = await (supabaseAdmin
+      .from("staff_suspensions" as any) as any)
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      staffUsername: r.staff_username,
+      reason: r.reason,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      status: r.status,
+      recordedBy: r.recorded_by,
+      notes: r.notes,
+      createdAt: r.created_at,
+    }));
+  });
+
+export const adminUploadStaffDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().trim().min(1).toLowerCase(),
+      documentName: z.string().trim().min(1),
+      documentType: z.enum(["contract", "nda", "guarantor_form", "id_card", "other"]),
+      fileUrl: z.string().trim().min(1),
+      fileSize: z.string().optional().nullable(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin.from("staff_documents" as any) as any).insert({
+      username: data.targetUsername,
+      document_name: data.documentName,
+      document_type: data.documentType,
+      file_url: data.fileUrl,
+      file_size: data.fileSize || "1.2 MB",
+      uploaded_by: "HR/Owner",
+    });
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListStaffDocuments = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      targetUsername: z.string().optional(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = (supabaseAdmin.from("staff_documents" as any) as any).select("*").order("created_at", { ascending: false });
+    if (data.targetUsername) {
+      q = q.eq("username", data.targetUsername.toLowerCase());
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      username: r.username,
+      documentName: r.document_name,
+      documentType: r.document_type,
+      fileUrl: r.file_url,
+      fileSize: r.file_size,
+      uploadedBy: r.uploaded_by,
+      createdAt: r.created_at,
+    }));
+  });
+
+export const adminDeleteStaffDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      documentId: z.string().uuid(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin.from("staff_documents" as any) as any).delete().eq("id", data.documentId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ─── ATTENDANCE SERVER FUNCTIONS ──────────────────────────────────────────────
+
+export const staffClockIn = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      username: z.string().trim().min(1).toLowerCase(),
+      notes: z.string().optional().nullable(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data: existing } = await (supabaseAdmin
+      .from("staff_attendance" as any) as any)
+      .select("id")
+      .eq("username", data.username)
+      .eq("attendance_date", today)
+      .maybeSingle();
+
+    if (existing) {
+      return { ok: true, message: "Already clocked in today!" };
+    }
+
+    const { error } = await (supabaseAdmin.from("staff_attendance" as any) as any).insert({
+      username: data.username,
+      attendance_date: today,
+      status: "present",
+      clock_in_time: new Date().toISOString(),
+      notes: data.notes || "Marked attendance via Staff Portal",
+    });
+
+    if (error) throw new Error(error.message);
+    return { ok: true, message: "Attendance clocked in successfully!" };
+  });
+
+export const adminListAttendance = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      username: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = (supabaseAdmin.from("staff_attendance" as any) as any).select("*").order("attendance_date", { ascending: false });
+    if (data.username) {
+      q = q.eq("username", data.username.toLowerCase());
+    }
+    if (data.startDate) {
+      q = q.gte("attendance_date", data.startDate);
+    }
+    if (data.endDate) {
+      q = q.lte("attendance_date", data.endDate);
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      username: r.username,
+      attendanceDate: r.attendance_date,
+      status: r.status,
+      clockInTime: r.clock_in_time,
+      clockOutTime: r.clock_out_time,
+      notes: r.notes,
+      createdAt: r.created_at,
+    }));
+  });
+
+export const adminMarkAttendance = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      username: z.string().trim().min(1).toLowerCase(),
+      attendanceDate: z.string(),
+      status: z.enum(["present", "absent", "late", "on_leave"]),
+      notes: z.string().optional().nullable(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin.from("staff_attendance" as any) as any).upsert(
+      {
+        username: data.username,
+        attendance_date: data.attendanceDate,
+        status: data.status,
+        notes: data.notes || "Recorded by HR",
+        clock_in_time: new Date().toISOString(),
+      },
+      { onConflict: "username,attendance_date" },
+    );
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ─── PAYROLL RECEIPTS SERVER FUNCTIONS ───────────────────────────────────────
+
+export const adminCreatePaymentReceipt = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      username: z.string().trim().min(1).toLowerCase(),
+      monthYear: z.string().trim().min(1),
+      amount: z.number().min(0),
+      paymentDate: z.string().optional(),
+      notes: z.string().optional().nullable(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin.from("staff_payment_receipts" as any) as any).insert({
+      username: data.username,
+      month_year: data.monthYear,
+      amount: data.amount,
+      payment_date: data.paymentDate || new Date().toISOString().split("T")[0],
+      status: "pending_signature",
+      notes: data.notes || null,
+    });
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListPaymentReceipts = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      username: z.string().optional(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = (supabaseAdmin.from("staff_payment_receipts" as any) as any).select("*").order("created_at", { ascending: false });
+    if (data.username) {
+      q = q.eq("username", data.username.toLowerCase());
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      username: r.username,
+      monthYear: r.month_year,
+      amount: r.amount,
+      paymentDate: r.payment_date,
+      status: r.status,
+      signedAt: r.signed_at,
+      receiptVoucherUrl: r.receipt_voucher_url,
+      notes: r.notes,
+      createdAt: r.created_at,
+    }));
+  });
+
+export const staffSignPaymentReceipt = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      receiptId: z.string().uuid(),
+      username: z.string().trim().min(1).toLowerCase(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin
+      .from("staff_payment_receipts" as any) as any)
+      .update({ status: "signed", signed_at: new Date().toISOString() })
+      .eq("id", data.receiptId)
+      .eq("username", data.username);
+
     if (error) throw new Error(error.message);
     return { ok: true };
   });

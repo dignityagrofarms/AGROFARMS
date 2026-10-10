@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
@@ -23,6 +23,7 @@ import { StaffTasksPanel } from "@/components/admin/StaffTasksPanel";
 import { PendingTasksModal } from "@/components/admin/PendingTasksModal";
 import { UnprocessedOrdersBanner } from "@/components/admin/UnprocessedOrdersBanner";
 import { ComplaintsDashboardPanel } from "@/components/admin/ComplaintsDashboardPanel";
+import { HrManagementPanel } from "@/components/admin/HrManagementPanel";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -263,7 +264,7 @@ function AdminOrders() {
   const [showFlyerModal, setShowFlyerModal] = useState(false);
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -616,6 +617,12 @@ function AdminOrders() {
                   {!isSidebarCollapsed && <span>Staff Tasks</span>}
                 </button>
               </li>
+              <li>
+                <button onClick={() => { setActiveTab("hr"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "hr" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <Users size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>HR Management</span>}
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -802,6 +809,8 @@ function AdminOrders() {
                   <VoucherPanel passcode={passcode} />
                 ) : activeTab === "december" ? (
                   <DecemberPreorderPanel passcode={passcode} />
+                ) : activeTab === "hr" ? (
+                  <HrManagementPanel passcode={passcode} role={role} />
                 ) : activeTab === "flyers" ? (
                   <div className="space-y-6">
                     <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
@@ -2443,6 +2452,7 @@ function PaymentSection({
 
 function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   const [filter, setFilter] = useState("all");
+  const [selectedDate, setSelectedDate] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
 
@@ -2491,16 +2501,128 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
 
   const [selectedPendingPayment, setSelectedPendingPayment] = useState<{ payment: any; preorder: any } | null>(null);
 
+  const allPreorders = query.data?.preorders || [];
+  const role = query.data?.role || "owner";
+
+  // Financial & Operational Metrics calculations
+  const totalReceived = allPreorders.reduce((acc: number, o: any) => acc + (o.totalPaid || 0), 0);
+  const totalOwed = allPreorders.reduce((acc: number, o: any) => {
+    const totalCost = o.totalAmount || 0;
+    const paid = o.totalPaid || 0;
+    return acc + Math.max(0, totalCost - paid);
+  }, 0);
+  const totalBirds = allPreorders.reduce((acc: number, o: any) => acc + (o.quantity || 0), 0);
+  const totalCount = allPreorders.length;
+
+  // Extract unique delivery dates
+  const uniqueDatesMap: { [date: string]: { date: string; count: number; birds: number } } = {};
+  allPreorders.forEach((o: any) => {
+    const d = o.preferredDate || o.deliveryDate || "Not Specified";
+    if (!uniqueDatesMap[d]) {
+      uniqueDatesMap[d] = { date: d, count: 0, birds: 0 };
+    }
+    uniqueDatesMap[d].count += 1;
+    uniqueDatesMap[d].birds += o.quantity || 0;
+  });
+  const dateChips = Object.values(uniqueDatesMap).sort((a, b) => a.date.localeCompare(b.date));
+
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
-        <div className="flex items-center gap-2 text-[#3F8F3F]"><Gift size={18} /><span className="text-xs font-semibold uppercase tracking-widest">December Pre-Orders</span></div>
-        <h2 className="mt-2 text-2xl font-semibold text-[#0F3D24]">Holiday Pre-Orders</h2>
-        <p className="mt-1 max-w-2xl text-sm text-[#0F3D24]/65">Manage reservations, update delivery status, and coordinate December collections.</p>
+      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8 space-y-6">
+        <div className="flex items-center gap-2 text-[#3F8F3F]"><Gift size={18} /><span className="text-xs font-semibold uppercase tracking-widest">December Pre-Orders Overview</span></div>
+        <div>
+          <h2 className="text-2xl font-extrabold text-[#0F3D24]">December Holiday Pre-Orders Dashboard</h2>
+          <p className="mt-1 max-w-2xl text-xs text-[#0F3D24]/65">Track total reservations, amounts received, balance owed, and filter by customer chosen delivery dates.</p>
+        </div>
+
+        {/* Financial & Operational Summary Cards */}
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10">
+            <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">Total Pre-Orders</span>
+            <p className="mt-1 text-2xl font-black text-[#0F3D24]">{totalCount}</p>
+            <span className="text-[10px] text-[#0F3D24]/60 font-semibold">Active Reservations</span>
+          </div>
+
+          <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10">
+            <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">Total Birds Reserved</span>
+            <p className="mt-1 text-2xl font-black text-[#3F8F3F]">{totalBirds.toLocaleString()}</p>
+            <span className="text-[10px] text-[#3F8F3F] font-bold">Broilers & Poultry</span>
+          </div>
+
+          {role === "owner" ? (
+            <>
+              <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200/60">
+                <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider block">Total Received</span>
+                <p className="mt-1 text-2xl font-black text-emerald-900">₦{totalReceived.toLocaleString()}</p>
+                <span className="text-[10px] text-emerald-700 font-semibold">Deposits & Payments</span>
+              </div>
+
+              <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200/60">
+                <span className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wider block">Total Balance Owed</span>
+                <p className="mt-1 text-2xl font-black text-amber-900">₦{totalOwed.toLocaleString()}</p>
+                <span className="text-[10px] text-amber-700 font-semibold">Pending Fulfillment</span>
+              </div>
+            </>
+          ) : (
+            <div className="col-span-2 rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">Financial Summary</span>
+                <p className="text-xs font-semibold text-[#0F3D24]/70 mt-1">Operational view active — ₦ amounts restricted for your account role.</p>
+              </div>
+              <Shield size={24} className="text-[#3F8F3F]" />
+            </div>
+          )}
+        </div>
+
+        {/* Delivery Date Timeline Selector */}
+        <div className="space-y-2 pt-2 border-t border-[#0F3D24]/10">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-extrabold text-[#0F3D24] uppercase tracking-wider flex items-center gap-1.5">
+              <Calendar size={14} className="text-[#3F8F3F]" /> Preferred Delivery Date Timeline
+            </span>
+            {selectedDate !== "all" && (
+              <button
+                onClick={() => setSelectedDate("all")}
+                className="text-[10px] font-bold text-[#3F8F3F] hover:underline"
+              >
+                Clear Date Filter (Show All)
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            <button
+              onClick={() => setSelectedDate("all")}
+              className={`rounded-full px-4 py-2 text-xs font-bold transition whitespace-nowrap ${
+                selectedDate === "all"
+                  ? "bg-[#0F3D24] text-white shadow-md"
+                  : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              All Dates ({totalCount} orders)
+            </button>
+            {dateChips.map((chip) => (
+              <button
+                key={chip.date}
+                onClick={() => setSelectedDate(chip.date)}
+                className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition whitespace-nowrap ${
+                  selectedDate === chip.date
+                    ? "bg-[#3F8F3F] text-white shadow-md"
+                    : "bg-[#F7F5F0] text-[#0F3D24] hover:bg-[#3F8F3F]/20"
+                }`}
+              >
+                <span>📅 {chip.date}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${selectedDate === chip.date ? "bg-white text-[#3F8F3F]" : "bg-[#0F3D24]/10 text-[#0F3D24]"}`}>
+                  {chip.count} orders · {chip.birds} birds
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Pending Payments Alert */}
         {pendingQuery.data && pendingQuery.data.length > 0 && (
-          <div className="mt-6 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
+          <div className="mt-4 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
             <h3 className="font-semibold text-amber-800 mb-2">Payment Approvals Needed ({pendingQuery.data.length})</h3>
             <div className="space-y-2">
               {pendingQuery.data.map(({ payment, preorder }) => (
@@ -2508,7 +2630,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-mono font-extrabold text-[#3F8F3F] text-base">{preorder.preorderCode}</span>
-                      <span className="font-bold text-[#0F3D24]">· ₦{payment.amount.toLocaleString()}</span>
+                      {role === "owner" && <span className="font-bold text-[#0F3D24]">· ₦{payment.amount.toLocaleString()}</span>}
                     </div>
                     <span className="block text-xs text-slate-600 font-semibold">{preorder.customerName} · {preorder.product} × {preorder.quantity}</span>
                   </div>
@@ -2597,6 +2719,10 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         <div className="space-y-4">
           {(() => {
             const list = query.data.preorders.filter((o: any) => {
+              if (selectedDate !== "all") {
+                const dateVal = o.preferredDate || o.deliveryDate || "Not Specified";
+                if (dateVal !== selectedDate) return false;
+              }
               if (filter === "awaiting_approval") {
                 return o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted";
               }
@@ -2604,6 +2730,12 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
             });
             return (
               <>
+                {selectedDate !== "all" && (
+                  <div className="rounded-2xl bg-[#3F8F3F]/10 p-4 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 flex items-center justify-between">
+                    <span>Showing {list.length} pre-orders scheduled for delivery on 📅 {selectedDate} ({list.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0)} total birds)</span>
+                    <button onClick={() => setSelectedDate("all")} className="text-[#3F8F3F] underline text-[11px]">Show All Dates</button>
+                  </div>
+                )}
                 {list.map((o: any) => (
                   <PreorderRow
                     key={o.id}

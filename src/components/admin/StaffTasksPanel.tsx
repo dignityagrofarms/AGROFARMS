@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckSquare, ListTodo, Plus, Trash2, CheckCircle2, Circle, Clock, Users, User, Loader2 } from "lucide-react";
+import { CheckSquare, ListTodo, Plus, Trash2, CheckCircle2, Circle, Clock, Users, User, Loader2, Calendar, UserCheck, Check } from "lucide-react";
 import { adminListTasks, adminCreateTask, adminCompleteTask, adminDeleteTask } from "@/lib/tasks.functions";
-import { adminListUserAccounts } from "@/lib/orders.functions";
+import { adminListUserAccounts, staffClockIn } from "@/lib/orders.functions";
 
 interface StaffTasksPanelProps {
   passcode: string;
@@ -15,17 +15,27 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
   const [description, setDescription] = useState("");
   const [assignedTo, setAssignedTo] = useState("everyone");
   const [msg, setMsg] = useState<string | null>(null);
+  const [clockInMsg, setClockInMsg] = useState<string | null>(null);
 
   const listTasksFn = useServerFn(adminListTasks);
   const createTaskFn = useServerFn(adminCreateTask);
   const completeTaskFn = useServerFn(adminCompleteTask);
   const deleteTaskFn = useServerFn(adminDeleteTask);
   const listUsersFn = useServerFn(adminListUserAccounts);
+  const clockInFn = useServerFn(staffClockIn);
+
+  const clockInMut = useMutation({
+    mutationFn: () => clockInFn({ data: { username: username || "staff" } }),
+    onSuccess: (res: any) => {
+      setClockInMsg(res.message || "Attendance clocked in successfully!");
+    },
+    onError: (e: Error) => setClockInMsg(`Error: ${e.message}`),
+  });
 
   const tasksQuery = useQuery({
     queryKey: ["staff_tasks", passcode],
     queryFn: () => listTasksFn({ data: { passcode } }),
-    refetchInterval: 30000, // Refresh every 30 seconds to get new tasks
+    refetchInterval: 30000,
   });
 
   const usersQuery = useQuery({
@@ -61,6 +71,31 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
 
   return (
     <div className="mb-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-6">
+      {/* Daily Attendance Clock-In Banner */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#0F3D24] to-[#134a2c] p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+        <div>
+          <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#3F8F3F]">Daily Attendance Register</span>
+          <h3 className="text-base font-bold flex items-center gap-2 mt-1">
+            <Calendar size={18} className="text-[#3F8F3F]" /> Welcome back, {username}!
+          </h3>
+          <p className="text-xs text-white/70 mt-0.5">
+            Mark your attendance for today ({new Date().toLocaleDateString()}) to record your clock-in status in the HR register.
+          </p>
+          {clockInMsg && (
+            <p className="mt-2 text-xs font-extrabold text-[#3F8F3F] bg-white/10 px-3 py-1.5 rounded-lg inline-block">
+              {clockInMsg}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => clockInMut.mutate()}
+          disabled={clockInMut.isPending}
+          className="rounded-full bg-[#3F8F3F] px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-600 transition shadow-md whitespace-nowrap flex items-center justify-center gap-2 disabled:opacity-50"
+        >
+          {clockInMut.isPending ? <Loader2 size={16} className="animate-spin" /> : <UserCheck size={16} />} Clock-In Attendance Today
+        </button>
+      </div>
+
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#0F3D24]/10 pb-4">
         <div>
