@@ -38,6 +38,9 @@ import {
   adminMarkAttendance,
   adminCreatePaymentReceipt,
   adminListPaymentReceipts,
+  adminListLeaveRequests,
+  adminDecideLeaveRequest,
+  staffSubmitLeaveRequest,
   type AdminRole,
   type UserAccountItem,
 } from "@/lib/orders.functions";
@@ -49,7 +52,7 @@ interface HrManagementPanelProps {
 
 export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const qc = useQueryClient();
-  const [subTab, setSubTab] = useState<"directory" | "documents" | "suspensions" | "attendance" | "payroll">("directory");
+  const [subTab, setSubTab] = useState<"directory" | "documents" | "suspensions" | "attendance" | "payroll" | "leave">("directory");
 
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState("");
@@ -114,12 +117,32 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const markAttendanceFn = useServerFn(adminMarkAttendance);
   const createPayrollFn = useServerFn(adminCreatePaymentReceipt);
   const listPayrollFn = useServerFn(adminListPaymentReceipts);
+  const listLeaveFn = useServerFn(adminListLeaveRequests);
+  const decideLeaveFn = useServerFn(adminDecideLeaveRequest);
 
   // Queries
   const staffQuery = useQuery({
     queryKey: ["hr-staff-list", passcode],
     queryFn: () => listStaffFn({ data: { passcode } }),
     refetchInterval: 15000,
+  });
+
+  const leaveQuery = useQuery({
+    queryKey: ["hr-leave-list", passcode],
+    queryFn: () => listLeaveFn({ data: { passcode } }),
+    enabled: subTab === "leave" || subTab === "directory",
+  });
+
+  const decideLeaveMut = useMutation({
+    mutationFn: (vars: { requestId: string; decision: "approved" | "rejected" }) =>
+      decideLeaveFn({ data: { passcode, requestId: vars.requestId, decision: vars.decision } }),
+    onSuccess: () => {
+      setActionMsg("Leave request decision recorded and attendance updated!");
+      qc.invalidateQueries({ queryKey: ["hr-leave-list"] });
+      qc.invalidateQueries({ queryKey: ["hr-attendance-list"] });
+      qc.invalidateQueries({ queryKey: ["hr-staff-list"] });
+    },
+    onError: (err: any) => setActionMsg("Error: " + err.message),
   });
 
   const suspensionsQuery = useQuery({
@@ -253,6 +276,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const attendanceList = attendanceQuery.data || [];
   const docsList = docsQuery.data || [];
   const payrollList = payrollQuery.data || [];
+  const leaveList = leaveQuery.data || [];
 
   // Metrics
   const totalStaffCount = staffList.length;
@@ -260,6 +284,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const presentTodayCount = attendanceList.filter((a: any) => a.attendanceDate === todayStr && a.status === "present").length;
   const suspendedCount = staffList.filter((s: any) => s.status === "suspended").length;
   const pendingPayrollCount = payrollList.filter((p: any) => p.status === "pending_signature").length;
+  const pendingLeaveCount = leaveList.filter((l: any) => l.status === "pending").length;
   const attendancePercentage = totalStaffCount > 0 ? Math.round((presentTodayCount / totalStaffCount) * 100) : 100;
 
   // Filtered Directory
@@ -393,6 +418,14 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             }`}
           >
             <DollarSign size={14} /> Monthly Payroll Receipts
+          </button>
+          <button
+            onClick={() => setSubTab("leave")}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+              subTab === "leave" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+            }`}
+          >
+            <Calendar size={14} /> Leave Requests ({leaveList.length}) {pendingLeaveCount > 0 && <span className="rounded-full bg-amber-500 text-white px-1.5 py-0.2 text-[9px] font-extrabold">{pendingLeaveCount}</span>}
           </button>
         </div>
       </div>
@@ -726,6 +759,93 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Leave Requests Sub-Tab */}
+      {subTab === "leave" && (
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-bold text-[#0F3D24] flex items-center gap-2">
+              <Calendar size={18} className="text-[#3F8F3F]" /> Employee Leave Requests & Approvals
+            </h3>
+            <span className="text-xs font-semibold text-[#0F3D24]/70">
+              {pendingLeaveCount} pending approvals
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-[#0F3D24]">
+              <thead className="bg-[#F7F5F0] text-[10px] font-extrabold uppercase tracking-wider text-[#0F3D24]/60">
+                <tr>
+                  <th className="p-3">Staff</th>
+                  <th className="p-3">Leave Type</th>
+                  <th className="p-3">Duration (Dates)</th>
+                  <th className="p-3">Reason</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#0F3D24]/5 font-medium">
+                {leaveList.map((req: any) => (
+                  <tr key={req.id} className="hover:bg-[#F7F5F0]/50 transition">
+                    <td className="p-3 font-bold text-[#0F3D24]">@{req.username}</td>
+                    <td className="p-3">
+                      <span className="rounded-full bg-[#0F3D24]/10 px-2.5 py-1 text-[10px] font-extrabold uppercase text-[#0F3D24]">
+                        {req.leaveType} Leave
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono">
+                      {req.startDate} → {req.endDate}
+                    </td>
+                    <td className="p-3 max-w-[200px] truncate">{req.reason}</td>
+                    <td className="p-3">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${
+                          req.status === "approved"
+                            ? "bg-emerald-100 text-emerald-800"
+                            : req.status === "rejected"
+                            ? "bg-rose-100 text-rose-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {req.status}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      {req.status === "pending" ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => decideLeaveMut.mutate({ requestId: req.id, decision: "approved" })}
+                            disabled={decideLeaveMut.isPending}
+                            className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => decideLeaveMut.mutate({ requestId: req.id, decision: "rejected" })}
+                            disabled={decideLeaveMut.isPending}
+                            className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 transition"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-[#0F3D24]/50">Reviewed by {req.reviewedBy || "HR"}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {leaveList.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-xs text-[#0F3D24]/60">
+                      No leave requests submitted yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

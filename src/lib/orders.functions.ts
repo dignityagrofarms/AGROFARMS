@@ -1907,3 +1907,124 @@ export const staffSignPaymentReceipt = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ─── LEAVE REQUESTS SERVER FUNCTIONS ─────────────────────────────────────────
+
+export const staffSubmitLeaveRequest = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      username: z.string().trim().min(1).toLowerCase(),
+      leaveType: z.enum(["annual", "sick", "emergency", "casual"]),
+      startDate: z.string().min(1),
+      endDate: z.string().min(1),
+      reason: z.string().trim().min(3),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin.from("staff_leave_requests" as any) as any).insert({
+      username: data.username,
+      leave_type: data.leaveType,
+      start_date: data.startDate,
+      end_date: data.endDate,
+      reason: data.reason,
+      status: "pending",
+    });
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminListLeaveRequests = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      username: z.string().optional(),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let q = (supabaseAdmin.from("staff_leave_requests" as any) as any).select("*").order("created_at", { ascending: false });
+    if (data.username) {
+      q = q.eq("username", data.username.toLowerCase());
+    }
+
+    const { data: rows, error } = await q;
+    if (error) throw new Error(error.message);
+
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      username: r.username,
+      leaveType: r.leave_type,
+      startDate: r.start_date,
+      endDate: r.end_date,
+      reason: r.reason,
+      status: r.status,
+      reviewedBy: r.reviewed_by,
+      reviewedAt: r.reviewed_at,
+      createdAt: r.created_at,
+    }));
+  });
+
+export const adminDecideLeaveRequest = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({
+      passcode: z.string(),
+      requestId: z.string().uuid(),
+      decision: z.enum(["approved", "rejected"]),
+    }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Fetch leave details
+    const { data: leave } = await (supabaseAdmin
+      .from("staff_leave_requests" as any) as any)
+      .select("*")
+      .eq("id", data.requestId)
+      .single();
+
+    if (!leave) throw new Error("Leave request not found");
+
+    const { error } = await (supabaseAdmin
+      .from("staff_leave_requests" as any) as any)
+      .update({
+        status: data.decision,
+        reviewed_by: "HR/Owner",
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq("id", data.requestId);
+
+    if (error) throw new Error(error.message);
+
+    // If approved, automatically update attendance status to 'on_leave' for the duration
+    if (data.decision === "approved" && leave.start_date) {
+      const start = new Date(leave.start_date);
+      const end = new Date(leave.end_date || leave.start_date);
+      
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dateStr = d.toISOString().split("T")[0];
+        await (supabaseAdmin.from("staff_attendance" as any) as any).upsert(
+          {
+            username: leave.username,
+            attendance_date: dateStr,
+            status: "on_leave",
+            notes: `Approved Leave (${leave.leave_type})`,
+          },
+          { onConflict: "username,attendance_date" },
+        );
+      }
+
+      // Also update staff account status to 'on_leave'
+      await (supabaseAdmin
+        .from("admin_access" as any) as any)
+        .update({ status: "on_leave", updated_at: new Date().toISOString() })
+        .eq("username", leave.username);
+    }
+
+    return { ok: true };
+  });

@@ -560,7 +560,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         </div>
 
         {selectedBatchId !== "all" && reportQuery.data && (
-          <div className="flex items-center gap-3 text-xs font-semibold text-[#0F3D24]">
+          <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-[#0F3D24]">
             <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-[#0F3D24]/10">
               Start: {reportQuery.data.batch.startDate}
             </span>
@@ -570,6 +570,52 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           </div>
         )}
       </div>
+
+      {/* Batch Growth Circular Progress Ring (Inspo STAFF.jpeg) */}
+      {selectedBatchId !== "all" && reportQuery.data && (() => {
+        const b = reportQuery.data.batch;
+        const targetW = (b as any).targetWeeks || 7;
+        const startMs = new Date(b.startDate).getTime();
+        const nowMs = new Date().getTime();
+        const elapsedWeeks = Math.max(1, Math.ceil((nowMs - startMs) / (1000 * 60 * 60 * 24 * 7)));
+        const currentW = Math.min(targetW, elapsedWeeks);
+        const pct = Math.round((currentW / targetW) * 100);
+
+        return (
+          <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative h-20 w-20 flex-shrink-0 flex items-center justify-center">
+                <svg className="h-full w-full transform -rotate-90" viewBox="0 0 36 36">
+                  <path className="text-slate-100" strokeWidth="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path className="text-[#3F8F3F]" strokeDasharray={`${pct}, 100`} strokeWidth="3.5" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div className="absolute text-center">
+                  <span className="text-sm font-black text-[#0F3D24]">{currentW}/{targetW}</span>
+                  <span className="block text-[8px] uppercase font-bold text-[#3F8F3F]">Weeks</span>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#0F3D24]">Batch Broiler Growth Progress</h4>
+                <p className="text-xs font-semibold text-[#0F3D24]/70 mt-0.5">{b.batchName} · {b.currentHeadcount} Live Heads</p>
+                <span className="inline-block mt-1.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
+                  {currentW >= targetW ? "✓ Healthy & Ready for Harvest" : `${targetW - currentW} weeks until target harvest`}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-[#0F3D24]/10 pt-3 sm:pt-0 sm:pl-5">
+              <div className="text-center sm:text-left">
+                <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">Initial Headcount</span>
+                <p className="text-base font-black text-[#0F3D24]">{b.initialHeadcount}</p>
+              </div>
+              <div className="text-center sm:text-left pl-4">
+                <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">Mortality Count</span>
+                <p className="text-base font-black text-rose-600">{b.initialHeadcount - b.currentHeadcount}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
