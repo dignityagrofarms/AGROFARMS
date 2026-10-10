@@ -23,6 +23,7 @@ service-account*.json
 test-pdf.cjs
 *.test.cjs
 *.pdf
+*.sql
 
 # ── Internal planning & agent docs ────────────────────────────────────────────
 .lovable/plan/
