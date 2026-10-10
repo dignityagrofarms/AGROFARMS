@@ -76,7 +76,7 @@ export function AdminLoginView({
         <div className="hidden md:flex md:w-1/2 lg:w-5/12 xl:w-1/2 relative bg-[#0b2918] select-none overflow-hidden flex-col justify-between">
           {/* Background Hero Image */}
           <img
-            src="/assets/admin-login-hero-hd.png"
+            src="/assets/dignity-login-hero.png"
             alt="Dignity Agro Farms Healthy Broiler"
             className="absolute inset-0 w-full h-full object-cover object-center filter brightness-[1.02]"
             loading="eager"
