@@ -73,35 +73,53 @@ export function AdminLoginView({
         {/* ========================================================= */}
         {/* DESKTOP LEFT PANEL: Chicken Farm Inspo Visual (hidden on mobile) */}
         {/* ========================================================= */}
-        <div className="hidden md:flex md:w-1/2 lg:w-5/12 xl:w-1/2 relative bg-[#0b2918] select-none overflow-hidden flex-col justify-between">
-          {/* Background Hero Image */}
-          <img
-            src="/assets/dignity-login-hero.png"
-            alt="Dignity Agro Farms Healthy Broiler"
-            className="absolute inset-0 w-full h-full object-cover object-center filter brightness-[1.02]"
-            loading="eager"
-          />
+        <div className="hidden md:flex md:w-1/2 lg:w-5/12 xl:w-1/2 relative bg-[#061e11] select-none overflow-hidden flex-col justify-between items-center">
+          {/* Layer 1: Ambient Blurred Background (fills column seamlessly with matching farm green glow) */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <img
+              src="/assets/dignity-login-hero.png"
+              alt=""
+              className="w-full h-full object-cover scale-125 filter blur-3xl opacity-35 brightness-75"
+              aria-hidden="true"
+            />
+            {/* Soft dark vignette over the blur */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#061e11] via-transparent to-[#061e11]/80" />
+            <div className="absolute inset-0 bg-radial-gradient from-transparent to-[#061e11]/60" />
+          </div>
 
-          {/* Subtle gradient vignette to blend edges cleanly */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/20 pointer-events-none" />
-
-          {/* Top subtle back-to-website chip overlay */}
-          <div className="relative z-10 p-6 lg:p-8 flex items-center justify-between">
+          {/* Layer 2: Top Floating Navigation (placed above artwork so it never clips the logo) */}
+          <div className="relative z-20 w-full p-4 lg:p-6 flex items-center justify-between">
             <Link
               to="/"
-              className="inline-flex items-center gap-2 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md px-4 py-2 text-xs font-semibold text-white shadow-sm border border-white/20 transition-all hover:scale-105"
+              className="inline-flex items-center gap-2 rounded-full bg-black/40 hover:bg-black/60 backdrop-blur-md px-3.5 py-1.5 text-xs font-semibold text-white/95 shadow-sm border border-white/20 transition-all hover:scale-105"
             >
               <ArrowLeft size={14} /> Back to Website
             </Link>
+            <div className="hidden xl:flex items-center gap-1.5 backdrop-blur-md bg-black/30 px-3 py-1 rounded-full border border-white/10 text-[11px] text-[#A2E0A2] font-medium">
+              <Sparkles size={12} />
+              <span>Official Agro Farms Portal</span>
+            </div>
           </div>
 
-          {/* Bottom Accreditation Badge */}
-          <div className="relative z-10 p-6 lg:p-8 flex items-center justify-between text-white/80 text-xs">
-            <div className="flex items-center gap-2 backdrop-blur-sm bg-black/20 px-3.5 py-1.5 rounded-full border border-white/10">
-              <Sparkles size={14} className="text-[#A2E0A2]" />
-              <span>Premium Organic Poultry & Livestock</span>
+          {/* Layer 3: Main Artwork (100% visible, uncropped, drop-shadowed, centered) */}
+          <div className="relative z-10 flex-1 w-full flex items-center justify-center px-4 py-2 overflow-hidden">
+            <img
+              src="/assets/dignity-login-hero.png"
+              alt="Dignity Agro Farms Limited - Healthy Birds, Better Tomorrow"
+              className="w-auto h-full max-h-[78vh] 2xl:max-h-[82vh] object-contain object-center drop-shadow-[0_16px_36px_rgba(0,0,0,0.6)] rounded-2xl transition-transform duration-300 hover:scale-[1.01]"
+              loading="eager"
+            />
+          </div>
+
+          {/* Layer 4: Bottom Accreditation Badge */}
+          <div className="relative z-20 w-full p-4 lg:p-5 flex items-center justify-between text-white/70 text-xs">
+            <div className="flex items-center gap-2 backdrop-blur-md bg-black/40 px-3.5 py-1.5 rounded-full border border-white/15 shadow-sm">
+              <Sparkles size={13} className="text-[#A2E0A2]" />
+              <span className="text-[11px] text-white/90">Premium Organic Poultry & Livestock</span>
             </div>
-            <span className="text-white/60 text-[11px]">© Dignity Agro Farms</span>
+            <span className="text-white/60 text-[11px] backdrop-blur-sm bg-black/25 px-2.5 py-1 rounded-full">
+              © Dignity Agro Farms Ltd
+            </span>
           </div>
         </div>
 
