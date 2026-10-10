@@ -25,6 +25,7 @@ import { UnprocessedOrdersBanner } from "@/components/admin/UnprocessedOrdersBan
 import { ComplaintsDashboardPanel } from "@/components/admin/ComplaintsDashboardPanel";
 import { HrManagementPanel } from "@/components/admin/HrManagementPanel";
 import { PreorderFinancialChart } from "@/components/admin/PreorderFinancialChart";
+import { AdminLoginView } from "@/components/admin/AdminLoginView";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -454,22 +455,20 @@ function AdminOrders() {
 
 
 
-  const submitPasscode = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAdminLogin = async ({ username: u, passcode: p, rememberMe }: { username: string; passcode: string; rememberMe: boolean }) => {
     setAuthError(null);
-    const p = input;
-    const u = username.trim().toLowerCase();
-    if (!u || !p) {
-      setAuthError("Please enter both username and passcode.");
-      return;
-    }
-
     setIsLoggingIn(true);
     try {
       const res = await verifyLoginFn({ data: { username: u, passcode: p } });
       qc.clear();
       const credential = JSON.stringify({ username: res.username, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
-      localStorage.setItem(STORAGE_KEY, credential);
+      if (rememberMe) {
+        localStorage.setItem(STORAGE_KEY, credential);
+        localStorage.setItem("daf_admin_passcode", credential);
+        localStorage.setItem("agrofarms_admin_passcode", credential);
+      } else {
+        localStorage.setItem(STORAGE_KEY, credential);
+      }
       setPasscode(credential);
       setInput("");
       setUsername("");
@@ -482,47 +481,13 @@ function AdminOrders() {
 
   if (!passcode) {
     return (
-      <div className="min-h-screen bg-[#F7F5F0] flex flex-col items-center justify-center p-4 relative">
-        <Link to="/" className="absolute top-6 left-6 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-[#0F3D24] shadow-sm hover:bg-gray-50 transition">
-          <Home size={16} /> Back to Website
-        </Link>
-        <form onSubmit={submitPasscode} className="mx-auto max-w-md w-full rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5">
-          <ShieldCheck className="mx-auto text-[#3F8F3F]" size={40} />
-          <h2 className="mt-3 text-center text-xl font-semibold">Admin sign in</h2>
-          <p className="mt-1 text-center text-sm text-[#0F3D24]/70">Sign in with your administrator, manager, or staff account credentials.</p>
-          <input
-            type="text"
-            autoFocus
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Username"
-            autoComplete="username"
-            className="mt-6 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
-          />
-          <input
-            type="password"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Passcode"
-            autoComplete="current-password"
-            className="mt-3 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
-          />
-          {authError && <p className="mt-2 text-sm text-red-600">{authError}</p>}
-          <button type="submit" disabled={isLoggingIn} className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#134a2c] disabled:opacity-75">
-            {isLoggingIn && <Loader2 size={16} className="animate-spin" />}
-            {isLoggingIn ? "Signing in..." : "Sign in"}
-          </button>
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={() => setShowRecoveryModal(true)}
-              className="text-xs font-semibold text-[#0F3D24]/70 hover:text-[#3F8F3F] transition underline"
-            >
-              Forgot Passcode / Password?
-            </button>
-          </div>
-        </form>
-      </div>
+      <AdminLoginView
+        onLogin={handleAdminLogin}
+        isLoggingIn={isLoggingIn}
+        authError={authError}
+        onClearError={() => setAuthError(null)}
+        initialUsername={username}
+      />
     );
   }
 

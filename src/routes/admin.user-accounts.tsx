@@ -20,6 +20,7 @@ import {
 import { SiteLayout } from "@/components/site/Layout";
 import { UserAccountsPanel } from "@/components/admin/UserAccountsPanel";
 import { PendingApprovalsPanel } from "@/components/admin/PendingApprovalsPanel";
+import { AdminLoginView } from "@/components/admin/AdminLoginView";
 import {
   adminVerifyLogin,
   adminListUserAccounts,
@@ -167,6 +168,52 @@ function UserAccountsPage() {
     );
   }
 
+  if (!passcode || verifyQuery.isError) {
+    return (
+      <AdminLoginView
+        onLogin={async ({ username: u, passcode: p, rememberMe }) => {
+          setAuthError(null);
+          setIsLoggingIn(true);
+          try {
+            const res = await verifyLoginFn({
+              data: {
+                username: u,
+                passcode: p,
+              },
+            });
+
+            if (!res.ok) {
+              setAuthError("Invalid username or passcode.");
+              setIsLoggingIn(false);
+              return;
+            }
+
+            queryClient.clear();
+            const sessionToken = JSON.stringify({ username: res.username, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
+
+            if (rememberMe) {
+              localStorage.setItem(ADMIN_STORAGE_KEY, sessionToken);
+              localStorage.setItem("daf_admin_passcode", sessionToken);
+              localStorage.setItem("agrofarms_admin_passcode", sessionToken);
+            } else {
+              localStorage.setItem(ADMIN_STORAGE_KEY, sessionToken);
+            }
+
+            setPasscode(sessionToken);
+          } catch (err: any) {
+            setAuthError(err?.message || "Login failed. Please check credentials.");
+          } finally {
+            setIsLoggingIn(false);
+          }
+        }}
+        isLoggingIn={isLoggingIn}
+        authError={authError}
+        onClearError={() => setAuthError(null)}
+        initialUsername={username}
+      />
+    );
+  }
+
   return (
     <SiteLayout>
       <div className="min-h-screen bg-[#FDFBF7] py-8 text-[#0F3D24]">
@@ -208,68 +255,8 @@ function UserAccountsPage() {
             )}
           </div>
 
-          {/* Unauthenticated Login Card */}
-          {!passcode || verifyQuery.isError ? (
-            <div className="mx-auto max-w-md my-12 rounded-3xl bg-white p-8 shadow-sm ring-1 ring-[#0F3D24]/5 space-y-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-[#3F8F3F] flex items-center justify-center mx-auto">
-                <ShieldCheck size={28} />
-              </div>
-              <div className="text-center">
-                <h2 className="text-xl font-bold">Admin Authentication</h2>
-                <p className="text-xs text-[#0F3D24]/70 mt-1">
-                  Enter your admin credentials to access user account management.
-                </p>
-              </div>
-
-              <form onSubmit={handleLogin} className="space-y-3 pt-2">
-                <div>
-                  <label className="block text-xs font-bold text-[#0F3D24] mb-1">Username (Optional for Owner)</label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="e.g. manager_1 or staff_sam"
-                    className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#0F3D24] mb-1">Passcode / Password *</label>
-                  <input
-                    type="password"
-                    value={inputPasscode}
-                    onChange={(e) => setInputPasscode(e.target.value)}
-                    placeholder="Enter passcode"
-                    className="w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
-                  />
-                </div>
-
-                {authError && (
-                  <p className="text-xs font-semibold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-200">
-                    {authError}
-                  </p>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isLoggingIn}
-                  className="w-full py-3 bg-[#0F3D24] hover:bg-[#134a2c] text-white font-bold rounded-xl text-xs transition-all shadow-md disabled:opacity-50 flex items-center justify-center space-x-2"
-                >
-                  {isLoggingIn ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Authenticating...</span>
-                    </>
-                  ) : (
-                    <span>Sign In to Access Accounts</span>
-                  )}
-                </button>
-              </form>
-            </div>
-          ) : (
-            <>
-              {/* Stat Cards Overview */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Stat Cards Overview */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
                   <div className="flex items-center justify-between text-[#0F3D24]/70">
                     <span className="text-xs font-semibold">Total Accounts</span>
@@ -369,8 +356,6 @@ function UserAccountsPage() {
               ) : (
                 <PendingApprovalsPanel passcode={passcode} role={role} />
               )}
-            </>
-          )}
         </div>
       </div>
     </SiteLayout>
