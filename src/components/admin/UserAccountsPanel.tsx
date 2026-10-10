@@ -196,48 +196,23 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
       {/* Section 2: Manage Accounts & RBAC Roles (Administrator Only) */}
       {role === "owner" && (
         <div className="space-y-6 pt-2">
-          {/* Create User Form */}
-          <div className="rounded-2xl border border-[#0F3D24]/15 p-5 space-y-4">
-            <h3 className="text-sm font-bold text-[#0F3D24] flex items-center gap-2">
-              <UserPlus size={16} className="text-[#3F8F3F]" /> Create Manager or Staff Account
-            </h3>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <input
-                type="text"
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                placeholder="Username (e.g. manager1)"
-                className="rounded-xl border border-[#0F3D24]/15 px-3.5 py-2 text-xs outline-none focus:border-[#3F8F3F]"
-              />
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Passcode (min 6 chars)"
-                className="rounded-xl border border-[#0F3D24]/15 px-3.5 py-2 text-xs outline-none focus:border-[#3F8F3F]"
-              />
-              <select
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value as AdminRole)}
-                className="rounded-xl border border-[#0F3D24]/15 bg-white px-3.5 py-2 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
-              >
-                <option value="manager">Manager (Read & Monitoring Access)</option>
-                <option value="staff">Staff (Operational Data Entry Only)</option>
-                <option value="owner">Administrator (Full Access)</option>
-              </select>
+          {/* HR Management Redirection Notice */}
+          <div className="rounded-2xl bg-gradient-to-r from-[#0F3D24]/5 to-[#3F8F3F]/10 border border-[#3F8F3F]/30 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#3F8F3F]">HR Staff Account Management</span>
+              <h3 className="text-sm font-bold text-[#0F3D24] flex items-center gap-2 mt-0.5">
+                <Users size={16} className="text-[#3F8F3F]" /> Staff Account Creation Moved to HR Tab
+              </h3>
+              <p className="text-xs text-[#0F3D24]/70 mt-1 max-w-xl">
+                Staff and Manager accounts are created and managed directly in the <strong>HR Management</strong> tab. This ensures complete employee records (Full Name, Phone, Email, Address, Department, Emergency Contact & Passcode) are registered together with signed documents.
+              </p>
             </div>
-            <button
-              onClick={() => createAccountMut.mutate()}
-              disabled={!newUsername.trim() || newPassword.trim().length < 6 || createAccountMut.isPending}
-              className="rounded-full bg-[#3F8F3F] px-5 py-2 text-xs font-bold text-white disabled:opacity-40 hover:bg-[#4ea94e] transition"
+            <a
+              href="/admin/admin-orders"
+              className="rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#134a2c] transition shadow-sm whitespace-nowrap text-center"
             >
-              {createAccountMut.isPending ? "Creating..." : "Create Account"}
-            </button>
-            {createMsg && (
-              <div className={`mt-2 p-3 rounded-lg text-xs font-semibold ${createMsg.startsWith("Error:") ? "bg-red-50 text-red-600 border border-red-200" : "bg-emerald-50 text-emerald-700 border border-emerald-200"}`}>
-                {createMsg}
-              </div>
-            )}
+              Go to HR Management Tab
+            </a>
           </div>
 
           {/* Accounts List Table */}
