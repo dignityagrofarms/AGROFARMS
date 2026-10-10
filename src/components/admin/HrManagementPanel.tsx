@@ -24,6 +24,7 @@ import {
   ExternalLink,
   ChevronRight,
   Sparkles,
+  Eye,
 } from "lucide-react";
 import {
   adminListUserAccounts,
@@ -297,6 +298,8 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
     return matchesSearch && matchesDept;
   });
 
+  const isOwner = role === "owner";
+
   return (
     <div className="space-y-6">
       {/* Top Banner / Hero */}
@@ -313,14 +316,35 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowAddStaffModal(true)}
-              className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
-            >
-              <UserPlus size={16} /> Add Staff Member
-            </button>
+            {isOwner ? (
+              <button
+                onClick={() => setShowAddStaffModal(true)}
+                className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
+              >
+                <UserPlus size={16} /> Add Staff Member
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3.5 py-1.5 text-xs font-bold text-amber-900 ring-1 ring-amber-300">
+                <Shield size={14} /> Manager (Read-Only)
+              </span>
+            )}
           </div>
         </div>
+
+        {/* Manager View-Only Banner */}
+        {!isOwner && (
+          <div className="mt-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 p-4 text-xs text-amber-950 flex items-start gap-3 shadow-xs">
+            <Shield size={18} className="text-amber-700 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-extrabold uppercase tracking-wider block text-amber-900">
+                Manager View (View-Only Mode)
+              </span>
+              <p className="mt-0.5 text-amber-800 leading-relaxed">
+                You have permission to inspect all staff profiles, signed contracts, attendance logs, disciplinary records, and monthly salary payment vouchers. Adding, updating, or deleting staff, uploading employment contracts, recording suspensions, and authorizing payroll remain restricted to the Farm Owner.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Global Notifications Message */}
         {actionMsg && (
@@ -515,38 +539,54 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                       </span>
                     </td>
                     <td className="p-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      {isOwner ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setSelectedStaffUser(staff)}
+                            title="View Staff Profile"
+                            className="rounded-full bg-[#F7F5F0] p-1.5 text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition"
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setDocumentForm((prev) => ({ ...prev, username: staff.username }));
+                              setShowDocumentModal(true);
+                            }}
+                            title="Upload Signed Document"
+                            className="rounded-full bg-[#F7F5F0] p-1.5 text-[#0F3D24] hover:bg-[#3F8F3F] hover:text-white transition"
+                          >
+                            <Upload size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSuspensionForm((prev) => ({ ...prev, username: staff.username }));
+                              setShowSuspensionModal(true);
+                            }}
+                            title="Record Suspension"
+                            className="rounded-full bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-600 hover:text-white transition"
+                          >
+                            <AlertTriangle size={14} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setPayrollForm((prev) => ({ ...prev, username: staff.username }));
+                              setShowPayrollModal(true);
+                            }}
+                            title="Generate Monthly Salary Receipt"
+                            className="rounded-full bg-amber-50 p-1.5 text-amber-700 hover:bg-amber-600 hover:text-white transition"
+                          >
+                            <DollarSign size={14} />
+                          </button>
+                        </div>
+                      ) : (
                         <button
-                          onClick={() => {
-                            setDocumentForm((prev) => ({ ...prev, username: staff.username }));
-                            setShowDocumentModal(true);
-                          }}
-                          title="Upload Signed Document"
-                          className="rounded-full bg-[#F7F5F0] p-1.5 text-[#0F3D24] hover:bg-[#3F8F3F] hover:text-white transition"
+                          onClick={() => setSelectedStaffUser(staff)}
+                          className="inline-flex items-center gap-1 rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-bold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition"
                         >
-                          <Upload size={14} />
+                          <Eye size={13} /> View Profile
                         </button>
-                        <button
-                          onClick={() => {
-                            setSuspensionForm((prev) => ({ ...prev, username: staff.username }));
-                            setShowSuspensionModal(true);
-                          }}
-                          title="Record Suspension"
-                          className="rounded-full bg-rose-50 p-1.5 text-rose-600 hover:bg-rose-600 hover:text-white transition"
-                        >
-                          <AlertTriangle size={14} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setPayrollForm((prev) => ({ ...prev, username: staff.username }));
-                            setShowPayrollModal(true);
-                          }}
-                          title="Generate Monthly Salary Receipt"
-                          className="rounded-full bg-amber-50 p-1.5 text-amber-700 hover:bg-amber-600 hover:text-white transition"
-                        >
-                          <DollarSign size={14} />
-                        </button>
-                      </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -563,12 +603,14 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             <h3 className="text-lg font-bold text-[#0F3D24] flex items-center gap-2">
               <FileText size={18} className="text-[#3F8F3F]" /> Staff Signed Documents Vault
             </h3>
-            <button
-              onClick={() => setShowDocumentModal(true)}
-              className="flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#134a2c] transition"
-            >
-              <Upload size={14} /> Upload Signed Document
-            </button>
+            {isOwner && (
+              <button
+                onClick={() => setShowDocumentModal(true)}
+                className="flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#134a2c] transition"
+              >
+                <Upload size={14} /> Upload Signed Document
+              </button>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -614,12 +656,14 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             <h3 className="text-lg font-bold text-[#0F3D24] flex items-center gap-2">
               <AlertTriangle size={18} className="text-rose-600" /> Disciplinary & Suspension Register
             </h3>
-            <button
-              onClick={() => setShowSuspensionModal(true)}
-              className="flex items-center gap-1.5 rounded-full bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition"
-            >
-              <AlertTriangle size={14} /> Record New Suspension
-            </button>
+            {isOwner && (
+              <button
+                onClick={() => setShowSuspensionModal(true)}
+                className="flex items-center gap-1.5 rounded-full bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-rose-700 transition"
+              >
+                <AlertTriangle size={14} /> Record New Suspension
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -720,12 +764,14 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             <h3 className="text-lg font-bold text-[#0F3D24] flex items-center gap-2">
               <DollarSign size={18} className="text-[#3F8F3F]" /> Monthly Payment Receipts Register
             </h3>
-            <button
-              onClick={() => setShowPayrollModal(true)}
-              className="flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#134a2c] transition"
-            >
-              <PlusCircle size={14} /> Create Salary Payment Receipt
-            </button>
+            {isOwner && (
+              <button
+                onClick={() => setShowPayrollModal(true)}
+                className="flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#134a2c] transition"
+              >
+                <PlusCircle size={14} /> Create Salary Payment Receipt
+              </button>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -817,22 +863,28 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                     </td>
                     <td className="p-3 text-right">
                       {req.status === "pending" ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => decideLeaveMut.mutate({ requestId: req.id, decision: "approved" })}
-                            disabled={decideLeaveMut.isPending}
-                            className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => decideLeaveMut.mutate({ requestId: req.id, decision: "rejected" })}
-                            disabled={decideLeaveMut.isPending}
-                            className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 transition"
-                          >
-                            Reject
-                          </button>
-                        </div>
+                        isOwner ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => decideLeaveMut.mutate({ requestId: req.id, decision: "approved" })}
+                              disabled={decideLeaveMut.isPending}
+                              className="rounded-full bg-emerald-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 transition"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => decideLeaveMut.mutate({ requestId: req.id, decision: "rejected" })}
+                              disabled={decideLeaveMut.isPending}
+                              className="rounded-full bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 transition"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-800 ring-1 ring-amber-200">
+                            Pending Owner Decision
+                          </span>
+                        )
                       ) : (
                         <span className="text-[10px] text-[#0F3D24]/50">Reviewed by {req.reviewedBy || "HR"}</span>
                       )}
@@ -853,6 +905,89 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
       )}
 
       {/* MODALS */}
+
+      {/* 0. Staff Profile View Modal */}
+      {selectedStaffUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#0F3D24]/10 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-[#0F3D24] text-white font-black flex items-center justify-center text-base">
+                  {(selectedStaffUser.fullName || selectedStaffUser.username)[0].toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-[#0F3D24]">{selectedStaffUser.fullName || selectedStaffUser.username}</h3>
+                  <span className="text-xs text-[#0F3D24]/60 font-mono">@{selectedStaffUser.username} · {selectedStaffUser.role}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedStaffUser(null)} className="text-[#0F3D24]/60 hover:text-[#0F3D24] p-1 rounded-lg">✕</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs bg-[#F7F5F0] p-4 rounded-2xl">
+              <div>
+                <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">Department</span>
+                <span className="font-bold text-[#0F3D24]">{selectedStaffUser.department || "Farm Operations"}</span>
+              </div>
+              <div>
+                <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">Employment Status</span>
+                <span className="font-bold capitalize text-emerald-800">{selectedStaffUser.status || "Active"}</span>
+              </div>
+              <div>
+                <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">Phone Contact</span>
+                <span className="font-mono text-[#0F3D24]">{selectedStaffUser.phone || "Not recorded"}</span>
+              </div>
+              <div>
+                <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">Email Address</span>
+                <span className="text-[#0F3D24] truncate block">{selectedStaffUser.email || "Not recorded"}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">Residential Address</span>
+                <span className="text-[#0F3D24]">{selectedStaffUser.address || "Owerri, Imo State"}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">Emergency Next of Kin</span>
+                <span className="text-[#0F3D24]">{selectedStaffUser.emergencyContact || "Not recorded"}</span>
+              </div>
+              {selectedStaffUser.notes && (
+                <div className="col-span-2">
+                  <span className="font-extrabold uppercase text-[10px] text-[#0F3D24]/60 block">HR Internal Notes</span>
+                  <p className="text-[#0F3D24]/80 italic">{selectedStaffUser.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Attached signed contracts */}
+            <div className="space-y-2 pt-2 border-t border-[#0F3D24]/10">
+              <span className="text-xs font-bold text-[#0F3D24] block">Attached Contract Documents</span>
+              {docsList.filter((d: any) => d.username === selectedStaffUser.username).length > 0 ? (
+                <div className="space-y-1.5">
+                  {docsList.filter((d: any) => d.username === selectedStaffUser.username).map((doc: any) => (
+                    <div key={doc.id} className="flex items-center justify-between bg-[#F7F5F0] p-2.5 rounded-xl text-xs">
+                      <div>
+                        <span className="font-bold text-[#0F3D24] block">{doc.documentName}</span>
+                        <span className="text-[10px] text-[#0F3D24]/60">{doc.documentType} · {doc.fileSize}</span>
+                      </div>
+                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs font-bold text-[#3F8F3F] underline">View</a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[#0F3D24]/50 italic">No documents attached for this employee.</p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedStaffUser(null)}
+                className="rounded-full bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white hover:bg-[#134a2c] transition"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Add Staff Modal */}
       {showAddStaffModal && (

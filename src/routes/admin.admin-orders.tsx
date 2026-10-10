@@ -24,6 +24,7 @@ import { PendingTasksModal } from "@/components/admin/PendingTasksModal";
 import { UnprocessedOrdersBanner } from "@/components/admin/UnprocessedOrdersBanner";
 import { ComplaintsDashboardPanel } from "@/components/admin/ComplaintsDashboardPanel";
 import { HrManagementPanel } from "@/components/admin/HrManagementPanel";
+import { PreorderFinancialChart } from "@/components/admin/PreorderFinancialChart";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -293,8 +294,12 @@ function AdminOrders() {
 
   useEffect(() => {
     if (role === "staff") {
-      if (["orders", "december", "clients", "leads", "complaints", "vouchers", "flyers"].includes(activeTab)) {
+      if (["orders", "december", "clients", "leads", "complaints", "vouchers", "flyers", "financials", "hr"].includes(activeTab)) {
         setActiveTab("tasks");
+      }
+    } else if (role === "manager") {
+      if (["vouchers", "flyers"].includes(activeTab)) {
+        setActiveTab("orders");
       }
     }
   }, [role, activeTab]);
@@ -599,12 +604,14 @@ function AdminOrders() {
           <div>
             {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Farm Operations</h3>}
             <ul className="space-y-1">
-              <li>
-                <button onClick={() => { setActiveTab("financials"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <TrendingUp size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Batches & Finances</span>}
-                </button>
-              </li>
+              {(role === "owner" || role === "manager") && (
+                <li>
+                  <button onClick={() => { setActiveTab("financials"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <TrendingUp size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>Batches & Finances</span>}
+                  </button>
+                </li>
+              )}
               <li>
                 <button onClick={() => { setActiveTab("activities"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "activities" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
                   <Activity size={18} className="shrink-0" />
@@ -614,15 +621,17 @@ function AdminOrders() {
               <li>
                 <button onClick={() => { setActiveTab("tasks"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "tasks" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
                   <CheckCircle2 size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>Staff Tasks</span>}
+                  {!isSidebarCollapsed && <span>{role === "staff" ? "Staff Workspace" : "Staff Tasks"}</span>}
                 </button>
               </li>
-              <li>
-                <button onClick={() => { setActiveTab("hr"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "hr" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                  <Users size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>HR Management</span>}
-                </button>
-              </li>
+              {(role === "owner" || role === "manager") && (
+                <li>
+                  <button onClick={() => { setActiveTab("hr"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "hr" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <Users size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>HR Management</span>}
+                  </button>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -809,7 +818,7 @@ function AdminOrders() {
                   <VoucherPanel passcode={passcode} />
                 ) : activeTab === "december" ? (
                   <DecemberPreorderPanel passcode={passcode} />
-                ) : activeTab === "hr" ? (
+                ) : activeTab === "hr" && (role === "owner" || role === "manager") ? (
                   <HrManagementPanel passcode={passcode} role={role} />
                 ) : activeTab === "flyers" ? (
                   <div className="space-y-6">
@@ -2505,24 +2514,63 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   const role = query.data?.role || "owner";
 
   // Financial & Operational Metrics calculations
-  const totalReceived = allPreorders.reduce((acc: number, o: any) => acc + (o.totalPaid || 0), 0);
-  const totalOwed = allPreorders.reduce((acc: number, o: any) => {
-    const totalCost = o.totalAmount || 0;
-    const paid = o.totalPaid || 0;
-    return acc + Math.max(0, totalCost - paid);
+  const totalReceived = allPreorders.reduce((acc: number, o: any) => {
+    const confirmedPaymentsSum = (o.payments || [])
+      .filter((p: any) => p.confirmedByAdmin)
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+    return acc + Math.max(Number(o.amountPaid) || 0, confirmedPaymentsSum);
   }, 0);
-  const totalBirds = allPreorders.reduce((acc: number, o: any) => acc + (o.quantity || 0), 0);
+
+  const totalPendingApproval = allPreorders.reduce((acc: number, o: any) => {
+    return (
+      acc +
+      (o.payments || [])
+        .filter((p: any) => !p.confirmedByAdmin)
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
+    );
+  }, 0);
+
+  const totalExpectedValue = allPreorders.reduce((acc: number, o: any) => acc + (Number(o.totalAmount) || 0), 0);
+  const totalOwed = Math.max(0, totalExpectedValue - totalReceived);
+  const totalBirds = allPreorders.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
   const totalCount = allPreorders.length;
+
+  const slotReservedList = allPreorders.filter((o: any) => o.reservationType === "slot_reserved");
+  const slotReservedCount = slotReservedList.length;
+  const slotReservedBirds = slotReservedList.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
+
+  const outrightList = allPreorders.filter((o: any) => o.reservationType === "outright");
+  const outrightCount = outrightList.length;
+  const outrightBirds = outrightList.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
+
+  const freeList = allPreorders.filter((o: any) => o.reservationType === "free_reservation");
+  const freeCount = freeList.length;
+  const freeBirds = freeList.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
+
+  // Helper to format delivery date
+  const formatDeliveryDate = (o: any) => {
+    const raw = o.preferredDeliveryDate || o.preferredDate || o.deliveryDate;
+    if (!raw || raw === "null" || raw === "undefined") return "Not Specified";
+    try {
+      const dObj = new Date(raw);
+      if (!isNaN(dObj.getTime())) {
+        return dObj.toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
+      }
+      return String(raw);
+    } catch {
+      return String(raw);
+    }
+  };
 
   // Extract unique delivery dates
   const uniqueDatesMap: { [date: string]: { date: string; count: number; birds: number } } = {};
   allPreorders.forEach((o: any) => {
-    const d = o.preferredDate || o.deliveryDate || "Not Specified";
+    const d = formatDeliveryDate(o);
     if (!uniqueDatesMap[d]) {
       uniqueDatesMap[d] = { date: d, count: 0, birds: 0 };
     }
     uniqueDatesMap[d].count += 1;
-    uniqueDatesMap[d].birds += o.quantity || 0;
+    uniqueDatesMap[d].birds += Number(o.quantity) || 0;
   });
   const dateChips = Object.values(uniqueDatesMap).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -2574,6 +2622,23 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           )}
         </div>
 
+        {/* Visual Financial Donut Chart & Reservation Mode Breakdown */}
+        <PreorderFinancialChart
+          totalExpectedValue={totalExpectedValue}
+          totalReceived={totalReceived}
+          totalPendingApproval={totalPendingApproval}
+          totalOwed={totalOwed}
+          totalCount={totalCount}
+          totalBirds={totalBirds}
+          slotReservedCount={slotReservedCount}
+          slotReservedBirds={slotReservedBirds}
+          outrightCount={outrightCount}
+          outrightBirds={outrightBirds}
+          freeCount={freeCount}
+          freeBirds={freeBirds}
+          role={role}
+        />
+
         {/* Delivery Date Timeline Selector */}
         <div className="space-y-2 pt-2 border-t border-[#0F3D24]/10">
           <div className="flex items-center justify-between">
@@ -2595,11 +2660,11 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
               onClick={() => setSelectedDate("all")}
               className={`rounded-full px-4 py-2 text-xs font-bold transition whitespace-nowrap ${
                 selectedDate === "all"
-                  ? "bg-[#0F3D24] text-white shadow-md"
+                  ? "bg-[#0F3D24] text-white shadow-md ring-2 ring-[#3F8F3F]"
                   : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
               }`}
             >
-              All Dates ({totalCount} orders)
+              All Dates ({totalCount} orders · {totalBirds} birds)
             </button>
             {dateChips.map((chip) => (
               <button
@@ -2607,7 +2672,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                 onClick={() => setSelectedDate(chip.date)}
                 className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition whitespace-nowrap ${
                   selectedDate === chip.date
-                    ? "bg-[#3F8F3F] text-white shadow-md"
+                    ? "bg-[#3F8F3F] text-white shadow-md ring-2 ring-[#0F3D24]"
                     : "bg-[#F7F5F0] text-[#0F3D24] hover:bg-[#3F8F3F]/20"
                 }`}
               >
@@ -2670,36 +2735,53 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
 
         <div className="flex flex-wrap gap-2">
           {[
-            { id: "all", label: "All Orders" },
-            { id: "awaiting_approval", label: "Awaiting Payment Approval" },
-            { id: "slot_reserved", label: "Slot Reserved" },
-            { id: "free_reservation", label: "Free" },
-            { id: "outright", label: "Paid Outrightly" },
-            { id: "partially_paid", label: "Partially Paid" },
-            { id: "fully_paid", label: "Fully Paid" },
-            { id: "pending", label: "Pay Pending" },
-            { id: "delivery_pending", label: "Delivery Pending" },
-            { id: "delivered", label: "Delivered" },
+            { id: "all", label: "All Orders", count: allPreorders.length },
+            {
+              id: "awaiting_approval",
+              label: "Awaiting Payment Approval",
+              count: allPreorders.filter(
+                (o: any) => o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted"
+              ).length,
+            },
+            { id: "slot_reserved", label: "Slot Reserved", count: slotReservedCount },
+            { id: "free_reservation", label: "Free", count: freeCount },
+            { id: "outright", label: "Paid Outrightly", count: outrightCount },
+            {
+              id: "partially_paid",
+              label: "Partially Paid",
+              count: allPreorders.filter((o: any) => o.paymentStatus === "partially_paid").length,
+            },
+            {
+              id: "fully_paid",
+              label: "Fully Paid",
+              count: allPreorders.filter((o: any) => o.paymentStatus === "fully_paid").length,
+            },
+            {
+              id: "pending",
+              label: "Pay Pending",
+              count: allPreorders.filter((o: any) => o.paymentStatus === "pending").length,
+            },
+            {
+              id: "delivery_pending",
+              label: "Delivery Pending",
+              count: allPreorders.filter((o: any) => o.deliveryStatus === "pending").length,
+            },
+            {
+              id: "delivered",
+              label: "Delivered",
+              count: allPreorders.filter((o: any) => o.deliveryStatus === "delivered").length,
+            },
           ].map((f) => {
-            const count =
-              f.id === "all"
-                ? query.data?.preorders.length || 0
-                : f.id === "awaiting_approval"
-                  ? (query.data?.preorders || []).filter(
-                    (o: any) => o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted"
-                  ).length
-                  : 0;
-
             return (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${filter === f.id
-                  ? "bg-[#0F3D24] text-white shadow-md"
+                  ? "bg-[#0F3D24] text-white shadow-md ring-2 ring-[#3F8F3F]"
                   : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
                   }`}
               >
-                {f.label} {count > 0 && <span className="ml-1 text-[10px] opacity-80">({count})</span>}
+                {f.label} {f.count > 0 && <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f.id ? "bg-white/20 text-white" : "bg-[#0F3D24]/10 text-[#0F3D24]"}`}>({f.count})</span>}
               </button>
             );
           })}
@@ -2720,7 +2802,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           {(() => {
             const list = query.data.preorders.filter((o: any) => {
               if (selectedDate !== "all") {
-                const dateVal = o.preferredDate || o.deliveryDate || "Not Specified";
+                const dateVal = formatDeliveryDate(o);
                 if (dateVal !== selectedDate) return false;
               }
               if (filter === "awaiting_approval") {

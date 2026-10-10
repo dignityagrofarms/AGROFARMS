@@ -58,6 +58,26 @@ function makePaymentRef(): string {
 
 function mapPreorder(r: Record<string, unknown>, batchMap?: Map<string, string>): Preorder {
   const bId = (r.batch_id as string) ?? null;
+  const rawPayments = r.preorder_payments
+    ? (r.preorder_payments as any[])
+        .map((p) => mapPayment(p))
+        .sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime())
+    : undefined;
+
+  const confirmedSum = (rawPayments || [])
+    .filter((p) => p.confirmedByAdmin)
+    .reduce((acc, p) => acc + (p.amount || 0), 0);
+  const totalAmount = Number(r.total_amount) || 0;
+  const dbAmountPaid = Number(r.amount_paid) || 0;
+  const amountPaid = Math.max(dbAmountPaid, confirmedSum);
+  const balance = Math.max(0, totalAmount - amountPaid);
+  const paymentStatus: PreorderPaymentStatus =
+    amountPaid >= totalAmount && totalAmount > 0
+      ? "fully_paid"
+      : amountPaid > 0
+        ? "partially_paid"
+        : ((r.payment_status as PreorderPaymentStatus) || "pending");
+
   return {
     id: r.id as string,
     preorderCode: r.preorder_code as string,
@@ -66,22 +86,59 @@ function mapPreorder(r: Record<string, unknown>, batchMap?: Map<string, string>)
     email: (r.email as string) ?? "",
     address: r.address as string,
     product: r.product as string,
-    quantity: r.quantity as number,
-    unitPrice: r.unit_price as number,
-    totalAmount: r.total_amount as number,
-    amountPaid: r.amount_paid as number,
-    balance: r.balance as number,
+    quantity: Number(r.quantity) || 0,
+    unitPrice: Number(r.unit_price) || 0,
+    totalAmount,
+    amountPaid,
+    balance,
     reservationType: r.reservation_type as ReservationType,
-    paymentStatus: r.payment_status as PreorderPaymentStatus,
-    deliveryStatus: r.delivery_status as DeliveryStatus,
-    preferredDeliveryDate: r.preferred_delivery_date as string | null,
+    paymentStatus,
+    deliveryStatus: (r.delivery_status as DeliveryStatus) || "pending",
+    preferredDeliveryDate: (r.preferred_delivery_date as string | null) ?? null,
     notes: r.notes as string | null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
     batchId: bId,
     batchName: bId && batchMap ? batchMap.get(bId) ?? null : null,
-    payments: r.preorder_payments ? (r.preorder_payments as any[]).map(p => mapPayment(p)).sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()) : undefined,
+    payments: rawPayments,
   };
+}
+
+async function syncPreorderTotals(preorderId: string): Promise<void> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: pData } = await supabaseAdmin
+    .from("preorders")
+    .select("id, total_amount")
+    .eq("id", preorderId)
+    .single();
+  if (!pData) return;
+
+  const { data: payments } = await supabaseAdmin
+    .from("preorder_payments")
+    .select("amount, confirmed_by_admin")
+    .eq("preorder_id", preorderId);
+
+  const confirmedTotal = (payments || [])
+    .filter((p: any) => p.confirmed_by_admin)
+    .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+  const totalAmount = Number(pData.total_amount) || 0;
+  const balance = Math.max(0, totalAmount - confirmedTotal);
+  const paymentStatus =
+    confirmedTotal >= totalAmount && totalAmount > 0
+      ? "fully_paid"
+      : confirmedTotal > 0
+        ? "partially_paid"
+        : "pending";
+
+  await supabaseAdmin
+    .from("preorders")
+    .update({
+      amount_paid: confirmedTotal,
+      balance,
+      payment_status: paymentStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", preorderId);
 }
 
 function mapPayment(r: Record<string, unknown>): PreorderPayment {
@@ -345,11 +402,16 @@ export const adminConfirmPreorderPayment = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<void> => {
     await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
+    const { data: updated, error } = await supabaseAdmin
       .from("preorder_payments")
       .update({ confirmed_by_admin: true })
-      .eq("id", data.paymentId);
+      .eq("id", data.paymentId)
+      .select("preorder_id")
+      .single();
     if (error) throw new Error(error.message);
+    if (updated?.preorder_id) {
+      await syncPreorderTotals(updated.preorder_id);
+    }
   });
 
 // ─── Admin: reject/remove a payment ──────────────────────────────────────────
@@ -359,8 +421,17 @@ export const adminDeletePreorderPayment = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<void> => {
     await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existing } = await supabaseAdmin
+      .from("preorder_payments")
+      .select("preorder_id")
+      .eq("id", data.paymentId)
+      .maybeSingle();
+
     const { error } = await supabaseAdmin.from("preorder_payments").delete().eq("id", data.paymentId);
     if (error) throw new Error(error.message);
+    if (existing?.preorder_id) {
+      await syncPreorderTotals(existing.preorder_id);
+    }
   });
 
 // ─── Admin: update delivery status ───────────────────────────────────────────
@@ -407,6 +478,7 @@ export const adminAddPreorderPayment = createServerFn({ method: "POST" })
       confirmed_by_admin: true,
     });
     if (error) throw new Error(error.message);
+    await syncPreorderTotals(data.preorderId);
   });
 
 // ─── Admin: list all pending (unconfirmed) payments ───────────────────────────
