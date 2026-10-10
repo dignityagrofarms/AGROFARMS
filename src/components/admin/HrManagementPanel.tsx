@@ -257,9 +257,9 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   // Metrics
   const totalStaffCount = staffList.length;
   const todayStr = new Date().toISOString().split("T")[0];
-  const presentTodayCount = attendanceList.filter((a) => a.attendanceDate === todayStr && a.status === "present").length;
-  const suspendedCount = staffList.filter((s) => s.status === "suspended").length;
-  const pendingPayrollCount = payrollList.filter((p) => p.status === "pending_signature").length;
+  const presentTodayCount = attendanceList.filter((a: any) => a.attendanceDate === todayStr && a.status === "present").length;
+  const suspendedCount = staffList.filter((s: any) => s.status === "suspended").length;
+  const pendingPayrollCount = payrollList.filter((p: any) => p.status === "pending_signature").length;
   const attendancePercentage = totalStaffCount > 0 ? Math.round((presentTodayCount / totalStaffCount) * 100) : 100;
 
   // Filtered Directory
@@ -539,7 +539,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {docsList.map((doc) => (
+            {docsList.map((doc: any) => (
               <div key={doc.id} className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10 flex flex-col justify-between gap-3">
                 <div>
                   <div className="flex items-center justify-between">
@@ -602,7 +602,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#0F3D24]/5 font-medium">
-                {suspensionsList.map((sup) => (
+                {suspensionsList.map((sup: any) => (
                   <tr key={sup.id} className="hover:bg-rose-50/40 transition">
                     <td className="p-3 font-bold text-rose-900">@{sup.staffUsername}</td>
                     <td className="p-3">{sup.reason}</td>
@@ -651,7 +651,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#0F3D24]/5 font-medium">
-                {attendanceList.map((att) => (
+                {attendanceList.map((att: any) => (
                   <tr key={att.id} className="hover:bg-[#F7F5F0]/50 transition">
                     <td className="p-3 font-mono font-bold text-[#0F3D24]">{att.attendanceDate}</td>
                     <td className="p-3 font-semibold text-[#0F3D24]">@{att.username}</td>
@@ -707,7 +707,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#0F3D24]/5 font-medium">
-                {payrollList.map((pay) => (
+                {payrollList.map((pay: any) => (
                   <tr key={pay.id} className="hover:bg-[#F7F5F0]/50 transition">
                     <td className="p-3 font-bold text-[#0F3D24]">@{pay.username}</td>
                     <td className="p-3 font-semibold">{pay.monthYear}</td>
