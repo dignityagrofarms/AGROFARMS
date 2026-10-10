@@ -15,7 +15,6 @@ ALTER TABLE public.admin_access
 -- 2. Staff Signed Documents Vault
 CREATE TABLE IF NOT EXISTS public.staff_documents (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES public.admin_access(id) ON DELETE CASCADE,
   username text NOT NULL,
   document_name text NOT NULL,
   document_type text NOT NULL DEFAULT 'contract', -- 'contract', 'nda', 'guarantor_form', 'id_card', 'other'
@@ -32,7 +31,6 @@ CREATE POLICY "Server access to staff documents" ON public.staff_documents FOR A
 -- 3. Staff Suspensions & Disciplinary Register
 CREATE TABLE IF NOT EXISTS public.staff_suspensions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid REFERENCES public.admin_access(id) ON DELETE CASCADE,
   staff_username text NOT NULL,
   reason text NOT NULL,
   start_date date NOT NULL DEFAULT CURRENT_DATE,
