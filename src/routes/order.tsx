@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { CheckCircle2, PhoneCall, ShoppingBag, Copy, AlertTriangle, MessageCircle, CalendarClock, Truck, Clock } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { createOrder, markPaymentSubmitted, MIN_ORDER_SUBTOTAL, validateVoucher } from "@/lib/orders.functions";
+import { getPreorderSettings } from "@/lib/preorders.functions";
 import { PRODUCTS } from "@/lib/products";
 import { DecemberPreorderForm } from "@/components/DecemberPreorderForm";
 
@@ -83,6 +84,21 @@ function OrderPage() {
   const createOrderFn = useServerFn(createOrder);
   const markPaidFn = useServerFn(markPaymentSubmitted);
   const validateVoucherFn = useServerFn(validateVoucher);
+  const getPreorderSettingsFn = useServerFn(getPreorderSettings);
+
+  const preorderSettingsQuery = useQuery({
+    queryKey: ["preorder-settings"],
+    queryFn: () => getPreorderSettingsFn(),
+    staleTime: 15000,
+    refetchInterval: 30000,
+  });
+  const preorderActive = preorderSettingsQuery.data ? preorderSettingsQuery.data.isActive : true;
+
+  useEffect(() => {
+    if (!preorderActive && (mode === "preorder" || mode === "december")) {
+      setMode("now");
+    }
+  }, [preorderActive, mode]);
 
   const product = useMemo(() => PRODUCTS.find((p) => p.id === productId)!, [productId]);
   const option = product.options[Math.min(optionIdx, product.options.length - 1)];
@@ -362,7 +378,7 @@ function OrderPage() {
             <div className="space-y-6">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">When do you need it?</div>
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className={`mt-3 grid gap-2 ${preorderActive ? "sm:grid-cols-3" : "sm:grid-cols-1"}`}>
                   <button
                     type="button"
                     onClick={() => setMode("now")}
@@ -372,24 +388,28 @@ function OrderPage() {
                   >
                     <Truck size={16} /> Deliver now (quick)
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("preorder")}
-                    className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
-                      mode === "preorder" ? "border-[#3F8F3F] bg-[#3F8F3F]/10" : "border-[#0F3D24]/15 hover:border-[#3F8F3F]"
-                    }`}
-                  >
-                    <CalendarClock size={16} /> Pre-order later
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMode("december")}
-                    className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-sm font-bold uppercase tracking-wider transition ${
-                      mode === "december" ? "border-red-600 bg-red-600 text-white" : "border-red-500/30 bg-red-50 text-red-700 hover:bg-red-100"
-                    }`}
-                  >
-                    🎄 December Pre-order
-                  </button>
+                  {preorderActive && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setMode("preorder")}
+                        className={`flex items-center gap-2 rounded-2xl border px-4 py-3 text-left text-sm font-semibold transition ${
+                          mode === "preorder" ? "border-[#3F8F3F] bg-[#3F8F3F]/10" : "border-[#0F3D24]/15 hover:border-[#3F8F3F]"
+                        }`}
+                      >
+                        <CalendarClock size={16} /> Pre-order later
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMode("december")}
+                        className={`flex items-center justify-center gap-2 rounded-2xl border px-4 py-3 text-center text-sm font-bold uppercase tracking-wider transition ${
+                          mode === "december" ? "border-red-600 bg-red-600 text-white" : "border-red-500/30 bg-red-50 text-red-700 hover:bg-red-100"
+                        }`}
+                      >
+                        🎄 December Pre-order
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

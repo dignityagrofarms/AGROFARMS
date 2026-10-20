@@ -1,6 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { SiteLayout } from "@/components/site/Layout";
-import { ArrowRight, Download } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { getPreorderSettings } from "@/lib/preorders.functions";
 
 export const Route = createFileRoute("/december-preorder")({
   head: () => ({
@@ -21,6 +24,47 @@ export const Route = createFileRoute("/december-preorder")({
 
 function FlyerLandingPage() {
   const navigate = useNavigate();
+  const getPreorderSettingsFn = useServerFn(getPreorderSettings);
+  const preorderSettingsQuery = useQuery({
+    queryKey: ["preorder-settings"],
+    queryFn: () => getPreorderSettingsFn(),
+    staleTime: 15000,
+  });
+  const preorderActive = preorderSettingsQuery.data ? preorderSettingsQuery.data.isActive : true;
+
+  if (!preorderActive) {
+    return (
+      <SiteLayout>
+        <div className="bg-white min-h-[calc(100vh-80px)] py-16">
+          <div className="mx-auto max-w-2xl px-4 text-center sm:px-6 lg:px-8 space-y-6">
+            <div className="inline-flex rounded-full bg-amber-100 px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-800">
+              Campaign Closed
+            </div>
+            <h1 className="text-3xl font-bold text-[#0F3D24] sm:text-4xl font-display">
+              December Pre-Order Reservations Have Ended
+            </h1>
+            <p className="text-base text-[#0F3D24]/75">
+              Thank you to everyone who reserved slots! You can still place a standard farm-fresh order for immediate delivery or track your existing December Pre-Order reservation below.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <Link
+                to="/order"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#3F8F3F] px-7 py-4 text-sm font-bold text-white shadow-md hover:bg-[#347834] transition"
+              >
+                Place Standard Order <ArrowRight size={18} />
+              </Link>
+              <Link
+                to="/track-order"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-7 py-4 text-sm font-bold text-white shadow-md hover:bg-[#165232] transition"
+              >
+                Track Existing Pre-Order
+              </Link>
+            </div>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
 
   return (
     <SiteLayout>

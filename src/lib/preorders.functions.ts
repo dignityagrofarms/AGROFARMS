@@ -166,6 +166,103 @@ async function checkAdminOwner(passcode: string): Promise<string> {
   return await checkOwner(passcode);
 }
 
+// ─── Pre-Order Campaign Settings (Active Toggle & End Date/Time) ─────────────
+
+export type PreorderSettings = {
+  enabled: boolean;
+  endDateTime: string | null;
+  isActive: boolean;
+  updatedAt?: string | null;
+};
+
+const PREORDER_SETTINGS_KEY = "december_preorder_settings";
+
+export async function readPreorderSettingsFromDb(): Promise<PreorderSettings> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  try {
+    const { data: row } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", PREORDER_SETTINGS_KEY)
+      .maybeSingle();
+
+    if (row?.value) {
+      const parsed = JSON.parse(row.value) as {
+        enabled?: boolean;
+        endDateTime?: string | null;
+        updatedAt?: string | null;
+      };
+      const enabled = parsed.enabled !== false;
+      const endDateTime = parsed.endDateTime || null;
+      const isExpired = endDateTime ? new Date(endDateTime).getTime() <= Date.now() : false;
+      return {
+        enabled,
+        endDateTime,
+        isActive: Boolean(enabled && !isExpired),
+        updatedAt: parsed.updatedAt || null,
+      };
+    }
+  } catch (err) {
+    console.warn("Could not read december_preorder_settings:", err);
+  }
+  return {
+    enabled: true,
+    endDateTime: null,
+    isActive: true,
+    updatedAt: null,
+  };
+}
+
+export const getPreorderSettings = createServerFn({ method: "GET" }).handler(
+  async (): Promise<PreorderSettings> => {
+    return await readPreorderSettingsFromDb();
+  },
+);
+
+export const adminUpdatePreorderSettings = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        enabled: z.boolean(),
+        endDateTime: z.string().trim().optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }): Promise<PreorderSettings> => {
+    await checkAdminOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const endDateTime = data.endDateTime ? data.endDateTime.trim() : null;
+    const updatedAt = new Date().toISOString();
+
+    const payload = {
+      enabled: data.enabled,
+      endDateTime,
+      updatedAt,
+    };
+
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert(
+        {
+          key: PREORDER_SETTINGS_KEY,
+          value: JSON.stringify(payload),
+          updated_at: updatedAt,
+        },
+        { onConflict: "key" },
+      );
+
+    if (error) throw new Error(error.message);
+
+    const isExpired = endDateTime ? new Date(endDateTime).getTime() <= Date.now() : false;
+    return {
+      enabled: data.enabled,
+      endDateTime,
+      isActive: Boolean(data.enabled && !isExpired),
+      updatedAt,
+    };
+  });
+
 // ─── Server Functions ─────────────────────────────────────────────────────────
 
 const createPreorderSchema = z.object({
@@ -185,6 +282,10 @@ const createPreorderSchema = z.object({
 export const createPreorder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createPreorderSchema.parse(data))
   .handler(async ({ data }): Promise<{ preorderCode: string }> => {
+    const settings = await readPreorderSettingsFromDb();
+    if (!settings.isActive) {
+      throw new Error("December Pre-Order reservations have ended and are currently closed.");
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // RECALCULATE PRICE ON BACKEND TO PREVENT SPOOFING

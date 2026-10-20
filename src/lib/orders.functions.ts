@@ -46,6 +46,13 @@ const createOrderSchema = z.object({
   total: z.number().int().min(0),
   notes: z.string().trim().max(1000).optional().nullable(),
   voucherCode: z.string().trim().max(40).optional().nullable(),
+  placedBy: z
+    .object({
+      username: z.string().trim().min(1).max(60),
+      role: z.enum(["owner", "manager", "staff"]),
+    })
+    .optional()
+    .nullable(),
 });
 
 const normalizeVoucherCode = (input: string) => input.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
@@ -187,6 +194,29 @@ export const createOrder = createServerFn({ method: "POST" })
             .maybeSingle();
           if (voucher) {
             await supabaseAdmin.from("discount_vouchers").update({ uses_count: voucher.uses_count + 1 }).eq("code", voucherCode);
+          }
+        }
+        if (data.placedBy) {
+          try {
+            const { data: mapRow } = await supabaseAdmin
+              .from("app_settings")
+              .select("value")
+              .eq("key", "order_placed_by_map")
+              .maybeSingle();
+            const existingMap = mapRow?.value ? JSON.parse(mapRow.value) : {};
+            existingMap[row.order_code] = {
+              username: data.placedBy.username.toLowerCase(),
+              role: data.placedBy.role,
+              at: new Date().toISOString(),
+            };
+            await supabaseAdmin
+              .from("app_settings")
+              .upsert(
+                { key: "order_placed_by_map", value: JSON.stringify(existingMap), updated_at: new Date().toISOString() },
+                { onConflict: "key" },
+              );
+          } catch (metaErr) {
+            console.warn("Could not record order_placed_by_map metadata:", metaErr);
           }
         }
         return { orderCode: row.order_code, trackCode: row.track_code as string, total: finalTotal, discountAmount };
@@ -978,7 +1008,35 @@ export type AdminOrder = TrackedOrder & {
   voucherCode: string | null;
   batchId?: string | null;
   batchName?: string | null;
+  placedBy?: { username: string; role: AdminRole } | null;
 };
+
+function extractAndStripPlacedBy(
+  rawNotes: string | null | undefined,
+  orderCode: string,
+  placedByMap: Record<string, { username: string; role: AdminRole }>,
+): { cleanNotes: string | null; placedBy: { username: string; role: AdminRole } | null } {
+  let placedBy: { username: string; role: AdminRole } | null = placedByMap[orderCode] || null;
+  let cleanNotes = rawNotes ?? null;
+
+  if (cleanNotes) {
+    const match = cleanNotes.match(/\[Placed by (OWNER|MANAGER|STAFF):\s*@?([^\]]+)\]/i);
+    if (match) {
+      if (!placedBy) {
+        placedBy = {
+          role: match[1]!.toLowerCase() as AdminRole,
+          username: match[2]!.trim().toLowerCase(),
+        };
+      }
+      cleanNotes = cleanNotes
+        .replace(/\s*·?\s*\[Placed by (?:OWNER|MANAGER|STAFF):\s*@?[^\]]+\]/gi, "")
+        .trim();
+      if (!cleanNotes) cleanNotes = null;
+    }
+  }
+
+  return { cleanNotes, placedBy };
+}
 
 export const adminListOrders = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => adminListSchema.parse(data))
@@ -1015,37 +1073,56 @@ export const adminListOrders = createServerFn({ method: "POST" })
     const batchMap = new Map<string, string>();
     (batchRows ?? []).forEach((b) => batchMap.set(b.id, b.batch_name));
 
+    // Fetch order_placed_by_map metadata from app_settings
+    let placedByMap: Record<string, { username: string; role: AdminRole }> = {};
+    try {
+      const { data: placedByRow } = await supabaseAdmin
+        .from("app_settings")
+        .select("value")
+        .eq("key", "order_placed_by_map")
+        .maybeSingle();
+      if (placedByRow?.value) {
+        placedByMap = JSON.parse(placedByRow.value);
+      }
+    } catch {
+      // ignore parse errors
+    }
+
     return {
-      orders: (rows ?? []).map((r) => ({
-        id: r.id,
-        orderCode: r.order_code,
-        trackCode: (r as { track_code: string | null }).track_code ?? "",
-        customerName: r.customer_name,
-        phone: r.phone,
-        address: r.address,
-        notes: r.notes,
-        status: r.status as AdminOrder["status"],
-        statusNote: r.status_note,
-        eta: r.eta,
-        items: (r.items as AdminOrder["items"]) ?? [],
-        subtotal: r.subtotal,
-        deliveryFee: r.delivery_fee,
-        total: r.total,
-        deliveryZone: r.delivery_zone,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-        paymentStatus: r.payment_status as AdminOrder["paymentStatus"],
-        paymentRejectionReason: r.payment_rejection_reason,
-        paymentSubmittedAt: r.payment_submitted_at,
-        paymentApprovedAt: r.payment_approved_at,
-        discountAmount: r.discount_amount ?? 0,
-        voucherCode: r.voucher_code,
-        cancelledAt: r.cancelled_at,
-        cancelledBy: r.cancelled_by,
-        cancelReason: r.cancel_reason,
-        batchId: (r as any).batch_id ?? null,
-        batchName: (r as any).batch_id ? batchMap.get((r as any).batch_id) ?? null : null,
-      })),
+      orders: (rows ?? []).map((r) => {
+        const { cleanNotes, placedBy } = extractAndStripPlacedBy(r.notes, r.order_code, placedByMap);
+        return {
+          id: r.id,
+          orderCode: r.order_code,
+          trackCode: (r as { track_code: string | null }).track_code ?? "",
+          customerName: r.customer_name,
+          phone: r.phone,
+          address: r.address,
+          notes: cleanNotes,
+          status: r.status as AdminOrder["status"],
+          statusNote: r.status_note,
+          eta: r.eta,
+          items: (r.items as AdminOrder["items"]) ?? [],
+          subtotal: r.subtotal,
+          deliveryFee: r.delivery_fee,
+          total: r.total,
+          deliveryZone: r.delivery_zone,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          paymentStatus: r.payment_status as AdminOrder["paymentStatus"],
+          paymentRejectionReason: r.payment_rejection_reason,
+          paymentSubmittedAt: r.payment_submitted_at,
+          paymentApprovedAt: r.payment_approved_at,
+          discountAmount: r.discount_amount ?? 0,
+          voucherCode: r.voucher_code,
+          cancelledAt: r.cancelled_at,
+          cancelledBy: r.cancelled_by,
+          cancelReason: r.cancel_reason,
+          batchId: (r as any).batch_id ?? null,
+          batchName: (r as any).batch_id ? batchMap.get((r as any).batch_id) ?? null : null,
+          placedBy,
+        };
+      }),
       role,
     };
   });

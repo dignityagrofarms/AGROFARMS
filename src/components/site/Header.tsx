@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import logo from "@/assets/logo.png";
+import { getPreorderSettings } from "@/lib/preorders.functions";
 
 const nav = [
   { to: "/", label: "Home" },
@@ -19,6 +22,16 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  const getPreorderSettingsFn = useServerFn(getPreorderSettings);
+  const preorderSettingsQuery = useQuery({
+    queryKey: ["preorder-settings"],
+    queryFn: () => getPreorderSettingsFn(),
+    refetchInterval: 30000,
+    staleTime: 15000,
+  });
+  const preorderActive = preorderSettingsQuery.data ? preorderSettingsQuery.data.isActive : true;
+  const visibleNav = nav.filter((item) => preorderActive || item.to !== "/december-preorder");
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setIsAdmin(!!localStorage.getItem("daf_admin_passcode"));
@@ -34,12 +47,14 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-40">
-      <div className="bg-[#3F8F3F] px-2 sm:px-4 py-2 text-center text-[11px] sm:text-xs font-medium text-white shadow-inner flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2">
-        <span>🎄 <strong>December Pre-Order Sales</strong> are now open!</span>
-        <Link to="/order" search={{ mode: "december" }} className="inline-block bg-white/20 hover:bg-white/30 text-white rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold transition">
-          Learn More &rarr;
-        </Link>
-      </div>
+      {preorderActive && (
+        <div className="bg-[#3F8F3F] px-2 sm:px-4 py-2 text-center text-[11px] sm:text-xs font-medium text-white shadow-inner flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2">
+          <span>🎄 <strong>December Pre-Order Sales</strong> are now open!</span>
+          <Link to="/order" search={{ mode: "december" }} className="inline-block bg-white/20 hover:bg-white/30 text-white rounded-full px-3 py-1 text-[10px] sm:text-xs font-bold transition">
+            Learn More &rarr;
+          </Link>
+        </div>
+      )}
       <div
         className={`transition-all duration-500 ${
           scrolled
@@ -57,7 +72,7 @@ export function Header() {
         </Link>
 
         <nav className="hidden xl:flex items-center gap-0.5">
-          {nav.map((n) => (
+          {visibleNav.map((n) => (
             <Link
               key={n.to}
               to={n.to}
@@ -99,7 +114,7 @@ export function Header() {
       {open && (
         <div className="xl:hidden border-t border-white/10 bg-[#0F3D24] px-4 py-3 pb-safe-area transition-all animate-in slide-in-from-top-2">
           <nav className="flex flex-col gap-1 pb-8 sm:pb-3">
-            {nav.map((n) => (
+            {visibleNav.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}

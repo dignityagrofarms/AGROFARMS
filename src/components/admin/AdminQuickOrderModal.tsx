@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import {
   Plus,
   Trash2,
@@ -15,6 +16,7 @@ import {
   MapPin,
 } from "lucide-react";
 import { createOrder, MIN_ORDER_SUBTOTAL, type AdminRole } from "@/lib/orders.functions";
+import { getPreorderSettings } from "@/lib/preorders.functions";
 import { PRODUCTS } from "@/lib/products";
 
 const OWERRI_TOWNS = [
@@ -65,8 +67,22 @@ export function AdminQuickOrderModal({
   onOrderCreated,
 }: AdminQuickOrderModalProps) {
   const createOrderFn = useServerFn(createOrder);
+  const getPreorderSettingsFn = useServerFn(getPreorderSettings);
+
+  const preorderSettingsQuery = useQuery({
+    queryKey: ["preorder-settings"],
+    queryFn: () => getPreorderSettingsFn(),
+    staleTime: 15_000,
+  });
+  const preorderActive = preorderSettingsQuery.data ? preorderSettingsQuery.data.isActive : true;
 
   const [mode, setMode] = useState<"now" | "preorder">("now");
+
+  useEffect(() => {
+    if (!preorderActive && mode === "preorder") {
+      setMode("now");
+    }
+  }, [preorderActive, mode]);
   const [preorderDate, setPreorderDate] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [phone, setPhone] = useState("");
@@ -216,8 +232,7 @@ export function AdminQuickOrderModal({
           : "Farm Pickup (Owerri)"
         : `${address.trim() || town}, ${town}`;
 
-    const staffTag = `[Placed by ${role.toUpperCase()}: @${username || role}]`;
-    const combinedNotes = [preorderLabel, notes.trim(), staffTag].filter(Boolean).join(" · ");
+    const combinedNotes = [preorderLabel, notes.trim()].filter(Boolean).join(" · ");
 
     setSubmitting(true);
     try {
@@ -238,6 +253,10 @@ export function AdminQuickOrderModal({
           total,
           notes: combinedNotes,
           voucherCode: null,
+          placedBy: {
+            username: (username || role).trim(),
+            role,
+          },
         },
       });
       setCreatedCode(res.orderCode);
@@ -343,7 +362,7 @@ export function AdminQuickOrderModal({
           ) : (
             <form id="admin-quick-order-form" onSubmit={handleSubmit} className="space-y-5 text-xs">
               {/* Order Type Toggle */}
-              <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[#F7F5F0] p-1.5">
+              <div className={`grid ${preorderActive ? "grid-cols-2" : "grid-cols-1"} gap-2 rounded-2xl bg-[#F7F5F0] p-1.5`}>
                 <button
                   type="button"
                   onClick={() => setMode("now")}
@@ -355,17 +374,19 @@ export function AdminQuickOrderModal({
                 >
                   <Truck size={15} /> Standard / Immediate Order
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMode("preorder")}
-                  className={`flex items-center justify-center gap-2 rounded-xl py-2.5 font-bold transition ${
-                    mode === "preorder"
-                      ? "bg-[#0F3D24] text-white shadow-sm"
-                      : "text-[#0F3D24]/70 hover:text-[#0F3D24]"
-                  }`}
-                >
-                  <CalendarClock size={15} /> Scheduled Pre-Order
-                </button>
+                {preorderActive && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("preorder")}
+                    className={`flex items-center justify-center gap-2 rounded-xl py-2.5 font-bold transition ${
+                      mode === "preorder"
+                        ? "bg-[#0F3D24] text-white shadow-sm"
+                        : "text-[#0F3D24]/70 hover:text-[#0F3D24]"
+                    }`}
+                  >
+                    <CalendarClock size={15} /> Scheduled Pre-Order
+                  </button>
+                )}
               </div>
 
               {mode === "preorder" && (

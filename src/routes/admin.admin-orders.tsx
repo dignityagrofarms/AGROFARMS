@@ -8,7 +8,7 @@ import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, ADMIN_STORAGE_KEY, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
-import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
+import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, getPreorderSettings, adminUpdatePreorderSettings, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
 import { adminListBatches, adminEnsureLeadAndLogComm, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
@@ -2267,6 +2267,14 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             <span className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24]/10 px-2.5 py-0.5 text-xs font-bold text-[#0F3D24]">
               🛒 Store Order
             </span>
+            {role === "owner" && order.placedBy && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24]/[0.04] px-2 py-0.5 text-[10px] font-medium text-[#0F3D24]/45"
+                title={`Placed by @${order.placedBy.username} (${order.placedBy.role})`}
+              >
+                Placed by @{order.placedBy.username} ({order.placedBy.role})
+              </span>
+            )}
             {order.batchName ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
                 <Layers size={12} /> {order.batchName}
@@ -2673,6 +2681,62 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   const updateDeliveryFn = useServerFn(adminUpdatePreorderDelivery);
   const addPaymentFn = useServerFn(adminAddPreorderPayment);
   const pendingPaymentsFn = useServerFn(adminListPendingPayments);
+  const getPreorderSettingsFn = useServerFn(getPreorderSettings);
+  const updatePreorderSettingsFn = useServerFn(adminUpdatePreorderSettings);
+
+  const preorderSettingsQuery = useQuery({
+    queryKey: ["preorder-settings"],
+    queryFn: () => getPreorderSettingsFn(),
+    refetchInterval: 30000,
+  });
+
+  const [settingsEnabled, setSettingsEnabled] = useState(true);
+  const [settingsEndDateTime, setSettingsEndDateTime] = useState("");
+  const [settingsInitialized, setSettingsInitialized] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (preorderSettingsQuery.data && !settingsInitialized) {
+      setSettingsEnabled(preorderSettingsQuery.data.enabled);
+      if (preorderSettingsQuery.data.endDateTime) {
+        const dt = new Date(preorderSettingsQuery.data.endDateTime);
+        if (!Number.isNaN(dt.getTime())) {
+          const pad = (n: number) => String(n).padStart(2, "0");
+          const localIso = `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+          setSettingsEndDateTime(localIso);
+        }
+      } else {
+        setSettingsEndDateTime("");
+      }
+      setSettingsInitialized(true);
+    }
+  }, [preorderSettingsQuery.data, settingsInitialized]);
+
+  const handleSavePreorderSettings = async (nextEnabled?: boolean, nextEndDt?: string) => {
+    const enabledVal = nextEnabled !== undefined ? nextEnabled : settingsEnabled;
+    const endRaw = nextEndDt !== undefined ? nextEndDt : settingsEndDateTime;
+    const isoEnd = endRaw ? new Date(endRaw).toISOString() : null;
+
+    setSavingSettings(true);
+    setSettingsMsg(null);
+    try {
+      await updatePreorderSettingsFn({
+        data: {
+          passcode,
+          enabled: enabledVal,
+          endDateTime: isoEnd,
+        },
+      });
+      await qc.invalidateQueries({ queryKey: ["preorder-settings"] });
+      setSettingsMsg("December Pre-Order settings saved.");
+      setTimeout(() => setSettingsMsg(null), 3500);
+    } catch (err: any) {
+      setSettingsMsg(err instanceof Error ? err.message : "Could not update settings.");
+    } finally {
+      setSavingSettings(false);
+    }
+  };
 
   const pendingQuery = useQuery({
     queryKey: ["admin-preorders-pending-payments", passcode],
@@ -2756,6 +2820,91 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           <h2 className="text-2xl font-extrabold text-[#0F3D24]">December Holiday Pre-Orders Dashboard</h2>
           <p className="mt-1 max-w-2xl text-xs text-[#0F3D24]/65">Track total reservations, amounts received, balance owed, and filter by customer chosen delivery dates.</p>
         </div>
+
+        {/* Owner Campaign Settings Card */}
+        {role === "owner" && (
+          <div className="rounded-2xl border border-[#0F3D24]/15 bg-[#F7F5F0]/80 p-4 sm:p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-[#0F3D24]">
+                    December Pre-Order Campaign Settings (Owner Only)
+                  </span>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
+                      preorderSettingsQuery.data?.isActive !== false
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-rose-100 text-rose-800"
+                    }`}
+                  >
+                    {preorderSettingsQuery.data?.isActive !== false
+                      ? "🟢 Active on Public Site & Admin"
+                      : "🔴 Closed / Ended (Records Preserved)"}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-[#0F3D24]/70">
+                  Control when December Pre-Orders close. When deactivated or once the end date & time passes, the public site banner and pre-order options are hidden automatically while all existing records remain intact here.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={savingSettings}
+                  onClick={() => {
+                    const next = !settingsEnabled;
+                    setSettingsEnabled(next);
+                    handleSavePreorderSettings(next, settingsEndDateTime);
+                  }}
+                  className={`rounded-full px-4 py-2 text-xs font-extrabold transition shadow-sm ${
+                    settingsEnabled
+                      ? "bg-rose-600 text-white hover:bg-rose-700"
+                      : "bg-[#3F8F3F] text-white hover:bg-[#347834]"
+                  } disabled:opacity-50`}
+                >
+                  {settingsEnabled ? "Deactivate Pre-Orders Now" : "Activate Pre-Orders"}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-3 pt-2 border-t border-[#0F3D24]/10">
+              <div className="flex-1 min-w-[220px]">
+                <label className="block text-[11px] font-bold text-[#0F3D24] mb-1">
+                  Automatic End Date & Time (Optional)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={settingsEndDateTime}
+                  onChange={(e) => setSettingsEndDateTime(e.target.value)}
+                  className="w-full rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                />
+              </div>
+              <button
+                type="button"
+                disabled={savingSettings}
+                onClick={() => handleSavePreorderSettings(settingsEnabled, settingsEndDateTime)}
+                className="rounded-xl bg-[#0F3D24] px-4 py-2 text-xs font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition"
+              >
+                {savingSettings ? "Saving..." : "Save End Date & Time"}
+              </button>
+              {settingsEndDateTime && (
+                <button
+                  type="button"
+                  disabled={savingSettings}
+                  onClick={() => {
+                    setSettingsEndDateTime("");
+                    handleSavePreorderSettings(settingsEnabled, "");
+                  }}
+                  className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 disabled:opacity-50 transition"
+                >
+                  Clear End Date
+                </button>
+              )}
+              {settingsMsg && (
+                <span className="text-xs font-bold text-[#3F8F3F]">{settingsMsg}</span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Financial & Operational Summary Cards */}
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
