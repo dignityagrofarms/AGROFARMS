@@ -460,6 +460,13 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
   const credential = parseAdminCredential(value);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+  const master = process.env.ADMIN_PASSCODE;
+  const masterUsername = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
+  const isReservedOwnerUsername =
+    credential.username === "owner" ||
+    credential.username === "admin" ||
+    credential.username === masterUsername;
+
   // First check explicit account in admin_access DB table
   const { data: configured } = await supabaseAdmin
     .from("admin_access")
@@ -468,6 +475,20 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
     .maybeSingle();
 
   if (configured) {
+    // Auto-heal if the primary "owner" or "admin" username was accidentally demoted or deactivated
+    if (isReservedOwnerUsername && (configured.role !== "owner" || !configured.active)) {
+      await (supabaseAdmin.from("admin_access" as any) as any)
+        .update({
+          role: "owner",
+          active: true,
+          status: "active",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("username", credential.username);
+      configured.role = "owner";
+      configured.active = true;
+    }
+
     if (!configured.active) {
       throw new Error("This account is deactivated. Contact your Administrator.");
     }
@@ -477,25 +498,25 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
         .from("admin_access")
         .update({ last_login_at: new Date().toISOString() })
         .eq("username", credential.username);
-      return configured.role as AdminRole;
-    } else {
+      return (isReservedOwnerUsername ? "owner" : configured.role) as AdminRole;
+    }
+    // If not the reserved owner account, fail immediately on hash mismatch
+    if (!isReservedOwnerUsername) {
       throw new Error("Invalid username or passcode.");
     }
   }
 
   // Master owner recovery environment check
-  const master = process.env.ADMIN_PASSCODE;
-  const masterUsername = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
-  if (credential.username === masterUsername && master && credential.passcode === master) return "owner";
-  if (master && credential.username === "owner" && credential.passcode === master) return "owner";
+  if (isReservedOwnerUsername && master && credential.passcode === master) return "owner";
 
-  // Legacy staff setting check
+  // Legacy staff / owner setting check
   const { data: staffSetting } = await supabaseAdmin
     .from("app_settings")
     .select("value")
     .eq("key", "admin_passcode")
     .maybeSingle();
   if (credential.username === "staff" && staffSetting?.value && credential.passcode === staffSetting.value) return "staff";
+  if (isReservedOwnerUsername && staffSetting?.value && credential.passcode === staffSetting.value) return "owner";
 
   throw new Error("Invalid username or passcode.");
 }
@@ -542,21 +563,24 @@ export const adminSetPasscode = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    const role = await checkOwner(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const credential = parseAdminCredential(data.passcode);
-    
-    // Update admin_access row if user exists
-    const hash = await hashPasscode(data.newPasscode);
-    await supabaseAdmin
-      .from("admin_access")
-      .update({ passcode_hash: hash, updated_at: new Date().toISOString() })
-      .eq("username", credential.username);
 
-    // Also update legacy app_settings key
+    // Upsert owner's admin_access row with new hashed passcode without overwriting legacy staff app_settings
+    const hash = await hashPasscode(data.newPasscode);
     const { error } = await supabaseAdmin
-      .from("app_settings")
-      .upsert({ key: "admin_passcode", value: data.newPasscode, updated_at: new Date().toISOString() }, { onConflict: "key" });
+      .from("admin_access")
+      .upsert(
+        {
+          username: credential.username || "owner",
+          role: "owner",
+          passcode_hash: hash,
+          active: true,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "username" },
+      );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -584,12 +608,27 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<UserAccountItem[]> => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const masterUser = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
 
     const { data: rows, error } = await supabaseAdmin
       .from("admin_access")
       .select("*")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
+
+    // Auto-heal if owner/admin was accidentally changed to another role
+    for (const r of rows || []) {
+      const u = String(r.username || "").toLowerCase();
+      if ((u === "owner" || u === "admin" || u === masterUser) && (r.role !== "owner" || !r.active)) {
+        await (supabaseAdmin.from("admin_access" as any) as any)
+          .update({ role: "owner", active: true, status: "active", updated_at: new Date().toISOString() })
+          .eq("username", r.username);
+        r.role = "owner";
+        r.active = true;
+        (r as any).status = "active";
+      }
+    }
+
     const items: UserAccountItem[] = (rows || []).map((r: any) => ({
       id: r.id,
       username: r.username,
@@ -608,7 +647,6 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
       notes: r.notes ?? null,
     }));
 
-    const masterUser = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
     if (!items.some((i) => i.username === masterUser)) {
       items.unshift({
         id: "master-owner-account",
@@ -646,39 +684,61 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
     try {
       console.log("[adminCreateUserAccount] Validating access for account creation...");
       await checkOwner(data.passcode);
-      
-      console.log(`[adminCreateUserAccount] Initializing Supabase to create user: ${data.targetUsername}`);
+
+      const targetUsername = data.targetUsername.trim().toLowerCase();
+      const masterUser = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
+      const reservedUsernames = new Set(["owner", "admin", "everyone", "system", masterUser]);
+
+      if (reservedUsernames.has(targetUsername)) {
+        throw new Error(
+          `Username "${targetUsername}" already exists and is reserved for system administration! Please choose a different username.`,
+        );
+      }
+
+      console.log(`[adminCreateUserAccount] Initializing Supabase to create user: ${targetUsername}`);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      // Check if username already exists so we never overwrite an existing user account
+      const { data: existingUser } = await supabaseAdmin
+        .from("admin_access")
+        .select("username")
+        .eq("username", targetUsername)
+        .maybeSingle();
+
+      if (existingUser) {
+        throw new Error(`Username "${targetUsername}" already exists! Please choose a unique username.`);
+      }
+
       const hash = await hashPasscode(data.targetPasscode);
-      
-      console.log(`[adminCreateUserAccount] Executing upsert for: ${data.targetUsername}`);
+
+      console.log(`[adminCreateUserAccount] Executing insert for: ${targetUsername}`);
       const { error } = await (supabaseAdmin
         .from("admin_access" as any) as any)
-        .upsert(
-          {
-            username: data.targetUsername,
-            role: data.targetRole,
-            passcode_hash: hash,
-            active: true,
-            full_name: data.fullName ?? null,
-            phone: data.phone ?? null,
-            email: data.email ?? null,
-            address: data.address ?? null,
-            department: data.department ?? "Farm Operations",
-            status: "active",
-            emergency_contact: data.emergencyContact ?? null,
-            notes: data.notes ?? null,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "username" },
-        );
-        
+        .insert({
+          username: targetUsername,
+          role: data.targetRole,
+          passcode_hash: hash,
+          active: true,
+          full_name: data.fullName ?? null,
+          phone: data.phone ?? null,
+          email: data.email ?? null,
+          address: data.address ?? null,
+          department: data.department ?? "Farm Operations",
+          status: "active",
+          emergency_contact: data.emergencyContact ?? null,
+          notes: data.notes ?? null,
+          updated_at: new Date().toISOString(),
+        });
+
       if (error) {
-        console.error("[adminCreateUserAccount] Supabase upsert error:", error);
+        console.error("[adminCreateUserAccount] Supabase insert error:", error);
+        if (/duplicate key|unique/i.test(error.message)) {
+          throw new Error(`Username "${targetUsername}" already exists! Please choose a unique username.`);
+        }
         throw new Error(error.message);
       }
-      
-      console.log(`[adminCreateUserAccount] Successfully created user: ${data.targetUsername}`);
+
+      console.log(`[adminCreateUserAccount] Successfully created user: ${targetUsername}`);
       return { ok: true };
     } catch (err: any) {
       console.error("[adminCreateUserAccount] Caught exception:", err);
@@ -868,13 +928,23 @@ export const adminRecoverPasscode = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existingAccount } = await supabaseAdmin
+      .from("admin_access")
+      .select("role")
+      .eq("username", data.targetUsername)
+      .maybeSingle();
+
+    const preservedRole: AdminRole =
+      (existingAccount?.role as AdminRole) ||
+      (data.targetUsername === "staff" ? "staff" : data.targetUsername === "manager" ? "manager" : "owner");
+
     const hash = await hashPasscode(data.newPasscode);
     const { error } = await supabaseAdmin
       .from("admin_access")
       .upsert(
         {
           username: data.targetUsername,
-          role: "owner",
+          role: preservedRole,
           passcode_hash: hash,
           active: true,
           updated_at: new Date().toISOString(),
@@ -1560,7 +1630,7 @@ export const adminUpdateStaffMember = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const updatePayload: any = { updated_at: new Date().toISOString() };
@@ -1597,7 +1667,7 @@ export const adminRecordSuspension = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Insert suspension record
@@ -1658,7 +1728,7 @@ export const adminUploadStaffDocument = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin.from("staff_documents" as any) as any).insert({
@@ -1713,7 +1783,7 @@ export const adminDeleteStaffDocument = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin.from("staff_documents" as any) as any).delete().eq("id", data.documentId);
@@ -1726,18 +1796,23 @@ export const adminDeleteStaffDocument = createServerFn({ method: "POST" })
 export const staffClockIn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({
+      passcode: z.string(),
       username: z.string().trim().min(1).toLowerCase(),
       notes: z.string().optional().nullable(),
     }).parse(data),
   )
   .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const verifiedUsername = (cred.username && cred.username !== "unknown" ? cred.username : data.username).toLowerCase();
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const today = new Date().toISOString().split("T")[0];
 
     const { data: existing } = await (supabaseAdmin
       .from("staff_attendance" as any) as any)
       .select("id")
-      .eq("username", data.username)
+      .eq("username", verifiedUsername)
       .eq("attendance_date", today)
       .maybeSingle();
 
@@ -1746,7 +1821,7 @@ export const staffClockIn = createServerFn({ method: "POST" })
     }
 
     const { error } = await (supabaseAdmin.from("staff_attendance" as any) as any).insert({
-      username: data.username,
+      username: verifiedUsername,
       attendance_date: today,
       status: "present",
       clock_in_time: new Date().toISOString(),
@@ -1807,7 +1882,7 @@ export const adminMarkAttendance = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin.from("staff_attendance" as any) as any).upsert(
@@ -1839,7 +1914,7 @@ export const adminCreatePaymentReceipt = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin.from("staff_payment_receipts" as any) as any).insert({
@@ -1891,18 +1966,23 @@ export const adminListPaymentReceipts = createServerFn({ method: "POST" })
 export const staffSignPaymentReceipt = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({
+      passcode: z.string(),
       receiptId: z.string().uuid(),
       username: z.string().trim().min(1).toLowerCase(),
     }).parse(data),
   )
   .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const verifiedUsername = (cred.username && cred.username !== "unknown" ? cred.username : data.username).toLowerCase();
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin
       .from("staff_payment_receipts" as any) as any)
       .update({ status: "signed", signed_at: new Date().toISOString() })
       .eq("id", data.receiptId)
-      .eq("username", data.username);
+      .eq("username", verifiedUsername);
 
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1913,6 +1993,7 @@ export const staffSignPaymentReceipt = createServerFn({ method: "POST" })
 export const staffSubmitLeaveRequest = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({
+      passcode: z.string(),
       username: z.string().trim().min(1).toLowerCase(),
       leaveType: z.enum(["annual", "sick", "emergency", "casual"]),
       startDate: z.string().min(1),
@@ -1921,10 +2002,14 @@ export const staffSubmitLeaveRequest = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
+    await checkPasscode(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const verifiedUsername = (cred.username && cred.username !== "unknown" ? cred.username : data.username).toLowerCase();
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { error } = await (supabaseAdmin.from("staff_leave_requests" as any) as any).insert({
-      username: data.username,
+      username: verifiedUsername,
       leave_type: data.leaveType,
       start_date: data.startDate,
       end_date: data.endDate,
@@ -1978,7 +2063,7 @@ export const adminDecideLeaveRequest = createServerFn({ method: "POST" })
     }).parse(data),
   )
   .handler(async ({ data }) => {
-    await checkPasscode(data.passcode);
+    await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Fetch leave details

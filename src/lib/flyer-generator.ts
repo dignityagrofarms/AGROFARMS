@@ -31,22 +31,80 @@ export function maskAddress(address: string): string {
   return `${address} (Area *****)`;
 }
 
+/**
+ * Transforms raw database item records or comma-separated item strings
+ * into clean, punchy, high-converting social media wording.
+ * e.g. "Broiler Chicken Medium × 5" -> "5 Whole Broilers"
+ */
+export function formatSocialProofQuantity(
+  rawText?: string,
+  items?: Array<{ product: string; qty: number }>
+): string {
+  if (items && items.length > 0) {
+    const parts = items.map((item) => {
+      const p = item.product.toLowerCase();
+      let label = "Broilers";
+      if (p.includes("egg")) {
+        label = item.qty === 1 ? "Crate Fresh Eggs" : "Crates Fresh Eggs";
+      } else if (p.includes("jumbo")) {
+        label = item.qty === 1 ? "Jumbo Broiler" : "Jumbo Broilers";
+      } else if (p.includes("chicken") || p.includes("broiler") || p.includes("bird")) {
+        label = item.qty === 1 ? "Whole Broiler" : "Whole Broilers";
+      } else {
+        label = item.product;
+      }
+      return `${item.qty} ${label}`;
+    });
+    return parts.join(", ");
+  }
+
+  if (!rawText || !rawText.trim()) {
+    return "10 Whole Broilers";
+  }
+
+  let text = rawText.trim();
+
+  // If text is formatted as "Product × Qty" or "Product x Qty"
+  if (text.includes("×") || text.includes(" x ") || text.includes(" X ")) {
+    text = text.replace(/([^\d,]+)\s*[×xX]\s*(\d+)/g, "$2 $1").trim();
+  }
+
+  // Simplify verbose product names for punchy social media impact
+  text = text
+    .replace(/broiler chicken (medium|large|jumbo)/gi, "Broilers")
+    .replace(/dressed chicken/gi, "Broilers")
+    .replace(/broiler chicken/gi, "Broilers")
+    .replace(/chicken/gi, "Broilers")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return text;
+}
+
 export interface SocialProofFlyerOptions {
-  customerName: string;
-  phone: string;
-  orderDate?: string;
-  itemsText: string;
-  address: string;
   orderCode?: string;
+  quantityText?: string;
+  itemsText?: string;
+  alignment?: "center" | "left";
+  // Legacy fields kept for full backwards compatibility
+  customerName?: string;
+  phone?: string;
+  orderDate?: string;
+  address?: string;
   maskData?: boolean;
 }
 
+/**
+ * Draws the high-converting Dignity Agro Farms Social Proof flyer.
+ * Uses 2x supersampled resolution (1224 × 1836) for ultra-sharp retina and mobile downloads.
+ */
 export async function drawSocialProofFlyerOnCanvas(
   canvas: HTMLCanvasElement,
   options: SocialProofFlyerOptions
 ): Promise<void> {
-  const width = 1067;
-  const height = 1280;
+  // 2x supersampled resolution of the 612 × 918 template
+  const width = 1224;
+  const height = 1836;
 
   canvas.width = width;
   canvas.height = height;
@@ -59,72 +117,83 @@ export async function drawSocialProofFlyerOnCanvas(
     img.src = "/social_proof_template.png";
 
     img.onload = () => {
-      // 1. Draw template background poster image
+      // 1. Draw template background poster image at 2x supersampled size
       ctx.drawImage(img, 0, 0, width, height);
 
-      const doMask = options.maskData !== false;
-      const displayName = doMask ? maskName(options.customerName) : options.customerName;
-      const displayPhone = doMask ? maskPhone(options.phone) : options.phone;
-      const displayAddress = doMask ? maskAddress(options.address) : options.address;
-      const displayDate = options.orderDate || new Date().toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      });
-      const displayItems = options.itemsText || "Poultry Produce Order";
+      // 2. Prepare Order Number text (ensuring clean '#' prefix)
+      let displayOrderCode = (options.orderCode || "DEC-44851").trim();
+      if (displayOrderCode && !displayOrderCode.startsWith("#")) {
+        displayOrderCode = `#${displayOrderCode}`;
+      }
 
-      // 2. Base text styles
-      ctx.fillStyle = "#0F3D24"; // Dark Dignity Agro Farms Green font
-      ctx.textBaseline = "alphabetic"; // Baseline rests naturally on top of dotted lines
+      // 3. Prepare Quantity wording for social media
+      const displayQuantity =
+        options.quantityText?.trim() ||
+        formatSocialProofQuantity(options.itemsText) ||
+        "10 Whole Broilers";
 
-      // Colons in the template graphic are at X = 414px across all 5 lines!
-      // Start X at 425px gives 11px padding right after colons
-      const startX = 425;
-      const maxWidth = 500; // Max allowed width (X=425 + 500 = 925px, safely inside right border X=930px)
+      // 4. Alignment settings
+      const align = options.alignment || "center";
+      const isCenter = align === "center";
 
-      // Helper function to draw text with dynamic font scaling & overflow truncation
-      const drawAutoScaledText = (text: string, x: number, y: number, initialSize: number) => {
-        let fontSize = initialSize;
-        ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
+      // 5. Pill Box Coordinates (2x scaled from 612x918 template):
+      // - Pill inner bounds: X = [186, 476], Center X = 331, Left X = 210
+      // - Max printable text width = 260px (with safe inner padding)
+      const pillCenterX = 331;
+      const pillLeftX = 210;
+      const targetX = isCenter ? pillCenterX : pillLeftX;
+      const maxTextWidth = 260;
 
-        // Scale down font size if text width exceeds max width boundary
-        while (ctx.measureText(text).width > maxWidth && fontSize > 13) {
+      // Vertical Centers:
+      // Box 1 (ORDER NUMBER): Center Y = 532.0 * 2 = 1064
+      // Box 2 (QUANTITY): Center Y = 591.5 * 2 = 1183
+      const box1CenterY = 1064;
+      const box2CenterY = 1183;
+
+      ctx.fillStyle = "#0B3B1E"; // Dignity Agro Farms brand dark evergreen
+      ctx.textAlign = isCenter ? "center" : "left";
+      ctx.textBaseline = "middle";
+
+      // Helper function to auto-scale text font size to fit neatly in pill box
+      const drawAutoScaledPillText = (
+        text: string,
+        yCenter: number,
+        initialFontSize: number
+      ) => {
+        let fontSize = initialFontSize;
+        ctx.font = `bold ${fontSize}px 'Inter', 'Montserrat', -apple-system, BlinkMacSystemFont, Arial, sans-serif`;
+
+        // Scale down font size if text width exceeds pill boundaries
+        while (ctx.measureText(text).width > maxTextWidth && fontSize > 18) {
           fontSize -= 1;
-          ctx.font = `bold ${fontSize}px 'Inter', Arial, sans-serif`;
+          ctx.font = `bold ${fontSize}px 'Inter', 'Montserrat', -apple-system, BlinkMacSystemFont, Arial, sans-serif`;
         }
 
-        // If text still exceeds max width at minimum font size, truncate with trailing dots (...)
+        // If text still exceeds at minimum font size, truncate gracefully with ellipsis
         let finalText = text;
-        if (ctx.measureText(finalText).width > maxWidth) {
-          while (finalText.length > 4 && ctx.measureText(finalText + "...").width > maxWidth) {
+        if (ctx.measureText(finalText).width > maxTextWidth) {
+          while (
+            finalText.length > 3 &&
+            ctx.measureText(finalText + "...").width > maxTextWidth
+          ) {
             finalText = finalText.slice(0, -1);
           }
           finalText += "...";
         }
 
-        ctx.fillText(finalText, x, y);
+        ctx.fillText(finalText, targetX, yCenter);
       };
 
-      // Exact Y baselines resting 6px above dotted lines (dotted lines are at Y=831, 887, 942, 1001, 1061)
-      // Line 1: FULL NAME (Y: 825)
-      drawAutoScaledText(displayName, startX, 825, 25);
+      // Box 1: ORDER NUMBER (32px initial size)
+      drawAutoScaledPillText(displayOrderCode, box1CenterY, 32);
 
-      // Line 2: PHONE NUMBER (Y: 881)
-      drawAutoScaledText(displayPhone, startX, 881, 25);
-
-      // Line 3: ORDER DATE (Y: 936)
-      drawAutoScaledText(displayDate, startX, 936, 24);
-
-      // Line 4: ITEM(S) ORDERED (Y: 995)
-      drawAutoScaledText(displayItems, startX, 995, 23);
-
-      // Line 5: DELIVERY ADDRESS (Y: 1055)
-      drawAutoScaledText(displayAddress, startX, 1055, 23);
+      // Box 2: QUANTITY (30px initial size)
+      drawAutoScaledPillText(displayQuantity, box2CenterY, 30);
 
       resolve();
     };
 
-    img.onerror = (err) => {
+    img.onerror = () => {
       reject(new Error("Failed to load background template image"));
     };
   });

@@ -88,6 +88,16 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [staffSubmittedExpenses, setStaffSubmittedExpenses] = useState<
+    Array<{
+      id: string;
+      date: string;
+      category: string;
+      batchName: string;
+      description: string;
+      paymentMethod: string;
+    }>
+  >([]);
 
   const listOrdersFn = useServerFn(adminListOrders);
   const listPreordersFn = useServerFn(adminListPreorders);
@@ -106,7 +116,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const ordersQuery = useQuery({
     queryKey: ["admin-orders-financials", passcode],
     queryFn: () => listOrdersFn({ data: { passcode } }),
-    enabled: Boolean(passcode),
+    enabled: Boolean(passcode) && role !== "staff",
     staleTime: 30000,
     placeholderData: (previousData) => previousData,
   });
@@ -114,7 +124,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const preordersQuery = useQuery({
     queryKey: ["admin-preorders-financials", passcode],
     queryFn: () => listPreordersFn({ data: { passcode } }),
-    enabled: Boolean(passcode),
+    enabled: Boolean(passcode) && role !== "staff",
     staleTime: 30000,
     placeholderData: (previousData) => previousData,
   });
@@ -135,7 +145,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
-    enabled: Boolean(passcode),
+    enabled: Boolean(passcode) && role !== "staff",
     placeholderData: (previousData) => previousData,
   });
 
@@ -148,7 +158,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           batchId: selectedBatchId === "all" ? null : selectedBatchId,
         },
       }),
-    enabled: Boolean(passcode),
+    enabled: Boolean(passcode) && role !== "staff",
     placeholderData: (previousData) => previousData,
   });
 
@@ -158,7 +168,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
       selectedBatchId === "all"
         ? null
         : getBatchReportFn({ data: { passcode, batchId: selectedBatchId } }),
-    enabled: Boolean(passcode) && selectedBatchId !== "all",
+    enabled: Boolean(passcode) && selectedBatchId !== "all" && role !== "staff",
     placeholderData: (previousData) => previousData,
   });
 
@@ -246,7 +256,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         data: {
           passcode,
           batchId: finForm.batchId || null,
-          type: finForm.type,
+          type: role === "staff" ? "expense" : finForm.type,
           category: finForm.category,
           amount: Number(finForm.amount),
           description: finForm.description,
@@ -255,9 +265,24 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           referenceNo: finForm.referenceNo || null,
         },
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["farm-financials"] });
-      queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+    onSuccess: (res) => {
+      if (role === "staff") {
+        const matchedBatch = (batchesQuery.data || []).find((b) => b.id === finForm.batchId);
+        setStaffSubmittedExpenses((prev) => [
+          {
+            id: res.id,
+            date: finForm.transactionDate,
+            category: finForm.category,
+            batchName: matchedBatch ? matchedBatch.batchName : "General Farm",
+            description: finForm.description,
+            paymentMethod: finForm.paymentMethod,
+          },
+          ...prev,
+        ]);
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["farm-financials"] });
+        queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+      }
       setShowFinancialModal(false);
       setFinForm({
         batchId: "",
@@ -269,7 +294,11 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         transactionDate: new Date().toISOString().split("T")[0],
         referenceNo: "",
       });
-      setFeedback("Transaction registered successfully.");
+      setFeedback(
+        role === "staff"
+          ? "Expense submitted successfully for Administrator approval!"
+          : "Transaction registered successfully.",
+      );
     },
     onError: (e: Error) => setFeedback("Error: " + e.message),
   });
@@ -470,6 +499,190 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     document.body.removeChild(link);
   };
 
+  if (role === "staff") {
+    return (
+      <div className="space-y-6">
+        {/* Staff Header */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-[#0F3D24]">
+              <TrendingDown className="text-rose-600" size={22} />
+              <h2 className="text-xl font-bold">Record Farm Expense</h2>
+            </div>
+            <p className="mt-1 text-xs text-[#0F3D24]/70">
+              Log operational farm expenses (feed, medication, logistics, utilities) for Administrator approval. Financial figures and farm totals are restricted.
+            </p>
+          </div>
+          <span className="rounded-full bg-amber-100 px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-amber-900">
+            Staff Expense Entry Mode
+          </span>
+        </div>
+
+        {feedback && (
+          <div className="flex items-center justify-between rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-3 text-xs font-bold text-emerald-900">
+            <span className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-600" />
+              {feedback}
+            </span>
+            <button onClick={() => setFeedback(null)} className="text-emerald-800/60 hover:text-emerald-900">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Blind Expense Entry Form Card */}
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4 max-w-2xl">
+          <div className="border-b border-[#0F3D24]/10 pb-3">
+            <h3 className="text-base font-bold text-[#0F3D24]">New Expense Voucher</h3>
+            <p className="text-xs text-[#0F3D24]/60">
+              All submitted expenses are routed to the Owner's Pending Approvals queue.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">Assign to Batch</label>
+              <select
+                value={finForm.batchId}
+                onChange={(e) => setFinForm({ ...finForm, batchId: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              >
+                <option value="">General Farm Expense</option>
+                {batches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.batchName} ({b.batchType})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">Expense Category *</label>
+              <select
+                value={finForm.category}
+                onChange={(e) => setFinForm({ ...finForm, category: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              >
+                <option value="Feed">Feed & Nutrition</option>
+                <option value="Medication/Vaccine">Medication & Vaccines</option>
+                <option value="Day-Old Chicks">Day-Old Chicks / Stock Purchase</option>
+                <option value="Logistics/Transport">Logistics & Transportation</option>
+                <option value="Labor/Salaries">Labor & Wages</option>
+                <option value="Utilities">Utilities, Fuel & Electricity</option>
+                <option value="Equipment">Farm Equipment & Repairs</option>
+                <option value="Packaging">Packaging & Processing</option>
+                <option value="Other Expense">Other Expense</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">Amount Spent (₦) *</label>
+              <input
+                type="number"
+                min={1}
+                placeholder="Enter amount spent"
+                value={finForm.amount}
+                onChange={(e) => setFinForm({ ...finForm, amount: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-bold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">Payment Method</label>
+              <select
+                value={finForm.paymentMethod}
+                onChange={(e) => setFinForm({ ...finForm, paymentMethod: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              >
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Cash">Cash</option>
+                <option value="POS">POS / Card</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">Expense Date *</label>
+              <input
+                type="date"
+                value={finForm.transactionDate}
+                onChange={(e) => setFinForm({ ...finForm, transactionDate: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">Receipt / Reference No. (Optional)</label>
+              <input
+                type="text"
+                placeholder="e.g. INV-0042 or vendor name"
+                value={finForm.referenceNo}
+                onChange={(e) => setFinForm({ ...finForm, referenceNo: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-[#0F3D24]">Expense Description & Purpose *</label>
+              <input
+                type="text"
+                placeholder="e.g. Purchased 10 bags of broiler finisher feed & disinfectant"
+                value={finForm.description}
+                onChange={(e) => setFinForm({ ...finForm, description: e.target.value, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="button"
+              disabled={!finForm.amount || Number(finForm.amount) <= 0 || !finForm.description.trim() || createFinancialMut.isPending}
+              onClick={() => createFinancialMut.mutate()}
+              className="inline-flex items-center gap-2 rounded-full bg-rose-700 px-6 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-rose-800 disabled:opacity-50 transition"
+            >
+              {createFinancialMut.isPending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Submitting Expense...
+                </>
+              ) : (
+                <>
+                  <PlusCircle size={15} /> Submit Expense for Approval
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Session Confirmation Log (No Financial Figures Shown) */}
+        {staffSubmittedExpenses.length > 0 && (
+          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 max-w-2xl space-y-3">
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#0F3D24]/70">
+              Expenses Submitted in This Session ({staffSubmittedExpenses.length})
+            </h4>
+            <div className="divide-y divide-[#0F3D24]/10">
+              {staffSubmittedExpenses.map((exp) => (
+                <div key={exp.id} className="py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div>
+                    <div className="font-bold text-[#0F3D24]">
+                      {exp.category} · <span className="font-normal text-[#0F3D24]/70">{exp.batchName}</span>
+                    </div>
+                    <div className="text-[#0F3D24]/70">{exp.description}</div>
+                    <div className="text-[10px] text-[#0F3D24]/50">
+                      Date: {exp.date} · Method: {exp.paymentMethod}
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800">
+                    Pending Owner Approval
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Top Header & Quick Actions */}
@@ -544,7 +757,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
               </option>
             ))}
           </select>
-          {selectedBatchId !== "all" && role !== "staff" && (
+          {selectedBatchId !== "all" && (
             <button
               onClick={() => {
                 const target = batches.find((b) => b.id === selectedBatchId);
@@ -853,25 +1066,25 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                         </span>
                       ) : (
                         <div className="flex items-center justify-center gap-1">
-                          {role !== "staff" && (
-                            <button
-                              onClick={() => setEditingFinancial(f as FarmFinancial)}
-                              className="text-[#3F8F3F] hover:text-[#0F3D24] transition p-1"
-                              title="Edit financial record"
-                            >
-                              <Pencil size={15} />
-                            </button>
-                          )}
                           {role === "owner" && (
-                            <button
-                              onClick={() => {
-                                if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
-                              }}
-                              className="text-rose-600 hover:text-rose-800 transition p-1"
-                              title="Delete record"
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setEditingFinancial(f as FarmFinancial)}
+                                className="text-[#3F8F3F] hover:text-[#0F3D24] transition p-1"
+                                title="Edit financial record"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm("Delete this financial record?")) deleteFinMut.mutate(f.id);
+                                }}
+                                className="text-rose-600 hover:text-rose-800 transition p-1"
+                                title="Delete record"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
@@ -1669,14 +1882,16 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() => setShowImportModal(true)}
-            className="flex items-center gap-2 rounded-full border border-[#3F8F3F] bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#3F8F3F]/20 transition"
-            title="Import multiple leads from a CSV or Excel spreadsheet"
-          >
-            <FileText size={16} className="text-[#3F8F3F]" />
-            Import CSV / Excel Batch
-          </button>
+          {role !== "staff" && (
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-2 rounded-full border border-[#3F8F3F] bg-[#3F8F3F]/10 px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#3F8F3F]/20 transition"
+              title="Import multiple leads from a CSV or Excel spreadsheet"
+            >
+              <FileText size={16} className="text-[#3F8F3F]" />
+              Import CSV / Excel Batch
+            </button>
+          )}
           <button
             onClick={() => {
               setEditingLead(null);
@@ -1715,8 +1930,14 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
           <p className="mt-2 text-2xl font-bold text-emerald-700">{convertedLeads} Buyers</p>
         </div>
         <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
-          <span className="text-xs font-semibold text-[#0F3D24]/70">Est. Pipeline Value</span>
-          <p className="mt-2 text-2xl font-bold text-[#0F3D24]">{formatNaira(pipelineValue)}</p>
+          <span className="text-xs font-semibold text-[#0F3D24]/70">
+            {role === "owner" ? "Est. Pipeline Value" : "Contacted / Active Follow-up"}
+          </span>
+          <p className="mt-2 text-2xl font-bold text-[#0F3D24]">
+            {role === "owner"
+              ? formatNaira(pipelineValue)
+              : `${leads.filter((l) => l.status === "Contacted" || l.status === "Interested / Negotiating").length} Leads`}
+          </p>
         </div>
       </div>
 
@@ -1833,7 +2054,7 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
                     <Sparkles size={14} className="text-amber-500" />
                     <span>Source: {lead.leadSource}</span>
                   </div>
-                  {lead.estimatedValue > 0 && (
+                  {role === "owner" && lead.estimatedValue > 0 && (
                     <div className="flex items-center gap-2 font-bold text-[#0F3D24]">
                       <DollarSign size={14} className="text-emerald-600" />
                       <span>Est. Order Value: {formatNaira(lead.estimatedValue)}</span>
@@ -1914,7 +2135,7 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
                 <th className="p-4">Status</th>
                 <th className="p-4">Source</th>
                 <th className="p-4">Interested In</th>
-                <th className="p-4">Est. Value</th>
+                {role === "owner" && <th className="p-4">Est. Value</th>}
                 <th className="p-4">Notes / Location</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
@@ -1943,9 +2164,11 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
                   <td className="p-4 text-gray-800 font-medium">
                     {lead.interestedIn || <span className="text-gray-400 italic">General Inquiry</span>}
                   </td>
-                  <td className="p-4 font-bold text-[#0F3D24]">
-                    {lead.estimatedValue > 0 ? formatNaira(lead.estimatedValue) : "—"}
-                  </td>
+                  {role === "owner" && (
+                    <td className="p-4 font-bold text-[#0F3D24]">
+                      {lead.estimatedValue > 0 ? formatNaira(lead.estimatedValue) : "—"}
+                    </td>
+                  )}
                   <td className="p-4 text-gray-600 max-w-xs truncate">
                     {lead.location && <div className="font-medium text-gray-800">📍 {lead.location}</div>}
                     {lead.notes && <div className="text-[11px] italic text-gray-500">"{lead.notes}"</div>}
@@ -2069,7 +2292,7 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
+                <div className={role === "owner" ? "" : "sm:col-span-2"}>
                   <label className="block text-xs font-bold text-[#0F3D24]">Location / Address</label>
                   <input
                     type="text"
@@ -2079,16 +2302,18 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-[#0F3D24]">Estimated Value (₦)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 150000"
-                    value={leadForm.estimatedValue}
-                    onChange={(e) => setLeadForm({ ...leadForm, estimatedValue: e.target.value })}
-                    className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
-                  />
-                </div>
+                {role === "owner" && (
+                  <div>
+                    <label className="block text-xs font-bold text-[#0F3D24]">Estimated Value (₦)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 150000"
+                      value={leadForm.estimatedValue}
+                      onChange={(e) => setLeadForm({ ...leadForm, estimatedValue: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>

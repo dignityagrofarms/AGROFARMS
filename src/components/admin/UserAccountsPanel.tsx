@@ -162,36 +162,45 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
         </span>
       </div>
 
-      {/* Section 1: Change Own Password (Available to current user) */}
-      <div className="rounded-2xl bg-[#F7F5F0] p-5 space-y-3">
-        <h3 className="text-sm font-bold text-[#0F3D24] flex items-center gap-2">
-          <Key size={16} className="text-[#3F8F3F]" /> Change My Account Passcode
-        </h3>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <input
-            type="password"
-            value={nextPasscode}
-            onChange={(e) => setNextPasscode(e.target.value)}
-            placeholder="New passcode (min 6 chars)"
-            className="rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2.5 text-xs outline-none focus:border-[#3F8F3F]"
-          />
-          <input
-            type="password"
-            value={confirmPasscode}
-            onChange={(e) => setConfirmPasscode(e.target.value)}
-            placeholder="Confirm new passcode"
-            className="rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2.5 text-xs outline-none focus:border-[#3F8F3F]"
-          />
-          <button
-            disabled={!canSaveOwn || saveOwnPasscode.isPending}
-            onClick={() => saveOwnPasscode.mutate()}
-            className="rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#134a2c] transition"
-          >
-            {saveOwnPasscode.isPending ? "Saving..." : "Update My Passcode"}
-          </button>
+      {/* Section 1: Change Own Password (Owner Only) */}
+      {role === "owner" ? (
+        <div className="rounded-2xl bg-[#F7F5F0] p-5 space-y-3">
+          <h3 className="text-sm font-bold text-[#0F3D24] flex items-center gap-2">
+            <Key size={16} className="text-[#3F8F3F]" /> Change My Account Passcode
+          </h3>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <input
+              type="password"
+              value={nextPasscode}
+              onChange={(e) => setNextPasscode(e.target.value)}
+              placeholder="New passcode (min 6 chars)"
+              className="rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2.5 text-xs outline-none focus:border-[#3F8F3F]"
+            />
+            <input
+              type="password"
+              value={confirmPasscode}
+              onChange={(e) => setConfirmPasscode(e.target.value)}
+              placeholder="Confirm new passcode"
+              className="rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2.5 text-xs outline-none focus:border-[#3F8F3F]"
+            />
+            <button
+              disabled={!canSaveOwn || saveOwnPasscode.isPending}
+              onClick={() => saveOwnPasscode.mutate()}
+              className="rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-40 hover:bg-[#134a2c] transition"
+            >
+              {saveOwnPasscode.isPending ? "Saving..." : "Update My Passcode"}
+            </button>
+          </div>
+          {msg && <p className="text-xs font-medium text-[#3F8F3F]">{msg}</p>}
         </div>
-        {msg && <p className="text-xs font-medium text-[#3F8F3F]">{msg}</p>}
-      </div>
+      ) : (
+        <div className="rounded-2xl bg-[#F7F5F0] p-5 flex items-center gap-3 text-xs text-[#0F3D24]/80">
+          <Lock size={16} className="text-[#3F8F3F] shrink-0" />
+          <span>
+            You are signed in as <strong className="uppercase">{role}</strong>. Account creation, role changes, and passcode resets are managed exclusively by the Farm Owner.
+          </span>
+        </div>
+      )}
 
       {/* Section 2: Manage Accounts & RBAC Roles (Administrator Only) */}
       {role === "owner" && (

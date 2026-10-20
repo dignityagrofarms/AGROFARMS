@@ -211,7 +211,10 @@ export const adminListComplaints = createServerFn({ method: "POST" })
       })
       .parse(d)
   )
-  .handler(async () => {
+  .handler(async ({ data }) => {
+    const { checkPasscode } = await import("./orders.functions");
+    await checkPasscode(data.passcode);
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data: rows, error } = await supabaseAdmin
@@ -267,6 +270,9 @@ export const adminResolveComplaint = createServerFn({ method: "POST" })
       .parse(d)
   )
   .handler(async ({ data }) => {
+    const { checkPasscode } = await import("./orders.functions");
+    await checkPasscode(data.passcode);
+
     const now = new Date().toISOString();
     const resolutionNote = data.resolutionNote || "Resolved by admin";
 
@@ -316,6 +322,9 @@ export const adminCreateComplaint = createServerFn({ method: "POST" })
       .parse(d)
   )
   .handler(async ({ data }) => {
+    const { checkPasscode } = await import("./orders.functions");
+    await checkPasscode(data.passcode);
+
     const ticketCode = makeTicketCode();
     const now = new Date().toISOString();
 
@@ -369,6 +378,9 @@ export const adminDeleteComplaint = createServerFn({ method: "POST" })
       .parse(d)
   )
   .handler(async ({ data }) => {
+    const { checkOwner } = await import("./orders.functions");
+    await checkOwner(data.passcode);
+
     const memIdx = memoryComplaints.findIndex((c) => c.id === data.id);
     if (memIdx !== -1) {
       memoryComplaints.splice(memIdx, 1);

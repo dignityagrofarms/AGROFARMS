@@ -161,6 +161,11 @@ async function checkAdminPasscode(passcode: string): Promise<string> {
   return await checkPasscode(passcode);
 }
 
+async function checkAdminOwner(passcode: string): Promise<string> {
+  const { checkOwner } = await import("@/lib/orders.functions");
+  return await checkOwner(passcode);
+}
+
 // ─── Server Functions ─────────────────────────────────────────────────────────
 
 const createPreorderSchema = z.object({
@@ -509,7 +514,7 @@ export const adminDeletePreorder = createServerFn({ method: "POST" })
     z.object({ passcode: z.string().min(1), preorderId: z.string().uuid() }).parse(data)
   )
   .handler(async ({ data }): Promise<void> => {
-    await checkAdminPasscode(data.passcode);
+    await checkAdminOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.from("preorders").delete().eq("id", data.preorderId);
     if (error) throw new Error(error.message);
@@ -529,7 +534,7 @@ export const adminCorrectPreorder = createServerFn({ method: "POST" })
     }).parse(data)
   )
   .handler(async ({ data }): Promise<void> => {
-    await checkAdminPasscode(data.passcode);
+    await checkAdminOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("preorders")

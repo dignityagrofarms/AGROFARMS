@@ -980,7 +980,11 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
       unmatchedOfflineCount: number;
       matchedDetails: string[];
     }> => {
-      await checkPasscode(data.passcode);
+      const role = await checkPasscode(data.passcode);
+      const credential = parseAdminCredential(data.passcode);
+      const isOwner = role === "owner";
+      const approvalStatus = isOwner ? "approved" : "pending_approval";
+
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       // Fetch active website orders and preorders for customer auto-matching
@@ -1048,8 +1052,8 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
             matchedOrdersCount++;
             matchedDetails.push(`Matched '${item.customerName || item.customerPhone}' -> Order #${matchedOrderCode}`);
 
-            // Automatically link website order to the specified farm batch if selected
-            if (data.batchId) {
+            // Automatically link website order to the specified farm batch if selected and approved by owner
+            if (data.batchId && isOwner) {
               const table = isPreorder ? "preorders" : "orders";
               await supabaseAdmin.from(table).update({ batch_id: data.batchId }).eq("id", matchedOrderId);
             }
@@ -1075,6 +1079,8 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
           payment_method: item.paymentMethod || "Bank Transfer",
           transaction_date: item.transactionDate || new Date().toISOString().split("T")[0],
           reference_no: item.referenceNo || (matchedOrderCode ? `ORDER-${matchedOrderCode}` : null),
+          approval_status: approvalStatus,
+          recorded_by: credential.username,
         });
       }
 

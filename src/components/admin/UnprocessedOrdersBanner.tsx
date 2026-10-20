@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef, TouchEvent, MouseEvent } from "react";
 import { Bell, X, MoveLeft, MoveRight, Clock, Eye, Sparkles } from "lucide-react";
-import type { AdminOrder } from "@/lib/orders.functions";
+import type { AdminOrder, AdminRole } from "@/lib/orders.functions";
 
 interface UnprocessedOrdersBannerProps {
   unprocessedOrders: AdminOrder[];
   onViewOrders: () => void;
+  role?: AdminRole;
   autoDismissSeconds?: number; // Default 15 seconds
 }
 
 export function UnprocessedOrdersBanner({
   unprocessedOrders,
   onViewOrders,
+  role = "owner",
   autoDismissSeconds = 15,
 }: UnprocessedOrdersBannerProps) {
   const [isDismissed, setIsDismissed] = useState(false);
@@ -167,8 +169,18 @@ export function UnprocessedOrdersBanner({
               </h4>
             </div>
             <p className="text-xs text-[#0F3D24]/90 mt-0.5">
-              Latest order from <span className="font-bold underline">{latestOrder.customerName}</span> ({latestOrder.orderCode}) -{" "}
-              <span className="font-bold text-emerald-900">₦{latestOrder.total.toLocaleString()}</span>
+              Latest order from <span className="font-bold underline">{latestOrder.customerName}</span> ({latestOrder.orderCode})
+              {role === "owner" ? (
+                <>
+                  {" "}
+                  - <span className="font-bold text-emerald-900">₦{latestOrder.total.toLocaleString()}</span>
+                </>
+              ) : (
+                <>
+                  {" "}
+                  · <span className="font-bold text-emerald-900">{latestOrder.items.reduce((s, i) => s + i.qty, 0)} unit(s)</span>
+                </>
+              )}
             </p>
             <div className="flex items-center gap-2 text-[10px] text-[#0F3D24]/60 mt-1">
               <span className="flex items-center gap-1">

@@ -343,7 +343,7 @@ export function OrganizedOrdersList({ orders, passcode, role, batches, onSaved, 
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {group.totalRevenue > 0 && (
+                  {role === "owner" && group.totalRevenue > 0 && (
                     <div className="text-right">
                       <span className="block text-[10px] font-medium uppercase tracking-wider text-[#0F3D24]/50">
                         Sales Value

@@ -72,7 +72,7 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
 
   // Clock-in mutation
   const clockInMut = useMutation({
-    mutationFn: () => clockInFn({ data: { username: username || "staff" } }),
+    mutationFn: () => clockInFn({ data: { passcode, username: username || "staff" } }),
     onSuccess: (res: any) => {
       setClockInMsg(res.message || "Attendance clocked in successfully!");
       qc.invalidateQueries({ queryKey: ["staff-my-attendance"] });
@@ -91,7 +91,7 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
   const usersQuery = useQuery({
     queryKey: ["admin-user-accounts", passcode],
     queryFn: () => listUsersFn({ data: { passcode } }),
-    enabled: role === "owner",
+    enabled: role === "owner" || role === "manager",
   });
 
   const payrollQuery = useQuery({
@@ -136,7 +136,7 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
 
   // Sign Payroll Receipt Mutation
   const signPayrollMut = useMutation({
-    mutationFn: (receiptId: string) => signPayrollFn({ data: { receiptId, username: username || "staff" } }),
+    mutationFn: (receiptId: string) => signPayrollFn({ data: { passcode, receiptId, username: username || "staff" } }),
     onSuccess: () => {
       setMsg("You have successfully signed and acknowledged your salary payment receipt!");
       qc.invalidateQueries({ queryKey: ["staff-my-payroll"] });
@@ -151,6 +151,7 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
     mutationFn: () =>
       submitLeaveFn({
         data: {
+          passcode,
           username: username || "staff",
           leaveType,
           startDate: leaveStartDate,
@@ -300,16 +301,29 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
                 <select
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
-                  className="rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm font-semibold outline-none focus:border-[#3F8F3F] bg-white min-w-[200px]"
+                  className="rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm font-semibold outline-none focus:border-[#3F8F3F] bg-white min-w-[220px]"
                 >
                   <option value="everyone">Everyone (Broadcast)</option>
-                  {(usersQuery.data || [])
-                    .filter((u) => u.username !== "owner")
-                    .map((u) => (
-                      <option key={u.id} value={u.username}>
-                        {u.username} ({u.role})
-                      </option>
-                    ))}
+                  {role === "owner" && (
+                    <optgroup label="Managers">
+                      {(usersQuery.data || [])
+                        .filter((u) => u.role === "manager")
+                        .map((u) => (
+                          <option key={u.id} value={u.username}>
+                            {u.fullName ? `${u.fullName} (@${u.username})` : u.username} (Manager)
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  <optgroup label="Farm Staff">
+                    {(usersQuery.data || [])
+                      .filter((u) => u.role === "staff" || (role === "owner" && u.role !== "owner" && u.role !== "manager"))
+                      .map((u) => (
+                        <option key={u.id} value={u.username}>
+                          {u.fullName ? `${u.fullName} (@${u.username})` : u.username} ({u.role})
+                        </option>
+                      ))}
+                  </optgroup>
                 </select>
                 <button
                   disabled={!description.trim() || createMut.isPending}

@@ -1,0 +1,88 @@
+# Project Migration State & Handoff Document
+**Date:** October 20, 2026  
+**Repository:** Dignity Agro Farms (`dignityagrofarms/AGROFARMS`)  
+**Active Working Directory:** `/home/ritchietech/PROJECTS/AGROFARMS`
+
+---
+
+## 1. Architectural Decisions Made So Far
+
+1. **Framework & Stack**:
+   - **Fullstack Engine**: TanStack Start (React 19 + TanStack Router + TanStack Query + Nitro engine + Vite + Cloudflare Workers adapter).
+   - **Styling**: Tailwind CSS with custom branding tokens (`#0F3D24` evergreen, `#D4AF37` gold, `#3F8F3F` leaf green), Lucide React icons, and Framer Motion.
+   - **Data Fetching**: TanStack Query combined with TanStack Start Server Functions (`useServerFn`), backed by Cloudflare D1 / SQLite.
+   - **Authentication**: Role-based admin passcode authentication (`daf_admin_passcode` with fallback to `agrofarms_admin_passcode` in `localStorage`), passed to server functions.
+
+2. **Flyer & Social Proof Generation Engine**:
+   - **Client-Side Canvas 2D**: Runs in `src/lib/flyer-generator.ts`. Draws background template graphics and dynamic order typography entirely in-browser without server rendering overhead.
+   - **2x Supersampled High-DPI Resolution**: Canvas renders at **1224 × 1836** (2x supersampled version of the 612 × 918 template) so downloaded PNG flyers are crisp and legible on high-resolution Retina phone screens and social media stories/status.
+   - **Dynamic Typography Scaling**: Automatically scales font size down and applies ellipsis truncation if produce wording exceeds safe printable boundaries.
+   - **Web Share API with Fallbacks**: Uses `navigator.share` with file blob attachment for seamless 1-tap sharing to WhatsApp/Instagram on mobile; falls back to `wa.me` URL schema with pre-formatted promotional text on desktop.
+
+3. **Lovable Synchronization Constraint**:
+   - The repository is connected to [Lovable](https://lovable.dev).
+   - **CRITICAL RULE**: NEVER rewrite published git history (no force pushing, no rebasing, no squashing or amending published commits). Commits pushed to `origin/main` sync directly to the Lovable visual editor.
+
+---
+
+## 2. Exact Feature / Bug Currently Implemented
+
+### Social Proof Flyer Template Replacement (Complete & Tested)
+- **Problem Solved**:
+  - The old flyer template (`image.png` / legacy 5-field design) exposed customer personal details (full names, phone numbers, delivery addresses) and had dated typography.
+  - The new template (`New social template proof.png`) is a vibrant photographic flyer featuring Dignity Agro Farms packaged chicken held by a team member in a white lab coat, with dedicated pill boxes for **ORDER NUMBER** and **QUANTITY**.
+- **User Refinements Applied**:
+  - The user analyzed our visual preview and requested: *"The 10 whole broiler is kinda up and not well placed, make it centered and well structured.. Also remeber it is somthing thtas being posted to social media, so beware of the wordings"*.
+  - **Centering Fix**:
+    - Measured exact inner pill boundaries: Quantity pill inner white area spans **Y = 575 to 607** (Center Y = 591.0); Order Number pill inner white area spans **Y = 515 to 549** (Center Y = 532.0).
+    - Set HTML5 Canvas baselines to `textBaseline = "middle"` and `textAlign = "center"` at exact 2x supersampled coordinates:
+      - **Order Number**: Center X = 331, Center Y = 1064, max width = 260px, initial font size = 32px bold.
+      - **Quantity**: Center X = 331, Center Y = 1183, max width = 260px, initial font size = 30px bold.
+  - **Social-Media-Ready Phrasing**:
+    - Implemented `formatSocialProofQuantity` in `src/lib/flyer-generator.ts` to convert verbose database strings into punchy social phrases (e.g., `10 Whole Broilers`, `5 Whole Broilers`, `8 Jumbo Broilers`, `2 Crates Farm Eggs`).
+    - Added fast 1-click preset chips in `FlyerGeneratorModal.tsx`.
+    - Added 1-click **Auto-Fill from Recent Verified Orders** carousel so admins can generate a flyer from an existing order in 1 tap.
+    - Updated WhatsApp sharing caption to include social hooks, customer privacy, and the order link (`https://www.dignityagrofarms.com/order`).
+  - **Asset Updates**:
+    - Replaced `public/social_proof_template.png` with the new design.
+    - Preserved a backup of the old template at `public/assets/legacy_social_proof_template.png`.
+
+---
+
+## 3. Specific Edge Cases & Code Patterns to Follow
+
+1. **Social Privacy by Design**:
+   - Never print customer phone numbers, personal delivery addresses, or private identifying details on public social flyers. The template intentionally only prints the Order Reference and Quantity.
+2. **Order Code Normalization**:
+   - Always ensure the Order Reference starts with a single `#` prefix (e.g. normalize `#DEC-44851` vs `DEC-44851`).
+3. **Canvas Optical Centering**:
+   - When rendering text inside rounded pill boxes, use `ctx.textBaseline = "middle"` and `ctx.textAlign = "center"` to prevent vertical font ascent bias.
+4. **Modal Canvas Aspect Ratio**:
+   - The canvas container in `FlyerGeneratorModal.tsx` must use `aspect-[612/918]` (or `aspect-[2/3]`), matching the new template's aspect ratio.
+5. **Backwards Compatibility**:
+   - `drawSocialProofFlyerOnCanvas` supports both new fields (`orderCode`, `quantityText`, `alignment`) and deprecated legacy fields (`customerName`, `phone`, `orderDate`, `address`, `itemsText`) to prevent breaking any callers.
+6. **Git History Protection**:
+   - Follow standard non-destructive git commits (`git add`, `git commit -m "..."`, `git push origin main`). NEVER `git push --force` or `git rebase` published commits.
+
+---
+
+## 4. Immediate Next 3 Development Steps
+
+1. **Step 1: Commit and Push Current Template Replacement**:
+   - Commit the modified files (`public/social_proof_template.png`, `src/lib/flyer-generator.ts`, `src/components/admin/FlyerGeneratorModal.tsx`, `public/assets/legacy_social_proof_template.png`) and push to `origin/main` so Lovable synchronizes.
+2. **Step 2: Interactive Verification in Admin Portal**:
+   - Navigate to `/admin/admin-orders` -> open **Flyer Studio** (`FlyerGeneratorModal`).
+   - Test clicking an order from the **1-Click Auto-Fill** carousel.
+   - Verify live canvas rendering and download a flyer PNG to verify high-resolution output.
+3. **Step 3: Review Admin Orders Status & Notifications**:
+   - Confirm that the recent updates (defaulting to "All orders" filter on login and pulsing red badges on "Awaiting Approval" orders) are operating smoothly in production.
+
+---
+
+## 5. Key File Index
+
+- `src/lib/flyer-generator.ts`: High-res 2x canvas drawing logic, typography scaling, and `formatSocialProofQuantity`.
+- `src/components/admin/FlyerGeneratorModal.tsx`: Admin modal UI with live canvas preview, 1-click order picker, presets, and download/share actions.
+- `public/social_proof_template.png`: Active social proof graphic template (612 × 918).
+- `public/assets/legacy_social_proof_template.png`: Archived backup of the legacy 5-field template.
+- `src/routes/admin.admin-orders.tsx`: Admin orders management view with filter pills and status indicators.

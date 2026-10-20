@@ -15,7 +15,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
-import { drawSocialProofFlyerCanvas, maskName } from "@/lib/flyer-generator";
+import { drawSocialProofFlyerCanvas, formatSocialProofQuantity } from "@/lib/flyer-generator";
 import { adminListOrders, type AdminOrder } from "@/lib/orders.functions";
 
 export interface FlyerOrderData {
@@ -71,16 +71,24 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
   const [badgeText, setBadgeText] = useState("LOCK IN YOUR PRICE NOW");
   const [contactPhone, setContactPhone] = useState("08167099492");
 
-  // Social Proof Order Flyer State
-  const [customerName, setCustomerName] = useState(initialOrderData?.customerName || "Emeka Okonkwo");
+  // Social Proof Order Flyer State (2026 High-Converting Template)
+  const initialCode = initialOrderData?.orderCode || "DEC-44851";
+  const [orderCode, setOrderCode] = useState(initialCode.startsWith("#") ? initialCode : `#${initialCode}`);
+  const [quantityText, setQuantityText] = useState(
+    initialOrderData?.itemsText
+      ? formatSocialProofQuantity(initialOrderData.itemsText)
+      : "10 Whole Broilers"
+  );
+  const [alignment, setAlignment] = useState<"center" | "left">("center");
+
+  // Retain legacy metadata in state for backwards compatibility
+  const [customerName, setCustomerName] = useState(initialOrderData?.customerName || "Verified Customer");
   const [phone, setPhone] = useState(initialOrderData?.phone || "07012345678");
   const [orderDate, setOrderDate] = useState(
     initialOrderData?.orderDate ||
       new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
   );
-  const [itemsText, setItemsText] = useState(initialOrderData?.itemsText || "Dressed Chicken Medium × 3, Fresh Eggs × 2");
-  const [address, setAddress] = useState(initialOrderData?.location || "Ikenegbu, Owerri");
-  const [orderCode, setOrderCode] = useState(initialOrderData?.orderCode || "DEC-44851");
+  const [address, setAddress] = useState(initialOrderData?.location || "Owerri, Imo State");
   const [maskData, setMaskData] = useState<boolean>(true);
 
   const [generating, setGenerating] = useState(false);
@@ -89,15 +97,18 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
 
   // Auto-fill flyer fields when a verified order is selected from the list
   const applyOrderToFlyer = (ord: AdminOrder | FlyerOrderData) => {
-    setCustomerName(ord.customerName);
+    setCustomerName(ord.customerName || "Verified Customer");
     setPhone("phone" in ord && ord.phone ? ord.phone : "07012345678");
-    setOrderCode(ord.orderCode);
+    const rawCode = ord.orderCode || "DEC-44851";
+    setOrderCode(rawCode.startsWith("#") ? rawCode : `#${rawCode}`);
     setAddress("location" in ord ? ord.location : (ord as AdminOrder).address || "Owerri, Imo State");
     
-    if ("itemsText" in ord && ord.itemsText) {
-      setItemsText(ord.itemsText);
-    } else if ("items" in ord && Array.isArray((ord as AdminOrder).items)) {
-      setItemsText((ord as AdminOrder).items.map((i) => `${i.product} × ${i.qty}`).join(", "));
+    if ("items" in ord && Array.isArray((ord as AdminOrder).items) && (ord as AdminOrder).items.length > 0) {
+      setQuantityText(formatSocialProofQuantity(undefined, (ord as AdminOrder).items));
+    } else if ("itemsText" in ord && ord.itemsText) {
+      setQuantityText(formatSocialProofQuantity(ord.itemsText));
+    } else {
+      setQuantityText("10 Whole Broilers");
     }
 
     if ("orderDate" in ord && ord.orderDate) {
@@ -118,15 +129,17 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
     if (!isOpen || mode !== "social_proof" || !canvasRef.current) return;
 
     drawSocialProofFlyerCanvas(canvasRef.current, {
+      orderCode,
+      quantityText,
+      alignment,
       customerName,
       phone,
       orderDate,
-      itemsText,
+      itemsText: quantityText,
       address,
-      orderCode,
       maskData,
     }).catch((err) => console.error("Canvas draw error:", err));
-  }, [isOpen, mode, customerName, phone, orderDate, itemsText, address, orderCode, maskData]);
+  }, [isOpen, mode, orderCode, quantityText, alignment, customerName, phone, orderDate, address, maskData]);
 
   if (!isOpen) return null;
 
@@ -163,9 +176,13 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
           ? new File([blob], `Dignity_OrderProof_${orderCode}.png`, { type: "image/png" })
           : null;
 
-        const captionText = `📦 *New Order Confirmed & Verified!*\nOrder Ref: #${orderCode}\nCustomer: ${
-          maskData ? maskName(customerName) : customerName
-        }\nItems: ${itemsText}\n\nReserve your poultry at https://dignityagrofarms.com`;
+        const cleanOrderRef = orderCode.startsWith("#") ? orderCode : `#${orderCode}`;
+        const captionText = `📦 *NEW ORDER CONFIRMED!* 🚜\n\n` +
+          `Order Ref: ${cleanOrderRef}\n` +
+          `Quantity: ${quantityText}\n\n` +
+          `⚡ Affordable farm-fresh chicken for every home at farm price.\n` +
+          `🛒 Order yours at: https://www.dignityagrofarms.com/order\n` +
+          `📞 WhatsApp: 081 6709 9492`;
 
         if (file && navigator.share && navigator.canShare?.({ files: [file] })) {
           await navigator.share({
@@ -250,83 +267,144 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
 
 
 
-                {/* Privacy Masking Toggle */}
-                <div className="flex items-center justify-between bg-emerald-50 p-3.5 rounded-2xl border border-emerald-200/80 shadow-sm">
-                  <div className="flex items-center gap-2.5 text-[#0F3D24] pr-2">
-                    <ShieldCheck size={20} className="text-emerald-600 shrink-0" />
-                    <div>
-                      <span className="font-bold text-xs block">Privacy Identity Masking</span>
-                      <span className="text-[11px] text-gray-600 block leading-tight">Mask customer name, phone & address with *****</span>
+                {/* Social Media Ready Notice */}
+                <div className="bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-3.5 flex items-start gap-2.5 text-[#0F3D24]">
+                  <Sparkles size={18} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="text-[11.5px] leading-relaxed">
+                    <span className="font-bold block text-emerald-900">Social Media Proof Ready</span>
+                    Optimized for WhatsApp status, Instagram stories, and Facebook posts. High converting, punchy metrics with customer privacy protected by design.
+                  </div>
+                </div>
+
+                {/* 1-Click Auto-Fill from Recent Orders */}
+                {availableOrders.length > 0 && (
+                  <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                        <ShoppingBag size={13} className="text-[#0F3D24]" />
+                        1-Click Auto-Fill From Verified Orders
+                      </span>
+                      <span className="text-[10px] text-gray-400 font-semibold">
+                        {availableOrders.length} Available
+                      </span>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1 text-left no-scrollbar">
+                      {availableOrders.slice(0, 10).map((ord) => {
+                        const codeWithoutHash = ord.orderCode.replace(/^#/, "");
+                        const isSelected = orderCode.replace(/^#/, "") === codeWithoutHash;
+                        const qtySummary =
+                          ord.items && ord.items.length > 0
+                            ? formatSocialProofQuantity(undefined, ord.items)
+                            : "Broilers";
+                        return (
+                          <button
+                            key={ord.orderCode}
+                            type="button"
+                            onClick={() => applyOrderToFlyer(ord)}
+                            className={`shrink-0 rounded-xl px-3 py-2 border text-left transition ${
+                              isSelected
+                                ? "bg-emerald-50 border-emerald-600 text-emerald-950 ring-2 ring-emerald-600/20"
+                                : "bg-white border-slate-200 text-gray-700 hover:border-emerald-400 hover:bg-slate-50"
+                            }`}
+                          >
+                            <div className="font-bold text-xs text-[#0F3D24]">#{codeWithoutHash}</div>
+                            <div className="text-[10.5px] text-gray-500 truncate max-w-[130px] font-medium mt-0.5">
+                              {qtySummary}
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
-                    checked={maskData}
-                    onChange={(e) => setMaskData(e.target.checked)}
-                    className="h-5 w-5 rounded accent-[#0F3D24] cursor-pointer shrink-0"
-                  />
-                </div>
+                )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[#0F3D24] mb-1">Order Code / Ref</label>
-                    <input
-                      value={orderCode}
-                      onChange={(e) => setOrderCode(e.target.value)}
-                      placeholder="e.g. DEC-44851"
-                      className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0F3D24] mb-1">Customer Full Name</label>
-                    <input
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="e.g. Emeka Okonkwo"
-                      className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-bold text-[#0F3D24] mb-1">Phone Number</label>
-                    <input
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 07012345678"
-                      className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#0F3D24] mb-1">Order Date</label>
-                    <input
-                      value={orderDate}
-                      onChange={(e) => setOrderDate(e.target.value)}
-                      placeholder="e.g. 07 Oct 2026"
-                      className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
-                    />
-                  </div>
-                </div>
-
+                {/* Order Code / Reference */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0F3D24] mb-1">Item(s) Ordered</label>
+                  <label className="block text-xs font-bold text-[#0F3D24] mb-1">
+                    Order Number / Reference
+                  </label>
                   <input
-                    value={itemsText}
-                    onChange={(e) => setItemsText(e.target.value)}
-                    placeholder="e.g. Dressed Chicken Medium × 3, Fresh Eggs × 2"
-                    className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
+                    value={orderCode}
+                    onChange={(e) => setOrderCode(e.target.value)}
+                    placeholder="e.g. #DEC-44851"
+                    className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm font-semibold tracking-wide outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
                   />
                 </div>
 
+                {/* Quantity / Produce Text */}
                 <div>
-                  <label className="block text-xs font-bold text-[#0F3D24] mb-1">Delivery Address / Location</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-[#0F3D24]">
+                      Quantity / Produce Details
+                    </label>
+                    <span className="text-[10.5px] text-gray-500 font-medium">
+                      Keep concise for social impact
+                    </span>
+                  </div>
                   <input
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="e.g. Ikenegbu, Owerri"
-                    className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
+                    value={quantityText}
+                    onChange={(e) => setQuantityText(e.target.value)}
+                    placeholder="e.g. 10 Whole Broilers"
+                    className="w-full rounded-xl border border-[#0F3D24]/20 px-3.5 py-2.5 text-sm font-medium outline-none focus:border-[#3F8F3F] focus:ring-2 focus:ring-[#3F8F3F]/20 bg-white"
                   />
+
+                  {/* Quick Social Media Presets */}
+                  <div className="mt-2.5 flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] uppercase font-bold text-gray-400 mr-1">Presets:</span>
+                    {[
+                      "10 Whole Broilers",
+                      "5 Whole Broilers",
+                      "8 Jumbo Broilers",
+                      "5 Dressed Birds",
+                      "2 Crates Farm Eggs",
+                      "Family Poultry Pack",
+                    ].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setQuantityText(preset)}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition font-medium ${
+                          quantityText === preset
+                            ? "bg-[#0F3D24] text-white border-[#0F3D24]"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-emerald-500 hover:text-[#0F3D24]"
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Text Alignment Selector */}
+                <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                  <div>
+                    <span className="font-bold text-xs text-[#0F3D24] block">Text Alignment</span>
+                    <span className="text-[11px] text-gray-500 block">Pill box placement</span>
+                  </div>
+                  <div className="flex rounded-xl bg-slate-200/80 p-0.5 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setAlignment("center")}
+                      className={`px-3 py-1.5 rounded-lg transition ${
+                        alignment === "center"
+                          ? "bg-white text-[#0F3D24] shadow-sm"
+                          : "text-gray-600 hover:text-black"
+                      }`}
+                    >
+                      Centered (Best)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAlignment("left")}
+                      className={`px-3 py-1.5 rounded-lg transition ${
+                        alignment === "left"
+                          ? "bg-white text-[#0F3D24] shadow-sm"
+                          : "text-gray-600 hover:text-black"
+                      }`}
+                    >
+                      Left-Aligned
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
@@ -395,7 +473,7 @@ export function FlyerGeneratorModal({ isOpen, onClose, initialOrderData, passcod
             </span>
 
             {mode === "social_proof" ? (
-              <div className="w-full max-w-[290px] sm:max-w-[340px] aspect-[1067/1280] rounded-2xl shadow-xl overflow-hidden border border-slate-300 relative bg-white">
+              <div className="w-full max-w-[290px] sm:max-w-[340px] aspect-[612/918] rounded-2xl shadow-xl overflow-hidden border border-slate-300 relative bg-white">
                 <canvas ref={canvasRef} className="w-full h-full object-contain block" />
               </div>
             ) : (

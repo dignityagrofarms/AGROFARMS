@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone, Plus } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
@@ -26,6 +26,7 @@ import { ComplaintsDashboardPanel } from "@/components/admin/ComplaintsDashboard
 import { HrManagementPanel } from "@/components/admin/HrManagementPanel";
 import { PreorderFinancialChart } from "@/components/admin/PreorderFinancialChart";
 import { AdminLoginView } from "@/components/admin/AdminLoginView";
+import { AdminQuickOrderModal } from "@/components/admin/AdminQuickOrderModal";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -266,6 +267,7 @@ function AdminOrders() {
   const [showFlyerModal, setShowFlyerModal] = useState(false);
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
   const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -295,7 +297,7 @@ function AdminOrders() {
 
   useEffect(() => {
     if (role === "staff") {
-      if (["orders", "december", "clients", "leads", "complaints", "vouchers", "flyers", "financials", "hr"].includes(activeTab)) {
+      if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr"].includes(activeTab)) {
         setActiveTab("tasks");
       }
     } else if (role === "manager") {
@@ -537,63 +539,79 @@ function AdminOrders() {
 
         {/* Navigation Links */}
         <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 custom-scrollbar">
+          {/* Quick Action: Place New Order (All Roles) */}
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowQuickOrderModal(true);
+                setIsMobileMenuOpen(false);
+              }}
+              title="Place New Customer Order"
+              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm bg-[#3F8F3F] text-white hover:bg-[#347834] transition shadow-md whitespace-nowrap"
+            >
+              <Plus size={18} className="shrink-0" />
+              {!isSidebarCollapsed && <span>New Order</span>}
+            </button>
+          </div>
+
           {/* Sales & CRM */}
-          {(role === "owner" || role === "manager") && (
-            <div>
-              {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
-              <ul className="space-y-1">
-                <li>
-                  <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                    <div className="flex items-center gap-3">
-                      <FileText size={18} className="shrink-0" />
-                      {!isSidebarCollapsed && <span>Orders & Reports</span>}
-                    </div>
-                    {awaitingApprovalOrdersCount > 0 && (
-                      !isSidebarCollapsed ? (
-                        <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                          {awaitingApprovalOrdersCount}
-                        </span>
-                      ) : (
-                        <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
-                      )
-                    )}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => { setActiveTab("december"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                    <Gift size={18} className="shrink-0" />
-                    {!isSidebarCollapsed && <span>Dec Pre-Orders</span>}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => { setActiveTab("clients"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                    <Users size={18} className="shrink-0" />
-                    {!isSidebarCollapsed && <span>Order Clients</span>}
-                  </button>
-                </li>
-                <li>
-                  <button onClick={() => { setActiveTab("leads"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                    <UserPlus size={18} className="shrink-0" />
-                    {!isSidebarCollapsed && <span>Customer Leads</span>}
-                  </button>
-                </li>
-              </ul>
-            </div>
-          )}
+          <div>
+            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
+            <ul className="space-y-1">
+              {(role === "owner" || role === "manager") && (
+                <>
+                  <li>
+                    <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                      <div className="flex items-center gap-3">
+                        <FileText size={18} className="shrink-0" />
+                        {!isSidebarCollapsed && <span>Orders & Reports</span>}
+                      </div>
+                      {awaitingApprovalOrdersCount > 0 && (
+                        !isSidebarCollapsed ? (
+                          <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                            {awaitingApprovalOrdersCount}
+                          </span>
+                        ) : (
+                          <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
+                        )
+                      )}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => { setActiveTab("december"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                      <Gift size={18} className="shrink-0" />
+                      {!isSidebarCollapsed && <span>Dec Pre-Orders</span>}
+                    </button>
+                  </li>
+                  <li>
+                    <button onClick={() => { setActiveTab("clients"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                      <Users size={18} className="shrink-0" />
+                      {!isSidebarCollapsed && <span>Order Clients</span>}
+                    </button>
+                  </li>
+                </>
+              )}
+              <li>
+                <button onClick={() => { setActiveTab("leads"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <UserPlus size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>Customer Leads</span>}
+                </button>
+              </li>
+            </ul>
+          </div>
 
           {/* Farm Operations */}
           <div>
             {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Farm Operations</h3>}
             <ul className="space-y-1">
-              {(role === "owner" || role === "manager") && (
-                <li>
-                  <button onClick={() => { setActiveTab("financials"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                    <TrendingUp size={18} className="shrink-0" />
-                    {!isSidebarCollapsed && <span>Batches & Finances</span>}
-                  </button>
-                </li>
-              )}
+              <li>
+                <button onClick={() => { setActiveTab("financials"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <TrendingUp size={18} className="shrink-0" />
+                  {!isSidebarCollapsed && <span>{role === "staff" ? "Record Expenses" : "Batches & Finances"}</span>}
+                </button>
+              </li>
               <li>
                 <button onClick={() => { setActiveTab("activities"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "activities" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
                   <Activity size={18} className="shrink-0" />
@@ -677,7 +695,17 @@ function AdminOrders() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            {awaitingApprovalOrdersCount > 0 && (
+            {/* Top Plus (+) Button to Place Order for Owner, Manager & Staff */}
+            <button
+              type="button"
+              onClick={() => setShowQuickOrderModal(true)}
+              title="Place New Customer Order"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-3 sm:px-4 py-1.5 text-xs font-extrabold text-white hover:bg-[#165232] transition shadow-sm cursor-pointer"
+            >
+              <Plus size={15} className="stroke-[2.5]" />
+              <span className="hidden xs:inline sm:inline">New Order</span>
+            </button>
+            {awaitingApprovalOrdersCount > 0 && (role === "owner" || role === "manager") && (
               <button
                 onClick={() => {
                   setActiveTab("orders");
@@ -721,11 +749,12 @@ function AdminOrders() {
             const unprocessedOrders = (query.data?.orders || []).filter(
               (o) => (!o.status || o.status === "received") && (o.paymentStatus === "pending" || o.paymentStatus === "submitted" || !o.paymentStatus)
             );
-            if (unprocessedOrders.length === 0) return null;
+            if (unprocessedOrders.length === 0 || role === "staff") return null;
             return (
               <div className="mb-6">
                 <UnprocessedOrdersBanner
                   unprocessedOrders={unprocessedOrders}
+                  role={role}
                   onViewOrders={() => {
                     setActiveTab("orders");
                     setFilter("all");
@@ -756,6 +785,7 @@ function AdminOrders() {
                   <>
                     <ReportsPanel
                       orders={scoped}
+                      role={role}
                       from={from} setFrom={setFrom}
                       to={to} setTo={setTo}
                       statusFilter={statusFilter} setStatusFilter={setStatusFilter}
@@ -894,6 +924,15 @@ function AdminOrders() {
         />
       )}
 
+      {/* Quick Order Modal for Owner, Manager & Staff */}
+      <AdminQuickOrderModal
+        open={showQuickOrderModal}
+        onClose={() => setShowQuickOrderModal(false)}
+        role={role}
+        username={currentUsername}
+        onOrderCreated={() => query.refetch()}
+      />
+
       {/* Orders Tab SMS & WhatsApp Reminder Modal */}
       {orderSmsTarget && (
         <ReminderModal
@@ -943,8 +982,14 @@ function AdminOrders() {
                   <p className="font-mono font-bold text-[#0F3D24] text-sm">{newOrderPopupAlert.phone}</p>
                 </div>
                 <div>
-                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Total Order Amount</span>
-                  <p className="font-black text-emerald-700 text-base">₦{newOrderPopupAlert.total.toLocaleString()}</p>
+                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">
+                    {role === "owner" ? "Total Order Amount" : "Order Quantity"}
+                  </span>
+                  <p className="font-black text-emerald-700 text-base">
+                    {role === "owner"
+                      ? `₦${newOrderPopupAlert.total.toLocaleString()}`
+                      : `${newOrderPopupAlert.items.reduce((s, i) => s + i.qty, 0)} unit(s)`}
+                  </p>
                 </div>
                 <div>
                   <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Delivery Zone</span>
@@ -1741,11 +1786,12 @@ function FilterBtn({
 }
 
 function ReportsPanel({
-  orders, from, setFrom, to, setTo, statusFilter, setStatusFilter, payFilter, setPayFilter,
+  orders, role, from, setFrom, to, setTo, statusFilter, setStatusFilter, payFilter, setPayFilter,
   zoneFilter, setZoneFilter, search, setSearch, reasonFilter, setReasonFilter, reasonOptions,
   onApply, onReset, onQuickRange,
 }: {
   orders: AdminOrder[];
+  role: AdminRole;
   from: string; setFrom: (v: string) => void;
   to: string; setTo: (v: string) => void;
   statusFilter: string; setStatusFilter: (v: string) => void;
@@ -1756,30 +1802,47 @@ function ReportsPanel({
   onApply: () => void; onReset: () => void; onQuickRange: (d: number | "month") => void;
 }) {
   const [zipping, setZipping] = useState(false);
+  const isOwner = role === "owner";
   const paidOrders = orders.filter((o) => o.paymentStatus === "approved");
   const revenue = paidOrders.reduce((s, o) => s + o.total, 0);
   const fees = paidOrders.reduce((s, o) => s + o.deliveryFee, 0);
   const avg = paidOrders.length ? Math.round(revenue / paidOrders.length) : 0;
 
   const exportCsv = () => {
-    const head = [
-      "Order Code",
-      "Date (ISO)",
-      "Customer Name",
-      "Phone",
-      "Delivery Zone",
-      "Items Breakdown",
-      "Subtotal (NGN)",
-      "Delivery Fee (NGN)",
-      "Total Amount (NGN)",
-      "Order Status",
-      "Payment Status",
-      "Paid At (ISO)",
-      "Cancelled By",
-      "Cancel Reason",
-      "Cancelled At (ISO)",
-      "Not Completed",
-    ];
+    const head = isOwner
+      ? [
+          "Order Code",
+          "Date (ISO)",
+          "Customer Name",
+          "Phone",
+          "Delivery Zone",
+          "Items Breakdown",
+          "Subtotal (NGN)",
+          "Delivery Fee (NGN)",
+          "Total Amount (NGN)",
+          "Order Status",
+          "Payment Status",
+          "Paid At (ISO)",
+          "Cancelled By",
+          "Cancel Reason",
+          "Cancelled At (ISO)",
+          "Not Completed",
+        ]
+      : [
+          "Order Code",
+          "Date (ISO)",
+          "Customer Name",
+          "Phone",
+          "Delivery Zone",
+          "Items Breakdown",
+          "Order Status",
+          "Payment Status",
+          "Paid At (ISO)",
+          "Cancelled By",
+          "Cancel Reason",
+          "Cancelled At (ISO)",
+          "Not Completed",
+        ];
 
     let sumSub = 0;
     let sumFee = 0;
@@ -1795,16 +1858,18 @@ function ReportsPanel({
       sumFee += fee;
       sumTot += tot;
 
-      return [
+      const baseCols: (string | number)[] = [
         esc(o.orderCode),
         esc(o.createdAt ? new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 19) : ""),
         esc(o.customerName),
         esc(o.phone),
         esc(o.deliveryZone === "owerri" ? "Owerri Town" : "Outside Owerri"),
         esc(o.items.map((i) => `${i.product} (${i.option}) x${i.qty}`).join("; ")),
-        sub,
-        fee,
-        tot,
+      ];
+      if (isOwner) {
+        baseCols.push(sub, fee, tot);
+      }
+      baseCols.push(
         esc(STATUS_LABEL[o.status] || o.status),
         esc(o.paymentStatus ? o.paymentStatus.toUpperCase() : ""),
         esc(o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19) : ""),
@@ -1812,27 +1877,44 @@ function ReportsPanel({
         esc(o.cancelReason ?? ""),
         esc(o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : ""),
         esc(isNotCompleted(o) ? "Yes" : "No"),
-      ].join(",");
+      );
+      return baseCols.join(",");
     });
 
-    const totalsRow = [
-      esc("SUMMARY TOTALS"),
-      esc(""),
-      esc(""),
-      esc(""),
-      esc(""),
-      esc(`${orders.length} Total Orders`),
-      sumSub,
-      sumFee,
-      sumTot,
-      esc(""),
-      esc(""),
-      esc(""),
-      esc(""),
-      esc(""),
-      esc(""),
-      esc(""),
-    ].join(",");
+    const totalsRow = isOwner
+      ? [
+          esc("SUMMARY TOTALS"),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(`${orders.length} Total Orders`),
+          sumSub,
+          sumFee,
+          sumTot,
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+        ].join(",")
+      : [
+          esc("SUMMARY TOTALS"),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(`${orders.length} Total Orders`),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+          esc(""),
+        ].join(",");
 
     const csvString = "\uFEFF" + [head.map(esc).join(","), ...rows, "", totalsRow].join("\n");
     const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
@@ -1848,24 +1930,40 @@ function ReportsPanel({
     const XLSX = (await import("xlsx")).default;
     const wb = XLSX.utils.book_new();
 
-    const finHeader = [
-      "Order Code",
-      "Date (ISO)",
-      "Customer Name",
-      "Phone",
-      "Delivery Zone",
-      "Items Breakdown",
-      "Subtotal (NGN)",
-      "Delivery Fee (NGN)",
-      "Total Amount (NGN)",
-      "Order Status",
-      "Payment Status",
-      "Paid At",
-      "Cancelled By",
-      "Cancel Reason",
-      "Cancelled At",
-      "Not Completed",
-    ];
+    const finHeader = isOwner
+      ? [
+          "Order Code",
+          "Date (ISO)",
+          "Customer Name",
+          "Phone",
+          "Delivery Zone",
+          "Items Breakdown",
+          "Subtotal (NGN)",
+          "Delivery Fee (NGN)",
+          "Total Amount (NGN)",
+          "Order Status",
+          "Payment Status",
+          "Paid At",
+          "Cancelled By",
+          "Cancel Reason",
+          "Cancelled At",
+          "Not Completed",
+        ]
+      : [
+          "Order Code",
+          "Date (ISO)",
+          "Customer Name",
+          "Phone",
+          "Delivery Zone",
+          "Items Breakdown",
+          "Order Status",
+          "Payment Status",
+          "Paid At",
+          "Cancelled By",
+          "Cancel Reason",
+          "Cancelled At",
+          "Not Completed",
+        ];
 
     let sumSub = 0;
     let sumFee = 0;
@@ -1880,16 +1978,18 @@ function ReportsPanel({
       sumFee += fee;
       sumTot += tot;
 
-      return [
+      const baseRow: (string | number)[] = [
         o.orderCode,
         o.createdAt ? new Date(o.createdAt).toISOString().replace("T", " ").slice(0, 19) : "",
         o.customerName,
         o.phone,
         o.deliveryZone === "owerri" ? "Owerri Town" : "Outside Owerri",
         o.items.map((i) => `${i.product} (${i.option}) x${i.qty}`).join("; "),
-        sub,
-        fee,
-        tot,
+      ];
+      if (isOwner) {
+        baseRow.push(sub, fee, tot);
+      }
+      baseRow.push(
         STATUS_LABEL[o.status] || o.status,
         o.paymentStatus ? o.paymentStatus.toUpperCase() : "",
         o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19) : "",
@@ -1897,13 +1997,19 @@ function ReportsPanel({
         o.cancelReason ?? "",
         o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : "",
         isNotCompleted(o) ? "Yes" : "No",
-      ];
+      );
+      return baseRow;
     });
 
-    const totalRows: (string | number)[][] = [
-      [],
-      ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`, sumSub, sumFee, sumTot],
-    ];
+    const totalRows: (string | number)[][] = isOwner
+      ? [
+          [],
+          ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`, sumSub, sumFee, sumTot],
+        ]
+      : [
+          [],
+          ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`],
+        ];
 
     const allData = [finHeader, ...rows, ...totalRows];
     const sheet = XLSX.utils.aoa_to_sheet(allData);
@@ -1918,13 +2024,15 @@ function ReportsPanel({
     });
     sheet["!cols"] = colWidths.map((wch) => ({ wch: Math.min(wch, 60) }));
 
-    for (let r = 1; r < allData.length; r++) {
-      [6, 7, 8].forEach((c) => {
-        const cellAddr = XLSX.utils.encode_cell({ r, c });
-        if (sheet[cellAddr] && typeof sheet[cellAddr].v === "number") {
-          sheet[cellAddr].z = '"₦"#,##0.00';
-        }
-      });
+    if (isOwner) {
+      for (let r = 1; r < allData.length; r++) {
+        [6, 7, 8].forEach((c) => {
+          const cellAddr = XLSX.utils.encode_cell({ r, c });
+          if (sheet[cellAddr] && typeof sheet[cellAddr].v === "number") {
+            sheet[cellAddr].z = '"₦"#,##0.00';
+          }
+        });
+      }
     }
 
     XLSX.utils.book_append_sheet(wb, sheet, "Customer Orders");
@@ -1976,13 +2084,15 @@ function ReportsPanel({
           <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]">
             <FileSpreadsheet size={14} /> Export Excel (.xlsx)
           </button>
-          <button
-            onClick={downloadZip}
-            disabled={zipping || orders.length === 0}
-            className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50"
-          >
-            <FileArchive size={14} /> {zipping ? "Zipping…" : `Download all receipts (${orders.length}) ZIP`}
-          </button>
+          {isOwner && (
+            <button
+              onClick={downloadZip}
+              disabled={zipping || orders.length === 0}
+              className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50"
+            >
+              <FileArchive size={14} /> {zipping ? "Zipping…" : `Download all receipts (${orders.length}) ZIP`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -2038,9 +2148,15 @@ function ReportsPanel({
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Stat label="Orders" value={String(orders.length)} />
-        <Stat label="Revenue (approved)" value={naira(revenue)} />
-        <Stat label="Delivery fees" value={naira(fees)} />
-        <Stat label="Avg order value" value={naira(avg)} />
+        {isOwner ? (
+          <>
+            <Stat label="Revenue (approved)" value={naira(revenue)} />
+            <Stat label="Delivery fees" value={naira(fees)} />
+            <Stat label="Avg order value" value={naira(avg)} />
+          </>
+        ) : (
+          <Stat label="Approved / Paid Orders" value={String(paidOrders.length)} />
+        )}
         <Stat label="Cancelled" value={String(orders.filter((o) => o.status === "cancelled").length)} />
         <Stat label="Not completed" value={String(orders.filter(isNotCompleted).length)} />
       </div>
@@ -2187,8 +2303,14 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
 
         <div className="flex items-center gap-3">
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-widest text-[#0F3D24]/60">Total</div>
-            <div className="text-base sm:text-lg font-bold text-[#0F3D24]">{naira(order.total)}</div>
+            <div className="text-[10px] uppercase tracking-widest text-[#0F3D24]/60">
+              {role === "owner" ? "Total" : "Quantity"}
+            </div>
+            <div className="text-base sm:text-lg font-bold text-[#0F3D24]">
+              {role === "owner"
+                ? naira(order.total)
+                : `${order.items.reduce((s, i) => s + i.qty, 0)} unit(s)`}
+            </div>
             <div className="text-[11px] text-[#0F3D24]/60">{new Date(order.createdAt).toLocaleDateString()}</div>
           </div>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0F3D24]/70 ring-1 ring-[#0F3D24]/10">
@@ -2259,13 +2381,22 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             {order.items.map((it, i) => (
               <div key={i} className="flex justify-between items-center text-xs sm:text-sm">
                 <span className="font-semibold text-[#0F3D24]">{it.product} · {it.option} × {it.qty}</span>
-                <span className="text-[#0F3D24]/80 font-mono">{naira(it.unitPrice * it.qty)}</span>
+                {role === "owner" && (
+                  <span className="text-[#0F3D24]/80 font-mono">{naira(it.unitPrice * it.qty)}</span>
+                )}
               </div>
             ))}
-            <div className="pt-2 border-t border-[#0F3D24]/10 flex justify-between text-xs text-[#0F3D24]/70">
-              <span>Delivery Fee</span>
-              <span className="font-semibold">{order.deliveryFee === 0 ? "FREE" : naira(order.deliveryFee)}</span>
-            </div>
+            {role === "owner" ? (
+              <div className="pt-2 border-t border-[#0F3D24]/10 flex justify-between text-xs text-[#0F3D24]/70">
+                <span>Delivery Fee</span>
+                <span className="font-semibold">{order.deliveryFee === 0 ? "FREE" : naira(order.deliveryFee)}</span>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-[#0F3D24]/10 flex justify-between text-xs text-[#0F3D24]/70">
+                <span>Total Items</span>
+                <span className="font-semibold">{order.items.reduce((s, i) => s + i.qty, 0)} unit(s)</span>
+              </div>
+            )}
           </div>
 
           <OrderTimeline order={order} />
@@ -2321,44 +2452,48 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             >
               <MessageCircle size={15} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
             </button>
-            <button
-              type="button"
-              onClick={async () => {
-                const cleanPhone = order.phone.replace(/\D+/g, "");
-                const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
-                const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
-                const text = `🧾 *Dignity Agro Farms Official Receipt*\n\nCustomer: ${order.customerName}\nOrder Reference: ${order.orderCode}\nTotal Amount: ₦${order.total.toLocaleString()}\nPayment Status: ${(order.paymentStatus || "").toUpperCase()}\n\nView PDF Receipt: ${receiptUrl}\n\nThank you for choosing Dignity Agro Farms!`;
-                
-                if (typeof navigator !== "undefined" && navigator.share) {
-                  try {
-                    await navigator.share({
-                      title: `Receipt #${order.orderCode} - Dignity Agro Farms`,
-                      text: text,
-                      url: receiptUrl,
-                    });
-                    return;
-                  } catch {
-                    // Fallback to direct WhatsApp API link if share dismissed
-                  }
-                }
-                window.open(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-              }}
-              className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
-            >
-              <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
-                navigator.clipboard.writeText(receiptUrl);
-                alert(`✅ Receipt Link for order #${order.orderCode} copied to clipboard!\n\n${receiptUrl}`);
-              }}
-              className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
-              title="Copy receipt link"
-            >
-              <Copy size={14} className="text-[#3F8F3F]" /> Copy Link
-            </button>
+            {role === "owner" && (
+              <>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const cleanPhone = order.phone.replace(/\D+/g, "");
+                    const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+                    const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
+                    const text = `🧾 *Dignity Agro Farms Official Receipt*\n\nCustomer: ${order.customerName}\nOrder Reference: ${order.orderCode}\nTotal Amount: ₦${order.total.toLocaleString()}\nPayment Status: ${(order.paymentStatus || "").toUpperCase()}\n\nView PDF Receipt: ${receiptUrl}\n\nThank you for choosing Dignity Agro Farms!`;
+                    
+                    if (typeof navigator !== "undefined" && navigator.share) {
+                      try {
+                        await navigator.share({
+                          title: `Receipt #${order.orderCode} - Dignity Agro Farms`,
+                          text: text,
+                          url: receiptUrl,
+                        });
+                        return;
+                      } catch {
+                        // Fallback to direct WhatsApp API link if share dismissed
+                      }
+                    }
+                    window.open(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
+                >
+                  <Share2 size={14} className="text-[#25D366]" /> Share Receipt to WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
+                    navigator.clipboard.writeText(receiptUrl);
+                    alert(`✅ Receipt Link for order #${order.orderCode} copied to clipboard!\n\n${receiptUrl}`);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
+                  title="Copy receipt link"
+                >
+                  <Copy size={14} className="text-[#3F8F3F]" /> Copy Link
+                </button>
+              </>
+            )}
             {onOpenFlyerModal && (
               <button
                 type="button"
@@ -2392,17 +2527,17 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             >
               <MessageSquare size={14} /> Send SMS / Notification
             </button>
-            <Link
-              to="/receipt/$orderCode"
-              params={{ orderCode: order.orderCode }}
-              search={{ code: order.trackCode }}
-              target="_blank"
-              className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
-            >
-              <FileText size={14} /> {order.paymentStatus === "approved" ? "Receipt" : "Invoice"}
-            </Link>
             {role === "owner" && (
               <>
+                <Link
+                  to="/receipt/$orderCode"
+                  params={{ orderCode: order.orderCode }}
+                  search={{ code: order.trackCode }}
+                  target="_blank"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+                >
+                  <FileText size={14} /> {order.paymentStatus === "approved" ? "Receipt" : "Invoice"}
+                </Link>
                 <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
                 <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete order ${order.orderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete order</button>
               </>

@@ -34,8 +34,8 @@ export const adminListTasks = createServerFn({ method: "POST" })
       .select("*")
       .order("created_at", { ascending: false });
 
-    // If not owner, only show tasks assigned to them specifically, or to 'everyone'
-    if (role !== "owner") {
+    // Owner and Manager can view all tasks; Staff only see tasks assigned to them or 'everyone'
+    if (role !== "owner" && role !== "manager") {
       query = query.or(`assigned_to.eq.${username},assigned_to.eq.everyone`);
     }
 
@@ -59,13 +59,27 @@ export const adminCreateTask = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const role = await checkPasscode(data.passcode);
-    if (role !== "owner") throw new Error("Only the Administrator can create tasks.");
+    if (role !== "owner" && role !== "manager") {
+      throw new Error("Only the Administrator or Manager can create tasks.");
+    }
 
     const { parseAdminCredential } = await import("./orders.functions");
     const credential = parseAdminCredential(data.passcode);
     const username = credential.username || "owner";
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Managers can assign tasks to staff or everyone, while the Owner can assign tasks to both Managers and Staff
+    if (role === "manager" && data.assigned_to !== "everyone") {
+      const { data: targetAcc } = await supabaseAdmin
+        .from("admin_access")
+        .select("role")
+        .eq("username", data.assigned_to)
+        .maybeSingle();
+      if (targetAcc?.role === "owner") {
+        throw new Error("Managers cannot assign tasks to the Farm Owner.");
+      }
+    }
 
     const { error } = await supabaseAdmin.from("staff_tasks").insert({
       description: data.description,

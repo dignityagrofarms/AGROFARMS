@@ -41,7 +41,6 @@ import {
   adminListPaymentReceipts,
   adminListLeaveRequests,
   adminDecideLeaveRequest,
-  staffSubmitLeaveRequest,
   type AdminRole,
   type UserAccountItem,
 } from "@/lib/orders.functions";
@@ -104,6 +103,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   });
 
   const [actionMsg, setActionMsg] = useState<string | null>(null);
+  const [addStaffError, setAddStaffError] = useState<string | null>(null);
 
   // Server Fn Hooks
   const listStaffFn = useServerFn(adminListUserAccounts);
@@ -170,9 +170,18 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
     enabled: subTab === "payroll",
   });
 
+  const normalizedNewUsername = newStaff.username.trim().toLowerCase();
+  const isDuplicateUsername =
+    normalizedNewUsername.length > 0 &&
+    (["owner", "admin", "everyone", "system"].includes(normalizedNewUsername) ||
+      (staffQuery.data || []).some((s) => s.username.toLowerCase() === normalizedNewUsername));
+
   // Mutations
   const createStaffMut = useMutation({
     mutationFn: async () => {
+      if (isDuplicateUsername) {
+        throw new Error(`Username "${normalizedNewUsername}" already exists! Please choose a unique username.`);
+      }
       return createStaffFn({
         data: {
           passcode,
@@ -191,6 +200,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
     },
     onSuccess: () => {
       setActionMsg("Staff member added successfully!");
+      setAddStaffError(null);
       setShowAddStaffModal(false);
       setNewStaff({
         username: "",
@@ -206,7 +216,10 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
       });
       qc.invalidateQueries({ queryKey: ["hr-staff-list"] });
     },
-    onError: (err: any) => setActionMsg("Error: " + err.message),
+    onError: (err: any) => {
+      setAddStaffError(err.message || "Failed to create account");
+      setActionMsg("Error: " + err.message);
+    },
   });
 
   const recordSuspensionMut = useMutation({
@@ -1018,9 +1031,19 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                   type="text"
                   placeholder="e.g. cnwadi"
                   value={newStaff.username}
-                  onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
-                  className="w-full rounded-xl bg-[#F7F5F0] p-2.5 font-medium text-[#0F3D24] focus:outline-none focus:ring-2 focus:ring-[#3F8F3F]"
+                  onChange={(e) => {
+                    setNewStaff({ ...newStaff, username: e.target.value });
+                    setAddStaffError(null);
+                  }}
+                  className={`w-full rounded-xl bg-[#F7F5F0] p-2.5 font-medium text-[#0F3D24] focus:outline-none focus:ring-2 ${
+                    isDuplicateUsername ? "ring-2 ring-rose-500 bg-rose-50/50" : "focus:ring-[#3F8F3F]"
+                  }`}
                 />
+                {isDuplicateUsername && (
+                  <p className="mt-1 text-[11px] font-bold text-rose-600">
+                    Username "{normalizedNewUsername}" already exists! Please choose another username.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1107,10 +1130,19 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
               </div>
             </div>
 
+            {addStaffError && (
+              <div className="rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2.5 text-xs font-bold text-rose-700">
+                {addStaffError}
+              </div>
+            )}
+
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#0F3D24]/10">
               <button
                 type="button"
-                onClick={() => setShowAddStaffModal(false)}
+                onClick={() => {
+                  setShowAddStaffModal(false);
+                  setAddStaffError(null);
+                }}
                 className="rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-bold text-[#0F3D24]"
               >
                 Cancel
@@ -1118,7 +1150,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
               <button
                 type="button"
                 onClick={() => createStaffMut.mutate()}
-                disabled={createStaffMut.isPending || !newStaff.username || !newStaff.passcode}
+                disabled={createStaffMut.isPending || !newStaff.username.trim() || !newStaff.passcode || isDuplicateUsername}
                 className="rounded-full bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white hover:bg-[#134a2c] disabled:opacity-50 transition flex items-center gap-1.5"
               >
                 {createStaffMut.isPending && <Loader2 size={14} className="animate-spin" />} Save Staff Profile
