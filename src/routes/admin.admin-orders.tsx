@@ -254,7 +254,7 @@ function AdminOrders() {
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"awaiting" | "all" | "cancelled_customer" | "cancelled_admin" | "not_completed">("awaiting");
+  const [filter, setFilter] = useState<"all" | "awaiting" | "cancelled_customer" | "cancelled_admin" | "not_completed">("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -438,6 +438,7 @@ function AdminOrders() {
   const resetFilters = () => {
     setFrom(""); setTo(""); setStatusFilter(""); setPayFilter(""); setZoneFilter(""); setSearch("");
     setReasonFilter("");
+    setFilter("all");
     setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   };
 
@@ -491,6 +492,10 @@ function AdminOrders() {
     );
   }
 
+  const awaitingApprovalOrdersCount = (query.data?.orders || []).filter(
+    (o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")
+  ).length;
+
   return (
     <div className="flex h-screen bg-[#f4f7f5] overflow-hidden text-[#0F3D24]">
       <PwaInstallPrompt />
@@ -538,9 +543,21 @@ function AdminOrders() {
               {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
               <ul className="space-y-1">
                 <li>
-                  <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
-                    <FileText size={18} className="shrink-0" />
-                    {!isSidebarCollapsed && <span>Orders & Reports</span>}
+                  <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <div className="flex items-center gap-3">
+                      <FileText size={18} className="shrink-0" />
+                      {!isSidebarCollapsed && <span>Orders & Reports</span>}
+                    </div>
+                    {awaitingApprovalOrdersCount > 0 && (
+                      !isSidebarCollapsed ? (
+                        <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                          {awaitingApprovalOrdersCount}
+                        </span>
+                      ) : (
+                        <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
+                      )
+                    )}
                   </button>
                 </li>
                 <li>
@@ -659,7 +676,27 @@ function AdminOrders() {
             </h2>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {awaitingApprovalOrdersCount > 0 && (
+              <button
+                onClick={() => {
+                  setActiveTab("orders");
+                  setFilter("awaiting");
+                }}
+                title={`${awaitingApprovalOrdersCount} order(s) awaiting payment approval`}
+                className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-300 px-2.5 sm:px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-100 transition shadow-xs cursor-pointer"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+                </span>
+                <span className="hidden sm:inline">Awaiting Approval:</span>
+                <span className="sm:hidden">Approval:</span>
+                <span className="bg-red-600 text-white rounded-full px-1.5 py-0.2 text-[10px] font-extrabold animate-pulse">
+                  {awaitingApprovalOrdersCount}
+                </span>
+              </button>
+            )}
             <Link to="/" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition">
               <Home size={14} /> <span className="hidden sm:inline">Back to Website</span>
             </Link>
@@ -729,24 +766,25 @@ function AdminOrders() {
                       onApply={applyFilters} onReset={resetFilters} onQuickRange={setRange}
                     />
                     <div className="mb-4 flex flex-wrap gap-2">
+                      <FilterBtn active={filter === "all"} onClick={() => setFilter("all")} count={scoped.length}>
+                        All orders
+                      </FilterBtn>
                       <FilterBtn
                         active={filter === "awaiting"}
                         onClick={() => setFilter("awaiting")}
                         count={scoped.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")).length}
+                        isAlert
                       >
                         Awaiting payment approval
+                      </FilterBtn>
+                      <FilterBtn active={filter === "not_completed"} onClick={() => setFilter("not_completed")} count={scoped.filter(isNotCompleted).length}>
+                        Not completed
                       </FilterBtn>
                       <FilterBtn active={filter === "cancelled_customer"} onClick={() => setFilter("cancelled_customer")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy === "customer").length}>
                         Cancelled by customer
                       </FilterBtn>
                       <FilterBtn active={filter === "cancelled_admin"} onClick={() => setFilter("cancelled_admin")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy !== "customer").length}>
                         Cancelled by farm
-                      </FilterBtn>
-                      <FilterBtn active={filter === "not_completed"} onClick={() => setFilter("not_completed")} count={scoped.filter(isNotCompleted).length}>
-                        Not completed
-                      </FilterBtn>
-                      <FilterBtn active={filter === "all"} onClick={() => setFilter("all")} count={scoped.length}>
-                        All orders
                       </FilterBtn>
                     </div>
                     <div className="mt-4">
@@ -1655,13 +1693,49 @@ function flyerCaption(order: AdminOrder, stage: FlyerStage): string {
 }
 
 
-function FilterBtn({ active, onClick, count, children }: { active: boolean; onClick: () => void; count: number; children: React.ReactNode }) {
+function FilterBtn({
+  active,
+  onClick,
+  count,
+  children,
+  isAlert = false,
+}: {
+  active: boolean;
+  onClick: () => void;
+  count: number;
+  children: React.ReactNode;
+  isAlert?: boolean;
+}) {
+  const showAlert = isAlert && count > 0;
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition ${active ? "bg-[#0F3D24] text-white" : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"}`}
+      className={`relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition cursor-pointer ${
+        active
+          ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
+          : showAlert
+          ? "bg-red-50 text-red-700 ring-1 ring-red-300 hover:bg-red-100 shadow-xs"
+          : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
+      }`}
     >
-      {children} <span className={`rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-white/20" : "bg-[#0F3D24]/10"}`}>{count}</span>
+      {showAlert && (
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+        </span>
+      )}
+      {children}
+      <span
+        className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+          showAlert
+            ? "bg-red-600 text-white animate-pulse"
+            : active
+            ? "bg-white/20 text-white"
+            : "bg-[#0F3D24]/10 text-[#0F3D24]"
+        }`}
+      >
+        {count}
+      </span>
     </button>
   );
 }
