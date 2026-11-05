@@ -251,7 +251,16 @@ function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", rea
 }
 
 function AdminOrders() {
-  const [passcode, setPasscode] = useState<string | null>(() => (typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null));
+  const [mounted, setMounted] = useState(false);
+  const [passcode, setPasscode] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    if (saved) {
+      setPasscode(saved);
+    }
+  }, []);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
@@ -482,6 +491,19 @@ function AdminOrders() {
       setIsLoggingIn(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0F3D24]">
+        <div className="text-center">
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-white" />
+          <p className="mt-4 text-xs font-semibold uppercase tracking-widest text-white/70">
+            Dignity Agro Farms · Loading Admin...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!passcode) {
     return (

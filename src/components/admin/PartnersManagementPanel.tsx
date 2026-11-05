@@ -425,6 +425,9 @@ function PartnerDetailView({
   const reopenCycleFn = useServerFn(adminReopenPartnerCycle);
 
   const [settling, setSettling] = useState(false);
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: ["admin-partner-detail", passcode, partnerId],
@@ -463,10 +466,6 @@ function PartnerDetailView({
 
   const { partner, financials, activities, charts, summary } = detailQuery.data;
   const s = partner.settlement;
-
-  const [showSignModal, setShowSignModal] = useState(false);
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const handleCloseCycle = async () => {
     if (
