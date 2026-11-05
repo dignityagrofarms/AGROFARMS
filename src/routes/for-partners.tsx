@@ -18,6 +18,9 @@ import {
   Download,
   Printer,
   ChevronDown,
+  Search,
+  Filter,
+  Sparkles,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { partnerVerifyLogin, partnerGetMyDashboard } from "@/lib/partners.functions";
@@ -346,6 +349,9 @@ function PartnersAccountPortal({
   onLogout: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"financials" | "activities">("financials");
+  const [finFilter, setFinFilter] = useState<"all" | "expense" | "income" | "payout">("all");
+  const [finSearch, setFinSearch] = useState("");
+  const [actFilter, setActFilter] = useState<string>("all");
   const [showSignModal, setShowSignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
@@ -564,213 +570,309 @@ function PartnersAccountPortal({
         </div>
 
         {/* Tab 1: Financial Statements */}
-        {activeTab === "financials" && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h3 className="text-base font-black text-[#0F3D24]">Itemized Investment Ledger</h3>
-                <p className="text-xs text-slate-500">
-                  Every expense, sales inflow, and payout remittance attributed to your investment.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 font-bold text-rose-800">
-                  Expenses: {naira(partner.settlement.totalExpenses)}
-                </span>
-                <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-800">
-                  Sales: {naira(partner.settlement.totalIncome)}
-                </span>
-                <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 font-bold text-blue-800">
-                  Paid Out: {naira(partner.settlement.paidOut)}
-                </span>
-              </div>
-            </div>
+        {activeTab === "financials" && (() => {
+          const filteredFinancials = financials.filter((row) => {
+            if (finFilter !== "all" && row.type !== finFilter) return false;
+            if (finSearch.trim()) {
+              const q = finSearch.toLowerCase();
+              return (
+                row.category?.toLowerCase().includes(q) ||
+                row.description?.toLowerCase().includes(q) ||
+                row.paymentMethod?.toLowerCase().includes(q) ||
+                row.referenceNo?.toLowerCase().includes(q) ||
+                row.transactionDate?.includes(q)
+              );
+            }
+            return true;
+          });
 
-            {financials.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center text-xs text-slate-500">
-                No financial entries have been keyed in yet for this cycle. Farm management will log entries as expenses are incurred and birds are sold.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      <th className="py-3 px-3">Date</th>
-                      <th className="py-3 px-3">Type</th>
-                      <th className="py-3 px-3">Category</th>
-                      <th className="py-3 px-3">Description</th>
-                      <th className="py-3 px-3">Payment Method</th>
-                      <th className="py-3 px-3 text-right">Amount (₦)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {financials.map((row) => {
-                      const removed = Boolean(row.removedAt);
-                      return (
-                        <tr
-                          key={row.id}
-                          className={removed ? "bg-slate-50 opacity-60" : "hover:bg-slate-50/70"}
-                        >
-                          <td className="py-3 px-3 font-medium text-slate-600 whitespace-nowrap">
-                            {row.transactionDate}
-                          </td>
-                          <td className="py-3 px-3">
-                            <span
-                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
-                                removed
-                                  ? "bg-slate-200 text-slate-600"
-                                  : row.type === "expense"
-                                    ? "bg-rose-100 text-rose-800"
-                                    : row.type === "income"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : "bg-blue-100 text-blue-800"
-                              }`}
-                            >
-                              {removed ? "removed" : row.type === "payout" ? "payout" : row.type}
-                            </span>
-                          </td>
-                          <td className={`py-3 px-3 font-bold text-[#0F3D24] ${removed ? "line-through" : ""}`}>
-                            {row.category}
-                          </td>
-                          <td className="py-3 px-3 text-slate-700 max-w-sm">
-                            <span className={removed ? "line-through" : ""}>{row.description}</span>
-                            {removed && (
-                              <span className="block text-[10px] font-semibold text-rose-700">
-                                Removed on {row.removedAt?.slice(0, 10)} ({row.removalReason || "no reason"})
-                              </span>
-                            )}
-                            {row.referenceNo && !removed && (
-                              <span className="block text-[10px] text-slate-400 font-mono">
-                                Ref: {row.referenceNo}
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-slate-600">{row.paymentMethod}</td>
-                          <td
-                            className={`py-3 px-3 text-right font-black ${
-                              removed
-                                ? "line-through text-slate-400"
-                                : row.type === "expense"
-                                  ? "text-rose-700"
-                                  : row.type === "income"
-                                    ? "text-emerald-700"
-                                    : "text-blue-700"
-                            }`}
-                          >
-                            {row.type === "expense" ? "-" : row.type === "income" ? "+" : ""}
-                            {naira(row.amount)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+          const expCount = financials.filter((f) => f.type === "expense" && !f.removedAt).length;
+          const incCount = financials.filter((f) => f.type === "income" && !f.removedAt).length;
+          const payCount = financials.filter((f) => f.type === "payout" && !f.removedAt).length;
 
-        {/* Tab 2: Daily Farm Activities */}
-        {activeTab === "activities" && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div>
-                <h3 className="text-base font-black text-[#0F3D24]">Daily Pen Logs & Stock Activity</h3>
-                <p className="text-xs text-slate-500">
-                  Direct updates recorded by farm supervisors for your investment flock.
-                </p>
+          return (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-black text-[#0F3D24]">Itemized Investment Ledger</h3>
+                  <p className="text-xs text-slate-500">
+                    Live record of expenses, bird sales, and capital payout remittances.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 font-bold text-rose-800">
+                    Expenses: {naira(partner.settlement.totalExpenses)}
+                  </span>
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-800">
+                    Sales: {naira(partner.settlement.totalIncome)}
+                  </span>
+                  <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 font-bold text-blue-800">
+                    Paid Out: {naira(partner.settlement.paidOut)}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 font-bold text-blue-800">
-                  Live Birds: {summary.currentStockCount}
-                </span>
-                <span className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 font-bold text-rose-800">
-                  Mortality: {summary.totalMortalityCount} ({summary.mortalityRatePercent}%)
-                </span>
-              </div>
-            </div>
 
-            {activities.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center text-xs text-slate-500">
-                No activity logs have been recorded for this cycle yet. Daily updates will appear here once flock operations commence.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {activities.map((act) => {
-                  const removed = Boolean(act.removedAt);
-                  return (
-                    <div
-                      key={act.id}
-                      className={`rounded-2xl border p-4 space-y-2 transition-colors ${
-                        removed
-                          ? "border-slate-200 bg-slate-50 opacity-60"
-                          : "border-slate-200 bg-[#F7F5F0]/40 hover:bg-[#F7F5F0]/80"
+              {/* Filter Pills + Search Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                <div className="flex flex-wrap gap-1.5 text-xs">
+                  {[
+                    { key: "all", label: `All (${financials.length})` },
+                    { key: "expense", label: `Expenses (${expCount})` },
+                    { key: "income", label: `Sales (${incCount})` },
+                    { key: "payout", label: `Payouts (${payCount})` },
+                  ].map((btn) => (
+                    <button
+                      key={btn.key}
+                      type="button"
+                      onClick={() => setFinFilter(btn.key as any)}
+                      className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                        finFilter === btn.key
+                          ? "bg-[#0F3D24] text-white shadow-sm"
+                          : "bg-[#F7F5F0] text-slate-700 hover:bg-slate-200"
                       }`}
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-slate-500">
-                            {act.activityDate}
-                          </span>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                              removed
-                                ? "bg-slate-200 text-slate-600 line-through"
-                                : "bg-[#3F8F3F]/15 text-[#0F3D24]"
-                            }`}
-                          >
-                            {act.activityType}
-                          </span>
-                          {act.mortalityCount > 0 && (
-                            <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-800">
-                              {act.mortalityCount} Mortality
-                            </span>
-                          )}
-                          {act.stockHeadcount > 0 && (
-                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-800">
-                              +{act.stockHeadcount} Birds Received
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          {act.recordedBy || "Farm Management"}
-                        </span>
-                      </div>
+                      {btn.label}
+                    </button>
+                  ))}
+                </div>
 
-                      {act.notes && (
-                        <p className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}>
-                          {act.notes}
-                        </p>
-                      )}
-
-                      {removed && (
-                        <p className="text-[11px] font-semibold text-rose-700">
-                          Removed on {act.removedAt?.slice(0, 10)} ({act.removalReason || "no reason"})
-                        </p>
-                      )}
-
-                      <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-600 pt-1">
-                        {act.feedConsumedKg > 0 && (
-                          <span>
-                            Feed Consumed: <strong>{act.feedConsumedKg} kg</strong>
-                          </span>
-                        )}
-                        {act.averageWeightKg > 0 && (
-                          <span>
-                            Flock Avg Weight: <strong>{act.averageWeightKg} kg</strong>
-                          </span>
-                        )}
-                        {act.causeOfMortality && (
-                          <span className="text-rose-700">Suspected Cause: {act.causeOfMortality}</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="relative w-full sm:w-64">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search ledger entries..."
+                    value={finSearch}
+                    onChange={(e) => setFinSearch(e.target.value)}
+                    className="w-full rounded-full border border-slate-200 bg-[#F7F5F0]/60 pl-8 pr-3 py-1.5 text-xs text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-        )}
+
+              {filteredFinancials.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center text-xs text-slate-500">
+                  {finSearch || finFilter !== "all"
+                    ? "No entries match your search or filter."
+                    : "No financial entries have been keyed in yet for this cycle."}
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-[#F7F5F0]/80 text-[10px] font-black uppercase tracking-wider text-[#0F3D24]/70">
+                        <th className="py-3 px-3.5">Date</th>
+                        <th className="py-3 px-3">Type</th>
+                        <th className="py-3 px-3">Category</th>
+                        <th className="py-3 px-3">Description</th>
+                        <th className="py-3 px-3">Payment Method</th>
+                        <th className="py-3 px-3.5 text-right">Amount (₦)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredFinancials.map((row) => {
+                        const removed = Boolean(row.removedAt);
+                        return (
+                          <tr
+                            key={row.id}
+                            className={removed ? "bg-slate-50 opacity-60" : "hover:bg-slate-50/70 transition-colors"}
+                          >
+                            <td className="py-3 px-3.5 font-medium text-slate-600 whitespace-nowrap">
+                              {row.transactionDate}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                                  removed
+                                    ? "bg-slate-200 text-slate-600"
+                                    : row.type === "expense"
+                                      ? "bg-rose-100 text-rose-800"
+                                      : row.type === "income"
+                                        ? "bg-emerald-100 text-emerald-800"
+                                        : "bg-blue-100 text-blue-800"
+                                }`}
+                              >
+                                {removed ? "removed" : row.type === "payout" ? "payout" : row.type}
+                              </span>
+                            </td>
+                            <td className={`py-3 px-3 font-bold text-[#0F3D24] ${removed ? "line-through" : ""}`}>
+                              {row.category}
+                            </td>
+                            <td className="py-3 px-3 text-slate-700 max-w-sm">
+                              <span className={removed ? "line-through" : ""}>{row.description}</span>
+                              {removed && (
+                                <span className="block text-[10px] font-semibold text-rose-700">
+                                  Removed on {row.removedAt?.slice(0, 10)} ({row.removalReason || "Correction"})
+                                </span>
+                              )}
+                              {row.referenceNo && !removed && (
+                                <span className="block text-[10px] text-slate-400 font-mono">
+                                  Ref: {row.referenceNo}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-slate-600">{row.paymentMethod}</td>
+                            <td
+                              className={`py-3 px-3.5 text-right font-black ${
+                                removed
+                                  ? "line-through text-slate-400"
+                                  : row.type === "expense"
+                                    ? "text-rose-700"
+                                    : row.type === "income"
+                                      ? "text-emerald-700"
+                                      : "text-blue-700"
+                              }`}
+                            >
+                              {row.type === "expense" ? "-" : row.type === "income" ? "+" : ""}
+                              {naira(row.amount)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Tab 2: Daily Farm Activities */}
+        {activeTab === "activities" && (() => {
+          const filteredActivities = activities.filter((act) => {
+            if (actFilter !== "all" && act.activityType !== actFilter) return false;
+            return true;
+          });
+
+          const actTypes = Array.from(new Set(activities.map((a) => a.activityType)));
+
+          return (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-black text-[#0F3D24]">Daily Pen Logs & Stock Activity</h3>
+                  <p className="text-xs text-slate-500">
+                    Direct updates recorded by farm supervisors for your investment flock.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 font-bold text-blue-800">
+                    Live Birds: {summary.currentStockCount}
+                  </span>
+                  <span className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 font-bold text-rose-800">
+                    Mortality: {summary.totalMortalityCount} ({summary.mortalityRatePercent}%)
+                  </span>
+                  <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 font-bold text-amber-800">
+                    Feed Intake: {summary.totalFeedConsumedKg} kg
+                  </span>
+                </div>
+              </div>
+
+              {/* Activity Type Filters */}
+              {actTypes.length > 1 && (
+                <div className="flex flex-wrap gap-1.5 text-xs pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setActFilter("all")}
+                    className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                      actFilter === "all"
+                        ? "bg-[#0F3D24] text-white shadow-sm"
+                        : "bg-[#F7F5F0] text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    All Activities ({activities.length})
+                  </button>
+                  {actTypes.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setActFilter(t)}
+                      className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                        actFilter === t
+                          ? "bg-[#0F3D24] text-white shadow-sm"
+                          : "bg-[#F7F5F0] text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {filteredActivities.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center text-xs text-slate-500">
+                  No activity logs match this filter. Daily updates appear here once recorded.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredActivities.map((act) => {
+                    const removed = Boolean(act.removedAt);
+                    return (
+                      <div
+                        key={act.id}
+                        className={`rounded-2xl border p-4 space-y-2 transition-colors ${
+                          removed
+                            ? "border-slate-200 bg-slate-50 opacity-60"
+                            : "border-slate-200 bg-[#F7F5F0]/40 hover:bg-[#F7F5F0]/80"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-bold text-slate-500">
+                              {act.activityDate}
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                                removed
+                                  ? "bg-slate-200 text-slate-600 line-through"
+                                  : "bg-[#3F8F3F]/15 text-[#0F3D24]"
+                              }`}
+                            >
+                              {act.activityType}
+                            </span>
+                            {act.mortalityCount > 0 && (
+                              <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-800">
+                                {act.mortalityCount} Mortality
+                              </span>
+                            )}
+                            {act.stockHeadcount > 0 && (
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-800">
+                                +{act.stockHeadcount} Birds Received
+                              </span>
+                            )}
+                            {act.feedConsumedKg > 0 && (
+                              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">
+                                {act.feedConsumedKg} kg Feed
+                              </span>
+                            )}
+                            {act.averageWeightKg > 0 && (
+                              <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800">
+                                Avg: {act.averageWeightKg} kg
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {act.recordedBy || "Farm Management"}
+                          </span>
+                        </div>
+
+                        {act.notes && (
+                          <p className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}>
+                            {act.notes}
+                          </p>
+                        )}
+
+                        {removed && (
+                          <p className="text-[11px] font-semibold text-rose-700">
+                            Removed on {act.removedAt?.slice(0, 10)} ({act.removalReason || "Correction"})
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

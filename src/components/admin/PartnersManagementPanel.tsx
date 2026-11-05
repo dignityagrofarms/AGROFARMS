@@ -26,6 +26,20 @@ import {
   FileDown,
   Download,
   ChevronDown,
+  ChevronLeft,
+  User,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Sparkles,
+  Eye,
+  EyeOff,
+  Check,
+  Share2,
+  ExternalLink,
+  ShieldCheck,
+  FileCheck2,
 } from "lucide-react";
 import {
   adminListPartners,
@@ -75,6 +89,16 @@ export function PartnersManagementPanel({
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [createdPartnerInfo, setCreatedPartnerInfo] = useState<{
+    id: string;
+    fullName: string;
+    username: string;
+    password: string;
+    capital: number;
+    profitPct: number;
+    lossPct: number;
+    cycleName: string;
+  } | null>(null);
 
   const listPartnersFn = useServerFn(adminListPartners);
   const listBatchesFn = useServerFn(adminListBatches);
@@ -355,9 +379,22 @@ export function PartnersManagementPanel({
           passcode={passcode}
           batches={batches}
           onClose={() => setIsAddModalOpen(false)}
-          onSuccess={() => {
+          onSuccess={(info) => {
             setIsAddModalOpen(false);
             qc.invalidateQueries({ queryKey: ["admin-partners"] });
+            if (info) setCreatedPartnerInfo(info);
+          }}
+        />
+      )}
+
+      {/* Post-Registration Success Modal */}
+      {createdPartnerInfo && (
+        <CreatedPartnerSuccessModal
+          info={createdPartnerInfo}
+          onClose={() => setCreatedPartnerInfo(null)}
+          onOpenWorkspace={(id) => {
+            setCreatedPartnerInfo(null);
+            setSelectedPartnerId(id);
           }}
         />
       )}
@@ -1862,7 +1899,18 @@ function PartnerCredentialsSubPanel({
   );
 }
 
-// ─── MODAL: REGISTER NEW PARTNER ──────────────────────────────────────────────
+// ─── MODAL: 4-STEP ONBOARDING WIZARD FOR NEW PARTNER ──────────────────────────
+
+interface CreatedPartnerInfo {
+  id: string;
+  fullName: string;
+  username: string;
+  password: string;
+  capital: number;
+  profitPct: number;
+  lossPct: number;
+  cycleName: string;
+}
 
 function AddPartnerModal({
   passcode,
@@ -1873,47 +1921,122 @@ function AddPartnerModal({
   passcode: string;
   batches: any[];
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (info?: CreatedPartnerInfo) => void;
 }) {
   const createPartnerFn = useServerFn(adminCreatePartner);
 
   const today = new Date().toISOString().slice(0, 10);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Step 1: Partner Profile
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Step 2: Capital & Cycle
+  const [initialInvestment, setInitialInvestment] = useState("");
+  const [investmentDate, setInvestmentDate] = useState(today);
   const [projectName, setProjectName] = useState("Broiler Cycle Partnership");
   const [cycleName, setCycleName] = useState("Cycle 1 — 6-Week Broilers");
   const [cycleStartDate, setCycleStartDate] = useState(today);
   const [cycleEndDate, setCycleEndDate] = useState("");
-  const [initialInvestment, setInitialInvestment] = useState("");
-  const [investmentDate, setInvestmentDate] = useState(today);
+  const [batchId, setBatchId] = useState<string>("");
+
+  // Step 3: Sharing Matrix
   const [profitSharePercentage, setProfitSharePercentage] = useState("70");
   const [lossSharePercentage, setLossSharePercentage] = useState("100");
-  const [agreedTerms, setAgreedTerms] = useState("");
-  const [batchId, setBatchId] = useState<string>("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [simMode, setSimMode] = useState<"profit" | "loss">("profit");
+
+  // Step 4: Terms & Review
+  const [customClauses, setCustomClauses] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const pPct = Math.min(100, Math.max(0, Number(profitSharePercentage) || 0));
   const lPct = Math.min(100, Math.max(0, Number(lossSharePercentage) || 0));
+  const numCapital = Number(initialInvestment) || 0;
+
+  // Helpers
+  const handleAutoSuggestUsername = () => {
+    if (!fullName.trim()) return;
+    const clean = fullName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, "")
+      .replace(/\s+/g, "_")
+      .slice(0, 25);
+    setUsername(clean || "partner_investor");
+  };
+
+  const handleGeneratePassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let rand = "";
+    for (let i = 0; i < 4; i++) {
+      rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(`Daf-${rand}`);
+    setShowPassword(true);
+  };
+
+  const validateStep1 = () => {
+    if (!fullName.trim()) {
+      setErrorMsg("Please enter the partner's full name.");
+      return false;
+    }
+    if (!phone.trim()) {
+      setErrorMsg("Please enter a contact phone number.");
+      return false;
+    }
+    if (!username.trim() || username.trim().length < 3) {
+      setErrorMsg("Username must be at least 3 characters.");
+      return false;
+    }
+    if (!password.trim() || password.trim().length < 6) {
+      setErrorMsg("Password must be at least 6 characters.");
+      return false;
+    }
+    setErrorMsg(null);
+    return true;
+  };
+
+  const validateStep2 = () => {
+    if (numCapital <= 0) {
+      setErrorMsg("Please enter a valid investment capital amount greater than zero.");
+      return false;
+    }
+    if (!cycleName.trim()) {
+      setErrorMsg("Please enter a cycle name.");
+      return false;
+    }
+    setErrorMsg(null);
+    return true;
+  };
+
+  const handleNext = () => {
+    if (step === 1 && !validateStep1()) return;
+    if (step === 2 && !validateStep2()) return;
+    setErrorMsg(null);
+    setStep((s) => Math.min(4, s + 1) as any);
+  };
+
+  const handleBack = () => {
+    setErrorMsg(null);
+    setStep((s) => Math.max(1, s - 1) as any);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const numCapital = Number(initialInvestment);
-    if (!fullName.trim()) return setErrorMsg("Please enter the partner's full name.");
-    if (!phone.trim()) return setErrorMsg("Please enter a phone number.");
-    if (isNaN(numCapital) || numCapital < 0) return setErrorMsg("Please enter a valid investment amount.");
-    if (!username.trim() || username.trim().length < 3) return setErrorMsg("Username must be at least 3 characters.");
-    if (!password.trim() || password.trim().length < 6) return setErrorMsg("Password must be at least 6 characters.");
+    if (!validateStep1() || !validateStep2()) return;
 
     setSubmitting(true);
     setErrorMsg(null);
     try {
-      await createPartnerFn({
+      const res = await createPartnerFn({
         data: {
           passcode,
           fullName: fullName.trim(),
@@ -1928,15 +2051,25 @@ function AddPartnerModal({
           investmentDate,
           profitSharePercentage: pPct,
           lossSharePercentage: lPct,
-          agreedTerms: agreedTerms.trim() || null,
+          agreedTerms: customClauses.trim() || null,
           batchId: batchId || null,
           username: username.trim().toLowerCase(),
           password: password.trim(),
         },
       });
-      onSuccess();
+
+      onSuccess({
+        id: res.partnerId,
+        fullName: fullName.trim(),
+        username: username.trim().toLowerCase(),
+        password: password.trim(),
+        capital: numCapital,
+        profitPct: pPct,
+        lossPct: lPct,
+        cycleName: cycleName.trim(),
+      });
     } catch (err: any) {
-      setErrorMsg(err instanceof Error ? err.message : "Could not register partner.");
+      setErrorMsg(err instanceof Error ? err.message : "Could not complete partner onboarding.");
     } finally {
       setSubmitting(false);
     }
@@ -1945,289 +2078,661 @@ function AddPartnerModal({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10 overflow-hidden max-h-[92vh] flex flex-col">
-        {/* Header */}
+        {/* Wizard Header Bar */}
         <div className="bg-[#0F3D24] px-6 py-4 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#3F8F3F]">
               <Handshake size={18} />
             </div>
             <div>
-              <h3 className="text-base font-extrabold">Register New Partner</h3>
+              <h3 className="text-base font-black">Partner Onboarding Wizard</h3>
               <p className="text-[11px] text-white/70">
-                Set capital, profit & loss split, cycle window, and portal login.
+                Setup partner profile, capital co-financing, sharing matrix, and portal access
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full bg-white/10 p-2 text-white/80 hover:bg-white/20"
+            className="rounded-full bg-white/10 p-2 text-white/80 hover:bg-white/20 transition"
           >
             ✕
           </button>
         </div>
 
-        {/* Body */}
-        <form id="add-partner-form" onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 text-xs">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Partner Full Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Chief Emeka Okafor"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Phone Number *</label>
-              <input
-                type="tel"
-                required
-                placeholder="e.g. 0803 123 4567"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Capital Invested (₦) *</label>
-              <input
-                type="number"
-                required
-                min={0}
-                placeholder="e.g. 2500000"
-                value={initialInvestment}
-                onChange={(e) => setInitialInvestment(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-bold text-[#0F3D24] outline-none"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Investment Date *</label>
-              <input
-                type="date"
-                required
-                value={investmentDate}
-                onChange={(e) => {
-                  setInvestmentDate(e.target.value);
-                  setCycleStartDate(e.target.value);
-                }}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
-              />
-            </div>
-          </div>
-
-          {/* Profit & Loss Partitioning Box */}
-          <div className="rounded-2xl border border-[#0F3D24]/15 bg-[#F7F5F0] p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F3D24]">
-                Profit & Loss Partitioning (Customizable Per Partner)
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { label: "70% Profit / 100% Loss", p: "70", l: "100" },
-                  { label: "50% / 50%", p: "50", l: "50" },
-                  { label: "70% / 70%", p: "70", l: "70" },
-                  { label: "100% / 100%", p: "100", l: "100" },
-                ].map((preset) => (
-                  <button
-                    key={preset.label}
-                    type="button"
-                    onClick={() => {
-                      setProfitSharePercentage(preset.p);
-                      setLossSharePercentage(preset.l);
-                    }}
-                    className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#0F3D24] ring-1 ring-slate-200 hover:bg-[#3F8F3F] hover:text-white transition"
+        {/* Stepper Progress Bar */}
+        <div className="border-b border-slate-100 bg-[#F7F5F0]/60 px-6 py-3 shrink-0">
+          <div className="grid grid-cols-4 gap-2 text-center text-xs">
+            {[
+              { num: 1, label: "Identity & Login" },
+              { num: 2, label: "Capital & Cycle" },
+              { num: 3, label: "Profit / Loss Split" },
+              { num: 4, label: "Terms & Review" },
+            ].map((s) => {
+              const active = step === s.num;
+              const done = step > s.num;
+              return (
+                <button
+                  key={s.num}
+                  type="button"
+                  onClick={() => {
+                    if (s.num < step) setStep(s.num as any);
+                    else if (step === 1 && validateStep1()) setStep(s.num as any);
+                    else if (step === 2 && validateStep2()) setStep(s.num as any);
+                  }}
+                  className={`flex items-center justify-center gap-2 rounded-xl py-1.5 px-2 transition ${
+                    active
+                      ? "bg-[#0F3D24] text-white font-black shadow-sm"
+                      : done
+                        ? "bg-emerald-100 text-emerald-900 font-bold"
+                        : "text-slate-400 font-medium"
+                  }`}
+                >
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black ${
+                      active
+                        ? "bg-white text-[#0F3D24]"
+                        : done
+                          ? "bg-emerald-700 text-white"
+                          : "bg-slate-200 text-slate-600"
+                    }`}
                   >
-                    {preset.label}
-                  </button>
-                ))}
+                    {done ? "✓" : s.num}
+                  </span>
+                  <span className="hidden sm:inline text-[11px] truncate">{s.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Wizard Step Body */}
+        <div className="p-6 overflow-y-auto space-y-4 text-xs flex-1">
+          {errorMsg && (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700 flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* ───────── STEP 1: IDENTITY & LOGIN ───────── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-[#0F3D24]/5 border border-[#0F3D24]/10 p-3 flex items-center gap-2 text-slate-700">
+                <User size={16} className="text-[#3F8F3F] shrink-0" />
+                <span>Enter the partner's legal identity and set their login credentials for the portal.</span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Full Legal Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Chief Emeka N. Okafor"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    onBlur={handleAutoSuggestUsername}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2.5 font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Phone Number *</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="e.g. 0803 123 4567"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2.5 font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Email Address (Optional)</label>
+                  <input
+                    type="email"
+                    placeholder="partner@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2.5 font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Residential / Office Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Plot 14 Ikenegbu Layout, Owerri"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2.5 font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                  />
+                </div>
+              </div>
+
+              {/* Portal Login Credentials Box */}
+              <div className="rounded-2xl border border-[#3F8F3F]/30 bg-[#3F8F3F]/5 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F3D24] flex items-center gap-1.5">
+                    <KeyRound size={13} className="text-[#3F8F3F]" /> Portal Login Credentials
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAutoSuggestUsername}
+                      className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#0F3D24] border border-slate-200 hover:bg-[#3F8F3F] hover:text-white transition"
+                    >
+                      Suggest Username
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGeneratePassword}
+                      className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#0F3D24] border border-slate-200 hover:bg-[#3F8F3F] hover:text-white transition"
+                    >
+                      Generate Passcode
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block font-bold text-[#0F3D24] mb-1">Portal Username *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. emeka_okafor"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 font-mono font-bold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-[#0F3D24] mb-1">Account Password *</label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        required
+                        placeholder="Min 6 characters"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-xl border border-slate-200 bg-white pl-3.5 pr-10 py-2 font-mono text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((v) => !v)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700"
+                      >
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+          )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block font-bold text-emerald-800 mb-1">
-                  Partner Profit Share (%) — Farm keeps {100 - pPct}%
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={0}
-                  max={100}
-                  step="0.5"
-                  value={profitSharePercentage}
-                  onChange={(e) => setProfitSharePercentage(e.target.value)}
-                  className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2 font-black text-emerald-900"
-                />
+          {/* ───────── STEP 2: CAPITAL & CYCLE ───────── */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-emerald-300 bg-emerald-50/70 p-4 space-y-1">
+                <label className="block font-black text-emerald-950 text-sm">Capital Invested by Partner (₦) *</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-3 text-lg font-black text-emerald-800">₦</span>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    placeholder="e.g. 2500000"
+                    value={initialInvestment}
+                    onChange={(e) => setInitialInvestment(e.target.value)}
+                    className="w-full rounded-xl border border-emerald-300 bg-white pl-8 pr-4 py-2.5 text-lg font-black text-emerald-950 outline-none focus:ring-2 focus:ring-[#3F8F3F]"
+                  />
+                </div>
+                {numCapital > 0 && (
+                  <p className="text-[11px] font-bold text-emerald-800 pt-1">
+                    Recorded Capital: {naira(numCapital)}
+                  </p>
+                )}
               </div>
-              <div>
-                <label className="block font-bold text-rose-800 mb-1">
-                  Partner Loss Responsibility (%) — Capped at Capital
-                </label>
-                <input
-                  type="number"
-                  required
-                  min={0}
-                  max={100}
-                  step="0.5"
-                  value={lossSharePercentage}
-                  onChange={(e) => setLossSharePercentage(e.target.value)}
-                  className="w-full rounded-xl border border-rose-300 bg-white px-3.5 py-2 font-black text-rose-900"
-                />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Investment / Payment Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={investmentDate}
+                    onChange={(e) => {
+                      setInvestmentDate(e.target.value);
+                      setCycleStartDate(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Link to Farm Pen Batch</label>
+                  <select
+                    value={batchId}
+                    onChange={(e) => setBatchId(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
+                  >
+                    <option value="">Independent slot (No batch linked)</option>
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.batchName} ({b.batchType} · {b.currentHeadcount} birds)
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-            </div>
 
-            <div className="rounded-xl bg-white p-2.5 text-[11px] text-slate-700 border border-slate-200/80">
-              <strong>Live Example on ₦1,000,000 result:</strong> If the cycle makes{" "}
-              <span className="font-bold text-emerald-700">+₦1,000,000 profit</span>, partner receives{" "}
-              <strong>{naira(1_000_000 * (pPct / 100))}</strong> and farm keeps{" "}
-              <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>. If the cycle makes{" "}
-              <span className="font-bold text-rose-700">-₦1,000,000 loss</span>, partner bears{" "}
-              <strong>{naira(1_000_000 * (lPct / 100))}</strong> (never exceeding capital).
-            </div>
-          </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Cycle Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={cycleName}
+                    onChange={(e) => setCycleName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-bold text-[#0F3D24]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Cycle Start Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={cycleStartDate}
+                    onChange={(e) => setCycleStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-[#0F3D24] mb-1">Target End / Harvest Date</label>
+                  <input
+                    type="date"
+                    value={cycleEndDate}
+                    onChange={(e) => setCycleEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
+                  />
+                </div>
+              </div>
 
-          {/* Cycle Configuration */}
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Cycle Name *</label>
-              <input
-                type="text"
-                required
-                value={cycleName}
-                onChange={(e) => setCycleName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-semibold text-[#0F3D24]"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Cycle Start Date *</label>
-              <input
-                type="date"
-                required
-                value={cycleStartDate}
-                onChange={(e) => setCycleStartDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Target End / Maturity Date</label>
-              <input
-                type="date"
-                value={cycleEndDate}
-                onChange={(e) => setCycleEndDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Investment Project Name</label>
-              <input
-                type="text"
-                required
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-semibold text-[#0F3D24]"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Link to Farm Batch (Optional)</label>
-              <select
-                value={batchId}
-                onChange={(e) => setBatchId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
-              >
-                <option value="">No linked batch (independent slot)</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.batchName} ({b.batchType} · {b.currentHeadcount} birds)
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Contract / Agreed Terms & Notes</label>
-            <textarea
-              rows={2}
-              placeholder="e.g. 6-week broiler cycle, partner funds expenses, payouts remitted upon bird offload..."
-              value={agreedTerms}
-              onChange={(e) => setAgreedTerms(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 text-[#0F3D24] outline-none"
-            />
-          </div>
-
-          {/* Portal Login Credentials Section */}
-          <div className="rounded-2xl border border-[#3F8F3F]/30 bg-[#3F8F3F]/5 p-3.5 space-y-2">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F] block">
-              Partner Portal Login Account
-            </span>
-            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block font-bold text-[#0F3D24] mb-1">Portal Username *</label>
+                <label className="block font-bold text-[#0F3D24] mb-1">Project Name</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. emeka_okafor"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono font-bold text-[#0F3D24]"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-semibold text-[#0F3D24]"
                 />
               </div>
-              <div>
-                <label className="block font-bold text-[#0F3D24] mb-1">Initial Password *</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Min 6 characters"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {errorMsg && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">
-              {errorMsg}
             </div>
           )}
-        </form>
 
-        {/* Footer */}
-        <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex items-center justify-end gap-3 shrink-0">
+          {/* ───────── STEP 3: PROFIT & LOSS PARTITIONING ───────── */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-[#0F3D24]/15 bg-[#F7F5F0] p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F3D24]">
+                    Select Agreed Partitioning Preset
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { label: "70% Profit / 100% Loss", p: "70", l: "100" },
+                      { label: "50% / 50% (Standard)", p: "50", l: "50" },
+                      { label: "80% Profit / 100% Loss", p: "80", l: "100" },
+                      { label: "100% Profit / 100% Loss", p: "100", l: "100" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setProfitSharePercentage(preset.p);
+                          setLossSharePercentage(preset.l);
+                        }}
+                        className={`rounded-full px-3 py-1 text-[10px] font-bold transition ${
+                          profitSharePercentage === preset.p && lossSharePercentage === preset.l
+                            ? "bg-[#0F3D24] text-white"
+                            : "bg-white text-[#0F3D24] ring-1 ring-slate-200 hover:bg-[#3F8F3F] hover:text-white"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 pt-2">
+                  <div className="rounded-2xl bg-white p-3.5 border border-emerald-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-emerald-900">Partner Profit Share (%)</label>
+                      <span className="text-base font-black text-emerald-800">{pPct}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={pPct}
+                      onChange={(e) => setProfitSharePercentage(e.target.value)}
+                      className="w-full accent-emerald-700"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                      <span>0%</span>
+                      <span>Farm Keeps: {100 - pPct}%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-white p-3.5 border border-rose-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="font-bold text-rose-900">Partner Loss Responsibility (%)</label>
+                      <span className="text-base font-black text-rose-800">{lPct}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={lPct}
+                      onChange={(e) => setLossSharePercentage(e.target.value)}
+                      className="w-full accent-rose-700"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                      <span>0%</span>
+                      <span>Farm Absorbs: {100 - lPct}%</span>
+                      <span>100%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Interactive Live Simulator */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-extrabold text-[#0F3D24] text-xs">
+                    Live Calculation Simulation
+                  </span>
+                  <div className="flex rounded-full bg-slate-100 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSimMode("profit")}
+                      className={`rounded-full px-3 py-1 text-[10px] font-black transition ${
+                        simMode === "profit" ? "bg-emerald-700 text-white shadow-sm" : "text-slate-600"
+                      }`}
+                    >
+                      +₦1,000,000 Profit Scenario
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSimMode("loss")}
+                      className={`rounded-full px-3 py-1 text-[10px] font-black transition ${
+                        simMode === "loss" ? "bg-rose-700 text-white shadow-sm" : "text-slate-600"
+                      }`}
+                    >
+                      -₦500,000 Loss Scenario
+                    </button>
+                  </div>
+                </div>
+
+                {simMode === "profit" ? (
+                  <div className="rounded-xl bg-emerald-50/70 p-3.5 border border-emerald-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-emerald-950 font-bold">
+                        Partner Receives ({pPct}% of Profit):
+                      </span>
+                      <strong className="text-base font-black text-emerald-900">
+                        {naira(1_000_000 * (pPct / 100))}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-emerald-800">
+                      <span>Farm Retained Share:</span>
+                      <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>
+                    </div>
+                    <p className="text-[10px] text-emerald-900/80 pt-1 border-t border-emerald-200/60">
+                      Total Capital Return to Partner: Capital ({naira(numCapital)}) + Profit ({naira(1_000_000 * (pPct / 100))}) = <strong>{naira(numCapital + 1_000_000 * (pPct / 100))}</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-rose-50/70 p-3.5 border border-rose-200 space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-rose-950 font-bold">
+                        Partner Loss Responsibility ({lPct}% of Loss):
+                      </span>
+                      <strong className="text-base font-black text-rose-900">
+                        -{naira(Math.min(numCapital || 500_000, 500_000 * (lPct / 100)))}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-rose-800">
+                      <span>Farm Absorbed Loss:</span>
+                      <strong>{naira(500_000 * ((100 - lPct) / 100))}</strong>
+                    </div>
+                    <p className="text-[10px] text-rose-900/80 pt-1 border-t border-rose-200/60 font-semibold">
+                      Capital Protection Active: Partner loss is strictly capped at their invested capital. The partner can never owe money.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ───────── STEP 4: TERMS & REVIEW ───────── */}
+          {step === 4 && (
+            <div className="space-y-4">
+              {/* Executive Summary Card */}
+              <div className="rounded-2xl bg-[#0F3D24] p-4 text-white space-y-3">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#a8e6a8] block">
+                  Onboarding Summary Review
+                </span>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-white/70 block text-[10px]">Partner:</span>
+                    <strong className="text-white text-sm">{fullName}</strong>
+                    <div className="font-mono text-white/80">@{username}</div>
+                  </div>
+                  <div>
+                    <span className="text-white/70 block text-[10px]">Invested Capital:</span>
+                    <strong className="text-[#a8e6a8] text-base">{naira(numCapital)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-white/70 block text-[10px]">Cycle & Project:</span>
+                    <strong className="text-white">{cycleName}</strong>
+                    <div className="text-white/70">{projectName}</div>
+                  </div>
+                  <div>
+                    <span className="text-white/70 block text-[10px]">Agreed Sharing Ratio:</span>
+                    <strong className="text-white">{pPct}% Profit / {lPct}% Loss</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Clauses */}
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">
+                  Custom Terms & Notes (Appended to Official Legal Terms)
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Broiler cycle duration estimated at 6 weeks. Payouts upon final bird offload reconciliation. Capital disbursed to partner's Zenith Bank account."
+                  value={customClauses}
+                  onChange={(e) => setCustomClauses(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 p-3 text-[#0F3D24] outline-none focus:border-[#3F8F3F] text-xs font-medium"
+                />
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 flex items-start gap-2">
+                <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0 mt-0.5" />
+                <span>
+                  The standard 7-clause Dignity Agro Farms Partnership Agreement will be automatically generated with these parameters. The partner will be prompted to read and digitally sign it upon logging in to the portal.
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Wizard Footer Controls */}
+        <div className="border-t border-slate-100 bg-slate-50 px-6 py-4 flex items-center justify-between shrink-0">
+          <div>
+            {step > 1 ? (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="inline-flex items-center gap-1 rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100 transition"
+              >
+                <ChevronLeft size={14} /> Back
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100 transition"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+
+          <div>
+            {step < 4 ? (
+              <button
+                type="button"
+                onClick={handleNext}
+                className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-extrabold text-white shadow-md hover:bg-[#165232] transition"
+              >
+                Continue &rarr;
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-extrabold text-white shadow-lg hover:bg-[#165232] disabled:opacity-50 transition"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Finalizing Onboarding...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} className="text-[#a8e6a8]" /> Complete & Issue Portal Access
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── POST-REGISTRATION SUCCESS MODAL ──────────────────────────────────────────
+
+function CreatedPartnerSuccessModal({
+  info,
+  onClose,
+  onOpenWorkspace,
+}: {
+  info: CreatedPartnerInfo;
+  onClose: () => void;
+  onOpenWorkspace: (id: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const portalUrl = typeof window !== "undefined" ? `${window.location.origin}/for-partners` : "https://dignityagrofarms.com/for-partners";
+
+  const welcomeMessage = `🌱 *DIGNITY AGRO FARMS — PARTNERSHIP PORTAL ACCESS*
+Dear ${info.fullName},
+You have been successfully registered as an agribusiness partner for *${info.cycleName}*.
+
+💰 *Investment Capital:* ₦${info.capital.toLocaleString()}
+📈 *Agreed Profit Share:* ${info.profitPct}% of Net Profit
+🛡️ *Loss Responsibility:* ${info.lossPct}% (Protected & capped at capital)
+
+You can now track daily pen activities, feeding, mortality, bird weights, and itemized financial statements live at:
+👉 ${portalUrl}
+
+*Your Login Credentials:*
+• Username: ${info.username}
+• Password: ${info.password}
+
+Please sign in to read and digitally sign your Partnership Terms & Conditions.`;
+
+  const handleCopyMessage = () => {
+    navigator.clipboard.writeText(welcomeMessage);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 3000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10 overflow-hidden space-y-4 p-6">
+        <div className="text-center space-y-2">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <Sparkles size={28} />
+          </div>
+          <h3 className="text-xl font-black text-[#0F3D24]">Partner Successfully Onboarded!</h3>
+          <p className="text-xs text-slate-600">
+            <strong>{info.fullName}</strong> is now registered. Credentials have been issued.
+          </p>
+        </div>
+
+        {/* Credentials Card */}
+        <div className="rounded-2xl border border-emerald-200 bg-[#F7F5F0] p-4 text-xs space-y-2">
+          <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+            <span className="text-slate-500 font-medium">Portal Username:</span>
+            <strong className="font-mono font-bold text-[#0F3D24] text-sm">@{info.username}</strong>
+          </div>
+          <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+            <span className="text-slate-500 font-medium">Initial Password:</span>
+            <strong className="font-mono font-bold text-[#0F3D24] text-sm">{info.password}</strong>
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-slate-500 font-medium">Portal URL:</span>
+            <a href={portalUrl} target="_blank" rel="noreferrer" className="text-[#3F8F3F] font-bold underline truncate max-w-[200px]">
+              {portalUrl}
+            </a>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="space-y-2 pt-2">
           <button
             type="button"
-            onClick={onClose}
-            className="rounded-full bg-white px-4 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-100"
+            onClick={handleCopyMessage}
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#25D366] py-3 text-xs font-extrabold text-white shadow-md hover:bg-[#20ba5a] transition"
           >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            form="add-partner-form"
-            disabled={submitting}
-            className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-extrabold text-white shadow-md hover:bg-[#165232] disabled:opacity-50"
-          >
-            {submitting ? (
+            {copied ? (
               <>
-                <Loader2 size={14} className="animate-spin" /> Registering...
+                <Check size={16} /> WhatsApp Message Copied!
               </>
             ) : (
               <>
-                <Plus size={14} /> Complete Registration
+                <Share2 size={16} /> Copy WhatsApp Welcome & Login Message
               </>
             )}
           </button>
+
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full bg-slate-100 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenWorkspace(info.id)}
+              className="rounded-full bg-[#0F3D24] py-2.5 text-xs font-bold text-white hover:bg-[#165232] transition"
+            >
+              Open Partner Workspace &rarr;
+            </button>
+          </div>
         </div>
       </div>
     </div>
