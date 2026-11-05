@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DecemberPreorderRouteImport } from './routes/december-preorder'
+import { Route as ForPartnersRouteImport } from './routes/for-partners'
 import { Route as OrderRouteImport } from './routes/order'
 import { Route as OrderPolicyRouteImport } from './routes/order-policy'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -48,6 +49,11 @@ const ContactRoute = ContactRouteImport.update({
 const DecemberPreorderRoute = DecemberPreorderRouteImport.update({
   id: '/december-preorder',
   path: '/december-preorder',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForPartnersRoute = ForPartnersRouteImport.update({
+  id: '/for-partners',
+  path: '/for-partners',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrderRoute = OrderRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/december-preorder': typeof DecemberPreorderRoute
+  '/for-partners': typeof ForPartnersRoute
   '/order': typeof OrderRoute
   '/order-policy': typeof OrderPolicyRoute
   '/privacy': typeof PrivacyRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/december-preorder': typeof DecemberPreorderRoute
+  '/for-partners': typeof ForPartnersRoute
   '/order': typeof OrderRoute
   '/order-policy': typeof OrderPolicyRoute
   '/privacy': typeof PrivacyRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/december-preorder': typeof DecemberPreorderRoute
+  '/for-partners': typeof ForPartnersRoute
   '/order': typeof OrderRoute
   '/order-policy': typeof OrderPolicyRoute
   '/privacy': typeof PrivacyRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/blog'
     | '/contact'
     | '/december-preorder'
+    | '/for-partners'
     | '/order'
     | '/order-policy'
     | '/privacy'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/blog'
     | '/contact'
     | '/december-preorder'
+    | '/for-partners'
     | '/order'
     | '/order-policy'
     | '/privacy'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/blog'
     | '/contact'
     | '/december-preorder'
+    | '/for-partners'
     | '/order'
     | '/order-policy'
     | '/privacy'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   BlogRoute: typeof BlogRoute
   ContactRoute: typeof ContactRoute
   DecemberPreorderRoute: typeof DecemberPreorderRoute
+  ForPartnersRoute: typeof ForPartnersRoute
   OrderRoute: typeof OrderRoute
   OrderPolicyRoute: typeof OrderPolicyRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/december-preorder'
       fullPath: '/december-preorder'
       preLoaderRoute: typeof DecemberPreorderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/for-partners': {
+      id: '/for-partners'
+      path: '/for-partners'
+      fullPath: '/for-partners'
+      preLoaderRoute: typeof ForPartnersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/order': {
@@ -341,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   BlogRoute: BlogRoute,
   ContactRoute: ContactRoute,
   DecemberPreorderRoute: DecemberPreorderRoute,
+  ForPartnersRoute: ForPartnersRoute,
   OrderRoute: OrderRoute,
   OrderPolicyRoute: OrderPolicyRoute,
   PrivacyRoute: PrivacyRoute,

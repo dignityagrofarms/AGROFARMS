@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone, Plus } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone, Plus, Handshake } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
@@ -27,6 +27,7 @@ import { HrManagementPanel } from "@/components/admin/HrManagementPanel";
 import { PreorderFinancialChart } from "@/components/admin/PreorderFinancialChart";
 import { AdminLoginView } from "@/components/admin/AdminLoginView";
 import { AdminQuickOrderModal } from "@/components/admin/AdminQuickOrderModal";
+import { PartnersManagementPanel } from "@/components/admin/PartnersManagementPanel";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -268,7 +269,7 @@ function AdminOrders() {
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr" | "partners">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -297,11 +298,11 @@ function AdminOrders() {
 
   useEffect(() => {
     if (role === "staff") {
-      if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr"].includes(activeTab)) {
+      if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr", "partners"].includes(activeTab)) {
         setActiveTab("tasks");
       }
     } else if (role === "manager") {
-      if (["vouchers", "flyers"].includes(activeTab)) {
+      if (["vouchers", "flyers", "partners"].includes(activeTab)) {
         setActiveTab("orders");
       }
     }
@@ -661,6 +662,21 @@ function AdminOrders() {
               </ul>
             </div>
           )}
+
+          {/* Partnership & Investor Relations (Owner Only) */}
+          {role === "owner" && (
+            <div>
+              {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Partnership</h3>}
+              <ul className="space-y-1">
+                <li>
+                  <button onClick={() => { setActiveTab("partners"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "partners" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <Handshake size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>For Partners</span>}
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
         </nav>
 
         {/* Bottom Profile / Logout */}
@@ -690,7 +706,7 @@ function AdminOrders() {
               <Menu size={24} />
             </button>
             <h2 className="text-lg font-bold text-gray-800 capitalize hidden sm:block">
-              {activeTab.replace("-", " ")} Dashboard
+              {activeTab === "partners" ? "For Partners" : `${activeTab.replace("-", " ")} Dashboard`}
             </h2>
           </div>
 
@@ -909,6 +925,8 @@ function AdminOrders() {
                   <StaffTasksPanel passcode={passcode!} role={query.data.role} username={currentUsername} />
                 ) : activeTab === "complaints" ? (
                   <ComplaintsDashboardPanel passcode={passcode!} />
+                ) : activeTab === "partners" && role === "owner" ? (
+                  <PartnersManagementPanel passcode={passcode!} role={role} />
                 ) : null}
               </>
             );
