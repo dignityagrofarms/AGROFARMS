@@ -14,6 +14,10 @@ import {
   AlertTriangle,
   Loader2,
   MessageCircle,
+  FileDown,
+  Download,
+  Printer,
+  ChevronDown,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { partnerVerifyLogin, partnerGetMyDashboard } from "@/lib/partners.functions";
@@ -25,7 +29,11 @@ import {
   PayoutTracker,
   HowCalculated,
   AuditTimeline,
+  AgreementCard,
+  SignAgreementModal,
+  UploadWrittenAgreementModal,
 } from "@/components/partners/PartnerSettlementCards";
+import { exportPartnerReportPDF, exportPartnerReportCSV } from "@/lib/partner-report-export";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
 const PARTNER_STORAGE_KEY = "daf_partner_session";
@@ -338,6 +346,9 @@ function PartnersAccountPortal({
   onLogout: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<"financials" | "activities">("financials");
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   const getDashboardFn = useServerFn(partnerGetMyDashboard);
   const dashboardQuery = useQuery({
@@ -401,7 +412,7 @@ function PartnersAccountPortal({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 self-start sm:self-center">
+        <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
           <span
             className={`rounded-full px-3.5 py-1 text-xs font-bold ring-1 ${
               partner.cycleStatus === "closed"
@@ -411,6 +422,63 @@ function PartnersAccountPortal({
           >
             {partner.cycleStatus === "closed" ? "● Cycle Settled" : "● Live Cycle Open"}
           </span>
+
+          {/* Export Report Dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowExportMenu((v) => !v)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-xs font-black text-[#0F3D24] shadow-md hover:bg-[#F7F5F0] transition"
+            >
+              <FileDown size={14} className="text-[#3F8F3F]" />
+              Export Report
+              <ChevronDown size={12} className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
+            </button>
+
+            {showExportMenu && (
+              <div
+                className="absolute right-0 mt-2 w-56 rounded-2xl bg-white p-2 text-xs font-semibold text-[#0F3D24] shadow-2xl ring-1 ring-black/10 z-30 space-y-1"
+                onClick={() => setShowExportMenu(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => exportPartnerReportPDF(partner, financials, activities)}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
+                >
+                  <Download size={14} className="text-emerald-700" />
+                  <div>
+                    <span className="block font-bold">Download PDF Statement</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Official signed & stamped PDF</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => exportPartnerReportCSV(partner, financials, activities)}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
+                >
+                  <Download size={14} className="text-blue-700" />
+                  <div>
+                    <span className="block font-bold">Download CSV / Excel</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Itemized ledger spreadsheet</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition border-t border-slate-100"
+                >
+                  <Printer size={14} className="text-slate-600" />
+                  <div>
+                    <span className="block font-bold">Print Statement</span>
+                    <span className="text-[10px] text-slate-500 font-normal">Browser print / Save as PDF</span>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={onLogout}
@@ -425,7 +493,14 @@ function PartnersAccountPortal({
       <ResultHero partner={partner} />
 
       {/* 2. Terms Banner */}
-      <TermsBanner partner={partner} />
+      <TermsBanner partner={partner} onOpenAgreement={() => setShowSignModal(true)} />
+
+      {/* 2b. Terms & Conditions Agreement Card */}
+      <AgreementCard
+        partner={partner}
+        onOpenSignModal={() => setShowSignModal(true)}
+        onOpenUploadModal={() => setShowUploadModal(true)}
+      />
 
       {/* 3. Settlement Breakdown & Payout Tracker */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -441,6 +516,25 @@ function PartnersAccountPortal({
 
       {/* 6. Audit Timeline (visible if terms changed or settled) */}
       <AuditTimeline partner={partner} />
+
+      {/* Modals */}
+      {showSignModal && (
+        <SignAgreementModal
+          partner={partner}
+          token={session.token}
+          onClose={() => setShowSignModal(false)}
+          onSigned={() => dashboardQuery.refetch()}
+        />
+      )}
+
+      {showUploadModal && (
+        <UploadWrittenAgreementModal
+          partner={partner}
+          token={session.token}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => dashboardQuery.refetch()}
+        />
+      )}
 
       {/* 7. Itemized Financials & Pen Activity Logs */}
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-6">

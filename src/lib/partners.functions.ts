@@ -13,7 +13,7 @@ import {
 export type PartnerAuditEvent = {
   at: string;
   by: string;
-  kind: "terms_amended" | "cycle_closed" | "cycle_reopened";
+  kind: "terms_amended" | "cycle_closed" | "cycle_reopened" | "agreement_signed";
   reason?: string | null;
   from?: { profit: number; loss: number } | null;
   to?: { profit: number; loss: number } | null;
@@ -47,6 +47,17 @@ export interface FarmPartner {
   cycleStatus: "open" | "closed";
   settledAt: string | null;
   auditLog: PartnerAuditEvent[];
+  // Terms & Conditions and Digital Signing
+  agreementTerms: string | null;
+  agreementSigned: boolean;
+  agreementSignedAt: string | null;
+  agreementSignedBy: string | null;
+  agreementSignatureData: string | null;
+  agreementDocumentUrl: string | null;
+  agreementDocumentName: string | null;
+  agreementDocumentSize: string | null;
+  agreementDocumentUploadedAt: string | null;
+  agreementDocumentUploadedBy: string | null;
   // Live computed result (identical on admin and partner side)
   settlement: Settlement;
 }
@@ -210,6 +221,58 @@ const mapAct = (r: any): PartnerActivity => ({
   removalReason: r.removal_reason ?? null,
 });
 
+export function generateDefaultAgreementTerms(data: {
+  fullName: string;
+  projectName?: string;
+  cycleName?: string;
+  initialInvestment: number;
+  investmentDate?: string;
+  profitSharePercentage: number;
+  lossSharePercentage: number;
+  customClauses?: string;
+}): string {
+  const naira = (n: number) => "NGN " + Math.round(n || 0).toLocaleString("en-NG");
+  const farmShareProfit = 100 - data.profitSharePercentage;
+  const project = data.projectName || "Broiler Production Partnership";
+  const cycle = data.cycleName || "Cycle 1";
+  const date = data.investmentDate || new Date().toISOString().slice(0, 10);
+
+  return `DIGNITY AGRO FARMS LIMITED
+POULTRY CO-FINANCING & EQUITY PARTNERSHIP TERMS AND CONDITIONS
+
+PARTIES:
+1. DIGNITY AGRO FARMS LIMITED (RC / Agribusiness), Owerri, Imo State ("Farm Manager" or "Farm")
+2. ${data.fullName} ("Co-Financing Partner" or "Partner")
+
+1. PURPOSE & CAPITAL COMMITMENT
+The Partner has contributed the capital sum of ${naira(data.initialInvestment)} to co-finance the poultry operations designated as "${project}" under "${cycle}", starting on ${date}. These funds are allocated directly to poultry operational requirements, including day-old chicks/stock procurement, commercial feeding, veterinary medication, brooding utilities, and pen management.
+
+2. TRANSPARENCY & LIVE DIGITAL ACCESS
+Dignity Agro Farms provides the Partner with 24/7 digital access to their dedicated Partners Account. The Farm commits to logging daily pen operations (feed intake in kg, stock headcount, mortality counts, average bird weight samplings) and itemizing all operational expenditures, bird sales, and offload revenue in real time.
+
+3. PROFIT SHARING RATIO
+Upon completion of cycle bird sales and operational reconciliation:
+a) Net Operational Profit is defined as Gross Sales Revenue minus Total Operational Expenses.
+b) When the cycle records a Net Operational Profit:
+   • The Partner is entitled to ${data.profitSharePercentage}% of the Net Operational Profit.
+   • Dignity Agro Farms retains ${farmShareProfit}% of the Net Operational Profit.
+
+4. LOSS RESPONSIBILITY & STRICT CAPITAL LOSS PROTECTION
+a) If the cycle incurs a Net Operational Loss due to disease mortality, adverse weather, or severe market drops:
+   • The Partner's allocated loss responsibility is ${data.lossSharePercentage}% of the Net Loss.
+   • MAXIMUM LOSS CAP: Under no circumstances shall the Partner's loss exceed their initial capital investment of ${naira(data.initialInvestment)}. The Partner shall bear zero debt, negative balance, or further liability beyond their capital.
+   • Any loss beyond the Partner's capital is absorbed entirely by Dignity Agro Farms.
+
+5. SETTLEMENT & PAYOUT DISBURSEMENT
+Within five (5) to seven (7) business days following final bird offload, sales reconciliation, and cycle closure, the Partner's final settlement (Capital adjusted for agreed profit or loss, minus any interim payouts received) shall be disbursed to the Partner's verified bank account.
+
+6. BIOSECURITY & FARM CARE PROTOCOLS
+Dignity Agro Farms undertakes to exercise the highest standards of professional poultry management, biosecurity control, routine vaccination schedules, and sanitary pen maintenance throughout the flock lifecycle.
+
+7. GOVERNING LAW & AMICABLE SETTLEMENT
+This Agreement is governed by the laws of Imo State and the Federal Republic of Nigeria. In the event of any dispute, the parties agree to resolve differences through good-faith mutual consultation and amicable mediation.${data.customClauses ? `\n\nADDITIONAL AGREED TERMS & CLAUSES:\n${data.customClauses.trim()}` : ""}`;
+}
+
 function mapPartner(p: any, finRows: any[]): FarmPartner {
   const initial = Number(p.initial_investment) || 0;
   const profitPct = Number(p.profit_share_percentage ?? 50);
@@ -244,6 +307,16 @@ function mapPartner(p: any, finRows: any[]): FarmPartner {
     cycleStatus: p.cycle_status === "closed" ? "closed" : "open",
     settledAt: p.settled_at ?? null,
     auditLog: Array.isArray(p.terms_history) ? p.terms_history : [],
+    agreementTerms: p.agreement_terms ?? p.agreed_terms ?? null,
+    agreementSigned: Boolean(p.agreement_signed),
+    agreementSignedAt: p.agreement_signed_at ?? null,
+    agreementSignedBy: p.agreement_signed_by ?? null,
+    agreementSignatureData: p.agreement_signature_data ?? null,
+    agreementDocumentUrl: p.agreement_document_url ?? null,
+    agreementDocumentName: p.agreement_document_name ?? null,
+    agreementDocumentSize: p.agreement_document_size ?? null,
+    agreementDocumentUploadedAt: p.agreement_document_uploaded_at ?? null,
+    agreementDocumentUploadedBy: p.agreement_document_uploaded_by ?? null,
     settlement,
   };
 }
@@ -417,6 +490,17 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
     if (existingP) throw new Error(`A partner with username '${data.username}' already exists.`);
 
     const hash = await hashPasscode(data.password);
+    const terms =
+      data.agreedTerms?.trim() ||
+      generateDefaultAgreementTerms({
+        fullName: data.fullName,
+        projectName: data.projectName,
+        cycleName: data.cycleName,
+        initialInvestment: data.initialInvestment,
+        investmentDate: data.investmentDate,
+        profitSharePercentage: data.profitSharePercentage,
+        lossSharePercentage: data.lossSharePercentage,
+      });
 
     const { data: inserted, error } = await supabaseAdmin
       .from("farm_partners")
@@ -431,7 +515,8 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
         investment_date: data.investmentDate,
         profit_share_percentage: data.profitSharePercentage,
         loss_share_percentage: data.lossSharePercentage,
-        agreed_terms: data.agreedTerms || null,
+        agreed_terms: terms,
+        agreement_terms: terms,
         project_name: data.projectName,
         cycle_name: data.cycleName,
         cycle_start_date: data.cycleStartDate,
@@ -933,4 +1018,167 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
       activities: maskedAct,
       ...buildSummaryAndCharts(financials, activities),
     };
+  });
+
+export const partnerSignAgreement = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().min(10),
+        legalName: z.string().trim().min(2, "Full legal name is required to sign"),
+        signatureData: z.string().optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const session = await verifySession(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: partner, error: pErr } = await supabaseAdmin
+      .from("farm_partners")
+      .select("id, full_name, terms_history, agreement_signed")
+      .eq("id", session.pid)
+      .single();
+
+    if (pErr || !partner) throw new Error("Partner record not found.");
+
+    const now = new Date().toISOString();
+    const history = Array.isArray(partner.terms_history) ? partner.terms_history : [];
+    const event: PartnerAuditEvent = {
+      at: now,
+      by: data.legalName,
+      kind: "agreement_signed",
+      reason: "Partner digitally reviewed and signed Terms & Conditions on the portal",
+    };
+
+    const { error: uErr } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        agreement_signed: true,
+        agreement_signed_at: now,
+        agreement_signed_by: data.legalName,
+        agreement_signature_data: data.signatureData || null,
+        terms_history: [...history, event],
+      })
+      .eq("id", partner.id);
+
+    if (uErr) throw new Error(uErr.message);
+    return { ok: true, signedAt: now, signedBy: data.legalName };
+  });
+
+export const partnerUploadWrittenAgreement = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().min(10),
+        fileUrl: z.string().trim().min(1, "File link or attachment data is required"),
+        fileName: z.string().trim().min(1, "File name is required"),
+        fileSize: z.string().optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const session = await verifySession(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        agreement_document_url: data.fileUrl,
+        agreement_document_name: data.fileName,
+        agreement_document_size: data.fileSize || "Attachment",
+        agreement_document_uploaded_at: now,
+        agreement_document_uploaded_by: "Partner",
+      })
+      .eq("id", session.pid);
+
+    if (error) throw new Error(error.message);
+    return { ok: true, uploadedAt: now };
+  });
+
+export const adminUploadPartnerDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        partnerId: z.string().uuid(),
+        fileUrl: z.string().trim().min(1, "File link or attachment data is required"),
+        fileName: z.string().trim().min(1, "File name is required"),
+        fileSize: z.string().optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        agreement_document_url: data.fileUrl,
+        agreement_document_name: data.fileName,
+        agreement_document_size: data.fileSize || "Attachment",
+        agreement_document_uploaded_at: now,
+        agreement_document_uploaded_by: "Owner / Management",
+      })
+      .eq("id", data.partnerId);
+
+    if (error) throw new Error(error.message);
+    return { ok: true, uploadedAt: now };
+  });
+
+export const adminDeletePartnerDocument = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        partnerId: z.string().uuid(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        agreement_document_url: null,
+        agreement_document_name: null,
+        agreement_document_size: null,
+        agreement_document_uploaded_at: null,
+        agreement_document_uploaded_by: null,
+      })
+      .eq("id", data.partnerId);
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminUpdatePartnerAgreementTerms = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        partnerId: z.string().uuid(),
+        terms: z.string().trim().min(10, "Agreement terms must be at least 10 characters"),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        agreement_terms: data.terms,
+        agreed_terms: data.terms,
+      })
+      .eq("id", data.partnerId);
+
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });

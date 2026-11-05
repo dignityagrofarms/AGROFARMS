@@ -23,6 +23,9 @@ import {
   BarChart3,
   Banknote,
   Pencil,
+  FileDown,
+  Download,
+  ChevronDown,
 } from "lucide-react";
 import {
   adminListPartners,
@@ -52,7 +55,11 @@ import {
   PayoutTracker,
   HowCalculated,
   AuditTimeline,
+  AgreementCard,
+  SignAgreementModal,
+  UploadWrittenAgreementModal,
 } from "@/components/partners/PartnerSettlementCards";
+import { exportPartnerReportPDF, exportPartnerReportCSV } from "@/lib/partner-report-export";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
 const signedNaira = (n: number) => (n > 0 ? "+" : n < 0 ? "-" : "") + naira(Math.abs(n));
@@ -298,7 +305,7 @@ export function PartnersManagementPanel({
                           <strong className="text-[#0F3D24] font-bold">{naira(partner.initialInvestment)}</strong>
                         </div>
                         <div className="flex items-center justify-between text-slate-600">
-                          <span>Partner Result ({s.roiPercent > 0 ? `+${s.roiPercent}%` : `${s.roiPercent}%`}):</span>
+                          <span>Partner Result ({isLoss ? `${partner.lossSharePercentage}% loss` : `${partner.profitSharePercentage}% profit`}):</span>
                           <strong
                             className={`font-black ${
                               isLoss ? "text-rose-700" : isProfit ? "text-emerald-700" : "text-slate-700"
@@ -420,6 +427,10 @@ function PartnerDetailView({
   const { partner, financials, activities, charts, summary } = detailQuery.data;
   const s = partner.settlement;
 
+  const [showSignModal, setShowSignModal] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
   const handleCloseCycle = async () => {
     if (
       !confirm(
@@ -466,6 +477,50 @@ function PartnerDetailView({
           </button>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* Export Statement Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowExportMenu((v) => !v)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F5F0] border border-[#0F3D24]/15 px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#0F3D24]/10 transition"
+              >
+                <FileDown size={13} className="text-[#3F8F3F]" />
+                Export Statement
+                <ChevronDown size={11} className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
+              </button>
+
+              {showExportMenu && (
+                <div
+                  className="absolute right-0 mt-2 w-52 rounded-2xl bg-white p-2 text-xs font-semibold text-[#0F3D24] shadow-2xl ring-1 ring-black/10 z-30 space-y-1"
+                  onClick={() => setShowExportMenu(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={() => exportPartnerReportPDF(partner, financials, activities)}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
+                  >
+                    <Download size={13} className="text-emerald-700" />
+                    <div>
+                      <span className="block font-bold">PDF Statement</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Official signed & stamped</span>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => exportPartnerReportCSV(partner, financials, activities)}
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
+                  >
+                    <Download size={13} className="text-blue-700" />
+                    <div>
+                      <span className="block font-bold">CSV / Excel Ledger</span>
+                      <span className="text-[10px] text-slate-500 font-normal">Itemized transactions</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
             {partner.cycleStatus === "open" ? (
               <button
                 type="button"
@@ -526,7 +581,7 @@ function PartnerDetailView({
                   s.result === "loss" ? "text-rose-700" : "text-emerald-700"
                 }`}
               >
-                Partner Share ({s.roiPercent > 0 ? `+${s.roiPercent}%` : `${s.roiPercent}%`} ROI)
+                Partner Net Share ({s.result === "loss" ? `${partner.lossSharePercentage}% loss` : `${partner.profitSharePercentage}% profit`})
               </div>
               <div
                 className={`text-lg font-black ${
@@ -592,7 +647,12 @@ function PartnerDetailView({
       {activeSubTab === "overview" && (
         <div className="space-y-6">
           <ResultHero partner={partner} />
-          <TermsBanner partner={partner} />
+          <TermsBanner partner={partner} onOpenAgreement={() => setShowSignModal(true)} />
+          <AgreementCard
+            partner={partner}
+            onOpenSignModal={() => setShowSignModal(true)}
+            onOpenUploadModal={() => setShowUploadModal(true)}
+          />
           <div className="grid gap-6 lg:grid-cols-2">
             <SettlementBreakdown partner={partner} />
             <PayoutTracker partner={partner} financials={financials} />
@@ -633,6 +693,24 @@ function PartnerDetailView({
           hasEntries={financials.some((f) => !f.removedAt)}
           onRefresh={refreshDetail}
           onDeleted={onBack}
+        />
+      )}
+
+      {/* Modals for Terms & Agreements */}
+      {showSignModal && (
+        <SignAgreementModal
+          partner={partner}
+          onClose={() => setShowSignModal(false)}
+          onSigned={() => refreshDetail()}
+        />
+      )}
+
+      {showUploadModal && (
+        <UploadWrittenAgreementModal
+          partner={partner}
+          passcode={passcode}
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => refreshDetail()}
         />
       )}
     </div>
