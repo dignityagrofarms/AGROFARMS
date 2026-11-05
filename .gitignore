@@ -24,6 +24,7 @@ test-pdf.cjs
 *.test.cjs
 *.pdf
 *.sql
+!supabase/migrations/*.sql
 
 # ── Internal planning & agent docs ────────────────────────────────────────────
 .lovable/plan/

@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Handshake,
   Plus,
   Users,
   Wallet,
   TrendingUp,
+  TrendingDown,
   Receipt,
   Activity,
   ArrowLeft,
@@ -15,24 +16,21 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
-  Calendar,
-  Layers,
-  Phone,
-  Mail,
   Copy,
-  ExternalLink,
-  DollarSign,
-  FileText,
-  Lock,
   ChevronRight,
-  ShieldCheck,
-  Building,
+  Lock,
+  Unlock,
+  BarChart3,
+  Banknote,
+  Pencil,
 } from "lucide-react";
 import {
   adminListPartners,
   adminGetPartnerDetail,
   adminCreatePartner,
   adminUpdatePartner,
+  adminClosePartnerCycle,
+  adminReopenPartnerCycle,
   adminResetPartnerPasscode,
   adminTogglePartnerActive,
   adminDeletePartner,
@@ -46,8 +44,18 @@ import {
 } from "@/lib/partners.functions";
 import { adminListBatches } from "@/lib/farm.functions";
 import type { AdminRole } from "@/lib/orders.functions";
+import { PartnerCharts } from "@/components/partners/PartnerCharts";
+import {
+  TermsBanner,
+  ResultHero,
+  SettlementBreakdown,
+  PayoutTracker,
+  HowCalculated,
+  AuditTimeline,
+} from "@/components/partners/PartnerSettlementCards";
 
-const naira = (n: number) => "\u20a6" + (n || 0).toLocaleString("en-NG");
+const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
+const signedNaira = (n: number) => (n > 0 ? "+" : n < 0 ? "-" : "") + naira(Math.abs(n));
 
 export function PartnersManagementPanel({
   passcode,
@@ -62,10 +70,8 @@ export function PartnersManagementPanel({
   const [searchTerm, setSearchTerm] = useState("");
 
   const listPartnersFn = useServerFn(adminListPartners);
-  const getPartnerDetailFn = useServerFn(adminGetPartnerDetail);
   const listBatchesFn = useServerFn(adminListBatches);
 
-  // Queries
   const partnersQuery = useQuery({
     queryKey: ["admin-partners", passcode],
     queryFn: () => listPartnersFn({ data: { passcode } }),
@@ -78,27 +84,25 @@ export function PartnersManagementPanel({
     staleTime: 60_000,
   });
 
-  const partnerDetailQuery = useQuery({
-    queryKey: ["admin-partner-detail", passcode, selectedPartnerId],
-    queryFn: () => getPartnerDetailFn({ data: { passcode, partnerId: selectedPartnerId! } }),
-    enabled: !!selectedPartnerId,
-    staleTime: 5_000,
-  });
-
   const partners = partnersQuery.data || [];
   const batches = batchesQuery.data || [];
 
-  // Summary Metrics
+  // Summary Metrics across all partners
   const totalCapitalInvested = partners.reduce((sum, p) => sum + p.initialInvestment, 0);
-  const totalExpenses = partners.reduce((sum, p) => sum + p.totalExpenses, 0);
-  const totalIncome = partners.reduce((sum, p) => sum + p.totalIncome, 0);
-  const activePartnersCount = partners.filter((p) => p.status === "active" && p.active).length;
+  const totalExpenses = partners.reduce((sum, p) => sum + p.settlement.totalExpenses, 0);
+  const totalIncome = partners.reduce((sum, p) => sum + p.settlement.totalIncome, 0);
+  const totalPayoutBalanceOwed = partners.reduce(
+    (sum, p) => sum + Math.max(0, p.settlement.balanceOwed),
+    0,
+  );
+  const activePartnersCount = partners.filter((p) => p.cycleStatus === "open" && p.active).length;
 
   const filteredPartners = partners.filter(
     (p) =>
       p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.cycleName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (p.phone && p.phone.includes(searchTerm)),
   );
 
@@ -112,12 +116,12 @@ export function PartnersManagementPanel({
               <Handshake size={18} />
             </span>
             <span className="text-xs font-bold uppercase tracking-wider text-[#a8e6a8]">
-              Investor Relations & Transparency
+              Investor Relations & Profit/Loss Transparency
             </span>
           </div>
           <h2 className="text-2xl font-black tracking-tight sm:text-3xl">For Partners</h2>
           <p className="max-w-2xl text-xs text-white/80">
-            Manage your partners and investors, track their capital, key in dedicated expenses & sales, and log live farm activities so they have complete visibility in their Partners Account.
+            Configure custom profit & loss sharing splits per partner, key in expenses, sales & payouts, and give every investor live charts and transparent settlement statements.
           </p>
         </div>
 
@@ -144,20 +148,9 @@ export function PartnersManagementPanel({
             </div>
           </div>
           <div className="mt-2 text-2xl font-black text-[#0F3D24]">{naira(totalCapitalInvested)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Cumulative investment received</span>
-        </div>
-
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
-              Active Partners
-            </span>
-            <div className="rounded-xl bg-blue-50 p-2 text-blue-700">
-              <Users size={16} />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-black text-blue-900">{activePartnersCount} / {partners.length}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Active investor cycles</span>
+          <span className="text-[10px] text-slate-500 font-medium">
+            {activePartnersCount} open cycle(s) · {partners.length} total partner(s)
+          </span>
         </div>
 
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
@@ -170,24 +163,39 @@ export function PartnersManagementPanel({
             </div>
           </div>
           <div className="mt-2 text-2xl font-black text-rose-900">{naira(totalExpenses)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Feed, DOC, vaccines, care</span>
+          <span className="text-[10px] text-slate-500 font-medium">Funded by partner capital</span>
         </div>
 
         <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
-              Partner Revenue Keyed
+              Partner Sales Keyed
             </span>
             <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
               <TrendingUp size={16} />
             </div>
           </div>
           <div className="mt-2 text-2xl font-black text-emerald-900">{naira(totalIncome)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Recorded bird offload sales</span>
+          <span className="text-[10px] text-slate-500 font-medium">
+            Cycle Net: {signedNaira(totalIncome - totalExpenses)}
+          </span>
+        </div>
+
+        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
+              Payout Balance Due
+            </span>
+            <div className="rounded-xl bg-amber-50 p-2 text-amber-700">
+              <Banknote size={16} />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-black text-amber-900">{naira(totalPayoutBalanceOwed)}</div>
+          <span className="text-[10px] text-slate-500 font-medium">Remaining owed across partners</span>
         </div>
       </div>
 
-      {/* Main Workspace: Either Partner Detail OR Partners Directory */}
+      {/* Main Workspace */}
       {selectedPartnerId ? (
         <PartnerDetailView
           passcode={passcode}
@@ -204,13 +212,13 @@ export function PartnersManagementPanel({
             <div>
               <h3 className="text-lg font-bold text-[#0F3D24]">All Partners Over Time</h3>
               <p className="text-xs text-[#0F3D24]/65">
-                Click any partner to open their dedicated ledger, key in expenses/income, or log daily activities.
+                Click any partner to inspect their live charts, key in expenses/income/payouts, or settle their cycle.
               </p>
             </div>
             <div className="w-full sm:w-72">
               <input
                 type="text"
-                placeholder="Search by name, username, phone..."
+                placeholder="Search by name, username, cycle..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-full border border-slate-200 bg-[#F7F5F0]/60 px-4 py-2 text-xs font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
@@ -229,78 +237,106 @@ export function PartnersManagementPanel({
               <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
                 {searchTerm
                   ? "No partners match your search criteria. Try a different query."
-                  : "You have not registered any partners yet. Click 'Register New Partner' above to add your first investor."}
+                  : "You have not registered any partners yet. Click 'Register New Partner' above to onboard your first investor."}
               </p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredPartners.map((partner) => (
-                <div
-                  key={partner.id}
-                  onClick={() => setSelectedPartnerId(partner.id)}
-                  className="group relative cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-[#3F8F3F]/50 hover:shadow-md flex flex-col justify-between"
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#3F8F3F]">
-                          {partner.projectName}
+              {filteredPartners.map((partner) => {
+                const s = partner.settlement;
+                const isLoss = s.result === "loss";
+                const isProfit = s.result === "profit";
+                return (
+                  <div
+                    key={partner.id}
+                    onClick={() => setSelectedPartnerId(partner.id)}
+                    className="group relative cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-[#3F8F3F]/50 hover:shadow-md flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#3F8F3F]">
+                            {partner.projectName} · {partner.cycleName}
+                          </span>
+                          <h4 className="text-base font-black text-[#0F3D24] group-hover:text-[#3F8F3F] transition-colors">
+                            {partner.fullName}
+                          </h4>
+                          <div className="text-[11px] font-medium text-slate-500">
+                            @{partner.username} · {partner.phone}
+                          </div>
+                        </div>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
+                            partner.cycleStatus === "closed"
+                              ? "bg-slate-800 text-white"
+                              : "bg-emerald-100 text-emerald-800"
+                          }`}
+                        >
+                          {partner.cycleStatus === "closed" ? (
+                            <>
+                              <Lock size={10} /> Settled
+                            </>
+                          ) : (
+                            "Open"
+                          )}
                         </span>
-                        <h4 className="text-base font-black text-[#0F3D24] group-hover:text-[#3F8F3F] transition-colors">
-                          {partner.fullName}
-                        </h4>
-                        <div className="text-[11px] font-medium text-slate-500">
-                          @{partner.username} · {partner.phone}
-                        </div>
                       </div>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
-                          partner.status === "active"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : partner.status === "matured"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {partner.status}
-                      </span>
-                    </div>
 
-                    <div className="rounded-xl bg-[#F7F5F0] p-3 text-xs space-y-1.5">
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span>Invested Capital:</span>
-                        <strong className="text-[#0F3D24] font-bold">{naira(partner.initialInvestment)}</strong>
+                      {/* Sharing Split Badge */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
+                        <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-emerald-800">
+                          {partner.profitSharePercentage}% Profit Share
+                        </span>
+                        <span className="rounded-lg bg-rose-50 border border-rose-200 px-2 py-0.5 text-rose-800">
+                          {partner.lossSharePercentage}% Loss Responsibility
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between text-slate-600">
-                        <span>Investment Date:</span>
-                        <span className="font-semibold text-slate-800">{partner.investmentDate}</span>
-                      </div>
-                      {partner.targetRoiPercentage > 0 && (
+
+                      <div className="rounded-xl bg-[#F7F5F0] p-3 text-xs space-y-1.5">
                         <div className="flex items-center justify-between text-slate-600">
-                          <span>Target ROI:</span>
-                          <span className="font-bold text-emerald-700">+{partner.targetRoiPercentage}%</span>
+                          <span>Invested Capital:</span>
+                          <strong className="text-[#0F3D24] font-bold">{naira(partner.initialInvestment)}</strong>
                         </div>
-                      )}
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Partner Result ({s.roiPercent > 0 ? `+${s.roiPercent}%` : `${s.roiPercent}%`}):</span>
+                          <strong
+                            className={`font-black ${
+                              isLoss ? "text-rose-700" : isProfit ? "text-emerald-700" : "text-slate-700"
+                            }`}
+                          >
+                            {signedNaira(s.partnerSignedResult)}
+                          </strong>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-600">
+                          <span>Payout Due / Balance:</span>
+                          <span className="font-bold text-[#0F3D24]">
+                            {naira(s.payoutDue)}{" "}
+                            <span className="text-[10px] text-slate-500">
+                              (Bal: {naira(Math.max(0, s.balanceOwed))})
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-center text-xs pt-1">
+                        <div className="rounded-xl bg-rose-50/70 p-2 border border-rose-100">
+                          <span className="text-[10px] font-bold uppercase text-rose-800 block">Expenses</span>
+                          <strong className="text-rose-950 font-black">{naira(s.totalExpenses)}</strong>
+                        </div>
+                        <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100">
+                          <span className="text-[10px] font-bold uppercase text-emerald-800 block">Sales</span>
+                          <strong className="text-emerald-950 font-black">{naira(s.totalIncome)}</strong>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-center text-xs pt-1">
-                      <div className="rounded-xl bg-rose-50/70 p-2 border border-rose-100">
-                        <span className="text-[10px] font-bold uppercase text-rose-800 block">Expenses</span>
-                        <strong className="text-rose-950 font-black">{naira(partner.totalExpenses)}</strong>
-                      </div>
-                      <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100">
-                        <span className="text-[10px] font-bold uppercase text-emerald-800 block">Revenue</span>
-                        <strong className="text-emerald-950 font-black">{naira(partner.totalIncome)}</strong>
-                      </div>
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#3F8F3F]">
+                      <span>Open Partner Workspace</span>
+                      <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
-
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#3F8F3F]">
-                    <span>Open Partner Workspace</span>
-                    <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -322,7 +358,7 @@ export function PartnersManagementPanel({
   );
 }
 
-// ─── PARTNER DETAIL WORKSPACE COMPONENT ────────────────────────────────────────
+// ─── PARTNER DETAIL WORKSPACE COMPONENT ──────────────────────────────────────
 
 function PartnerDetailView({
   passcode,
@@ -336,18 +372,26 @@ function PartnerDetailView({
   onBack: () => void;
 }) {
   const qc = useQueryClient();
-  const [activeSubTab, setActiveSubTab] = useState<"financials" | "activities" | "credentials">("financials");
+  const [activeSubTab, setActiveSubTab] = useState<
+    "overview" | "financials" | "activities" | "credentials"
+  >("overview");
 
   const getPartnerDetailFn = useServerFn(adminGetPartnerDetail);
+  const closeCycleFn = useServerFn(adminClosePartnerCycle);
+  const reopenCycleFn = useServerFn(adminReopenPartnerCycle);
+
+  const [settling, setSettling] = useState(false);
+
   const detailQuery = useQuery({
     queryKey: ["admin-partner-detail", passcode, partnerId],
     queryFn: () => getPartnerDetailFn({ data: { passcode, partnerId } }),
     staleTime: 5_000,
   });
 
-  const partner = detailQuery.data?.partner;
-  const financials = detailQuery.data?.financials || [];
-  const activities = detailQuery.data?.activities || [];
+  const refreshDetail = () => {
+    qc.invalidateQueries({ queryKey: ["admin-partner-detail", passcode, partnerId] });
+    qc.invalidateQueries({ queryKey: ["admin-partners"] });
+  };
 
   if (detailQuery.isLoading) {
     return (
@@ -358,7 +402,7 @@ function PartnerDetailView({
     );
   }
 
-  if (!partner) {
+  if (!detailQuery.data?.partner) {
     return (
       <div className="rounded-3xl bg-white p-12 text-center shadow-sm">
         <AlertTriangle className="mx-auto text-amber-500" size={36} />
@@ -373,35 +417,94 @@ function PartnerDetailView({
     );
   }
 
+  const { partner, financials, activities, charts, summary } = detailQuery.data;
+  const s = partner.settlement;
+
+  const handleCloseCycle = async () => {
+    if (
+      !confirm(
+        `Close & Settle ${partner.cycleName} for ${partner.fullName}?\n\nThis will stamp the final settlement statement (Partner Result: ${signedNaira(s.partnerSignedResult)}, Payout Due: ${naira(s.payoutDue)}) and lock new expenses/income unless re-opened.`,
+      )
+    )
+      return;
+    setSettling(true);
+    try {
+      await closeCycleFn({ data: { passcode, partnerId: partner.id } });
+      refreshDetail();
+    } catch (err: any) {
+      alert(err instanceof Error ? err.message : "Could not close cycle.");
+    } finally {
+      setSettling(false);
+    }
+  };
+
+  const handleReopenCycle = async () => {
+    const reason = prompt("Enter a reason for re-opening this settled cycle (visible in the partner's audit log):");
+    if (!reason || reason.trim().length < 3) return;
+    setSettling(true);
+    try {
+      await reopenCycleFn({ data: { passcode, partnerId: partner.id, reason: reason.trim() } });
+      refreshDetail();
+    } catch (err: any) {
+      alert(err instanceof Error ? err.message : "Could not re-open cycle.");
+    } finally {
+      setSettling(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Navigation & Profile Card */}
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 text-xs font-bold text-[#3F8F3F] hover:underline"
-        >
-          <ArrowLeft size={15} /> Back to All Partners
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#3F8F3F] hover:underline"
+          >
+            <ArrowLeft size={15} /> Back to All Partners
+          </button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {partner.cycleStatus === "open" ? (
+              <button
+                type="button"
+                disabled={settling}
+                onClick={handleCloseCycle}
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-[#165232] disabled:opacity-50 transition"
+              >
+                <Lock size={13} /> {settling ? "Settling..." : "Close & Settle Cycle"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={settling}
+                onClick={handleReopenCycle}
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 text-xs font-extrabold text-amber-900 hover:bg-amber-200 disabled:opacity-50 transition"
+              >
+                <Unlock size={13} /> Re-open Settled Cycle
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F] bg-[#3F8F3F]/10 px-2.5 py-0.5 rounded-full">
-                {partner.projectName}
+                {partner.projectName} · {partner.cycleName}
               </span>
-              <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
-                  partner.status === "active" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-800"
-                }`}
-              >
-                {partner.status}
+              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
+                {partner.profitSharePercentage}% Profit Share
+              </span>
+              <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800">
+                {partner.lossSharePercentage}% Loss Share
               </span>
             </div>
             <h2 className="text-2xl font-black text-[#0F3D24]">{partner.fullName}</h2>
             <p className="text-xs text-slate-600">
-              Username: <strong className="font-mono text-[#0F3D24]">@{partner.username}</strong> · Phone: {partner.phone}
+              Username: <strong className="font-mono text-[#0F3D24]">@{partner.username}</strong> · Phone:{" "}
+              {partner.phone}
               {partner.email && ` · Email: ${partner.email}`}
             </p>
           </div>
@@ -411,15 +514,44 @@ function PartnerDetailView({
               <div className="text-[10px] font-bold uppercase text-slate-500">Capital Invested</div>
               <div className="text-lg font-black text-[#0F3D24]">{naira(partner.initialInvestment)}</div>
             </div>
-            <div className="rounded-2xl bg-emerald-50 px-4 py-2.5 border border-emerald-200 text-right">
-              <div className="text-[10px] font-bold uppercase text-emerald-700">Net Profit to Date</div>
-              <div className="text-lg font-black text-emerald-950">{naira(partner.netProfit)}</div>
+            <div
+              className={`rounded-2xl px-4 py-2.5 border text-right ${
+                s.result === "loss"
+                  ? "bg-rose-50 border-rose-200"
+                  : "bg-emerald-50 border-emerald-200"
+              }`}
+            >
+              <div
+                className={`text-[10px] font-bold uppercase ${
+                  s.result === "loss" ? "text-rose-700" : "text-emerald-700"
+                }`}
+              >
+                Partner Share ({s.roiPercent > 0 ? `+${s.roiPercent}%` : `${s.roiPercent}%`} ROI)
+              </div>
+              <div
+                className={`text-lg font-black ${
+                  s.result === "loss" ? "text-rose-950" : "text-emerald-950"
+                }`}
+              >
+                {signedNaira(s.partnerSignedResult)}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-2">
+        {/* Sub-Tab Switcher */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveSubTab("overview")}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+              activeSubTab === "overview"
+                ? "bg-[#0F3D24] text-white shadow-sm"
+                : "text-slate-600 hover:bg-slate-100"
+            }`}
+          >
+            <BarChart3 size={14} /> Charts, Settlement & Payouts
+          </button>
           <button
             type="button"
             onClick={() => setActiveSubTab("financials")}
@@ -429,7 +561,7 @@ function PartnerDetailView({
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Receipt size={14} /> Key In Expenses & Income ({financials.length})
+            <Receipt size={14} /> Key In Expenses, Income & Payouts ({financials.length})
           </button>
           <button
             type="button"
@@ -451,39 +583,55 @@ function PartnerDetailView({
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <KeyRound size={14} /> Partner Account & Portal Access
+            <KeyRound size={14} /> Edit Terms, Cycle & Portal Access
           </button>
         </div>
       </div>
 
-      {/* Tab 1: Financials (Expenses & Income) */}
+      {/* Sub-Tab 1: Overview, Charts & Settlement (Mirrors what the Partner sees!) */}
+      {activeSubTab === "overview" && (
+        <div className="space-y-6">
+          <ResultHero partner={partner} />
+          <TermsBanner partner={partner} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <SettlementBreakdown partner={partner} />
+            <PayoutTracker partner={partner} financials={financials} />
+          </div>
+          <PartnerCharts charts={charts} settlement={s} partnerLabel={partner.fullName} />
+          <HowCalculated partner={partner} />
+          <AuditTimeline partner={partner} />
+        </div>
+      )}
+
+      {/* Sub-Tab 2: Financials Keying (Expense, Income, Payout) */}
       {activeSubTab === "financials" && (
         <PartnerFinancialsSubPanel
           passcode={passcode}
           partner={partner}
           financials={financials}
-          batches={batches}
-          onRefresh={() => qc.invalidateQueries({ queryKey: ["admin-partner-detail", passcode, partnerId] })}
+          onRefresh={refreshDetail}
         />
       )}
 
-      {/* Tab 2: Activities & Stock Logs */}
+      {/* Sub-Tab 3: Activities & Stock Logs */}
       {activeSubTab === "activities" && (
         <PartnerActivitiesSubPanel
           passcode={passcode}
           partner={partner}
           activities={activities}
-          batches={batches}
-          onRefresh={() => qc.invalidateQueries({ queryKey: ["admin-partner-detail", passcode, partnerId] })}
+          summary={summary}
+          onRefresh={refreshDetail}
         />
       )}
 
-      {/* Tab 3: Credentials & Settings */}
+      {/* Sub-Tab 4: Edit Terms, Cycle & Portal Access */}
       {activeSubTab === "credentials" && (
         <PartnerCredentialsSubPanel
           passcode={passcode}
           partner={partner}
-          onRefresh={() => qc.invalidateQueries({ queryKey: ["admin-partner-detail", passcode, partnerId] })}
+          batches={batches}
+          hasEntries={financials.some((f) => !f.removedAt)}
+          onRefresh={refreshDetail}
           onDeleted={onBack}
         />
       )}
@@ -491,25 +639,23 @@ function PartnerDetailView({
   );
 }
 
-// ─── SUBPANEL: FINANCIALS KEYING ──────────────────────────────────────────────
+// ─── SUBPANEL: FINANCIALS KEYING (EXPENSE / INCOME / PAYOUT) ─────────────────
 
 function PartnerFinancialsSubPanel({
   passcode,
   partner,
   financials,
-  batches,
   onRefresh,
 }: {
   passcode: string;
   partner: FarmPartner;
   financials: PartnerFinancial[];
-  batches: any[];
   onRefresh: () => void;
 }) {
   const recordFinancialFn = useServerFn(adminRecordPartnerFinancial);
   const deleteFinancialFn = useServerFn(adminDeletePartnerFinancial);
 
-  const [type, setType] = useState<"expense" | "income">("expense");
+  const [type, setType] = useState<"expense" | "income" | "payout">("expense");
   const [category, setCategory] = useState("Feed & Nutrition");
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -518,6 +664,9 @@ function PartnerFinancialsSubPanel({
   const [referenceNo, setReferenceNo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  const s = partner.settlement;
+  const isClosed = partner.cycleStatus === "closed";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -551,23 +700,26 @@ function PartnerFinancialsSubPanel({
       setAmount("");
       setDescription("");
       setReferenceNo("");
-      setMsg("Financial entry saved successfully.");
+      setMsg("Entry recorded and reflected in partner portal.");
       setTimeout(() => setMsg(null), 3000);
       onRefresh();
     } catch (err: any) {
-      setMsg(err instanceof Error ? err.message : "Could not record financial entry.");
+      setMsg(err instanceof Error ? err.message : "Could not record entry.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this financial record?")) return;
+  const handleRemove = async (id: string) => {
+    const reason = prompt(
+      "Enter a reason for removing this entry (for full transparency, the partner will see that this entry was removed along with your reason):",
+    );
+    if (!reason || reason.trim().length < 3) return;
     try {
-      await deleteFinancialFn({ data: { passcode, financialId: id } });
+      await deleteFinancialFn({ data: { passcode, financialId: id, reason: reason.trim() } });
       onRefresh();
     } catch (err: any) {
-      alert(err instanceof Error ? err.message : "Could not delete entry.");
+      alert(err instanceof Error ? err.message : "Could not remove entry.");
     }
   };
 
@@ -579,40 +731,81 @@ function PartnerFinancialsSubPanel({
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F]">
             Direct Key-In
           </span>
-          <h3 className="text-base font-black text-[#0F3D24]">Record Financial Entry</h3>
+          <h3 className="text-base font-black text-[#0F3D24]">Record Ledger Entry</h3>
           <p className="text-xs text-slate-500">
-            Transactions keyed here immediately reflect in {partner.fullName}'s transparent portal.
+            Expenses & sales update profit/loss; payouts reduce the balance owed to {partner.fullName}.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          {/* Expense / Income Toggle */}
-          <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#F7F5F0] p-1">
+          {/* Expense / Income / Payout Toggle */}
+          <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-[#F7F5F0] p-1">
             <button
               type="button"
+              disabled={isClosed}
               onClick={() => {
                 setType("expense");
                 setCategory("Feed & Nutrition");
               }}
               className={`rounded-lg py-2 font-bold transition ${
-                type === "expense" ? "bg-rose-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                type === "expense"
+                  ? "bg-rose-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 disabled:opacity-40"
               }`}
             >
-              Expense (Cost)
+              Expense
             </button>
             <button
               type="button"
+              disabled={isClosed}
               onClick={() => {
                 setType("income");
                 setCategory("Bird Offload / Sales");
               }}
               className={`rounded-lg py-2 font-bold transition ${
-                type === "income" ? "bg-emerald-600 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                type === "income"
+                  ? "bg-emerald-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900 disabled:opacity-40"
               }`}
             >
-              Income (Revenue)
+              Income
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setType("payout");
+                setCategory("Partner Payout / Remittance");
+              }}
+              className={`rounded-lg py-2 font-bold transition ${
+                type === "payout"
+                  ? "bg-[#0F3D24] text-white shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Payout
             </button>
           </div>
+
+          {type === "payout" && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-semibold text-amber-900">Balance currently owed:</span>
+                <strong className="font-black text-amber-950">{naira(Math.max(0, s.balanceOwed))}</strong>
+              </div>
+              {s.balanceOwed > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAmount(String(Math.round(s.balanceOwed)));
+                    if (!description) setDescription(`Settlement payout to ${partner.fullName}`);
+                  }}
+                  className="text-[11px] font-bold text-[#3F8F3F] hover:underline"
+                >
+                  Fill full remaining balance ({naira(s.balanceOwed)})
+                </button>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Category</label>
@@ -633,13 +826,18 @@ function PartnerFinancialsSubPanel({
                   <option value="Logistics & Delivery">Logistics & Delivery</option>
                   <option value="Other Expense">Other Expense</option>
                 </>
-              ) : (
+              ) : type === "income" ? (
                 <>
                   <option value="Bird Offload / Sales">Bird Offload / Sales</option>
                   <option value="Eggs / Produce Sales">Eggs / Produce Sales</option>
                   <option value="Manure / By-Product Sales">Manure / By-Product Sales</option>
-                  <option value="Capital Repayment / Payout">Capital Repayment / Payout</option>
                   <option value="Other Revenue">Other Revenue</option>
+                </>
+              ) : (
+                <>
+                  <option value="Partner Payout / Remittance">Partner Payout / Remittance</option>
+                  <option value="Capital Return">Capital Return</option>
+                  <option value="Profit Share Disbursement">Profit Share Disbursement</option>
                 </>
               )}
             </select>
@@ -663,7 +861,11 @@ function PartnerFinancialsSubPanel({
             <input
               type="text"
               required
-              placeholder="e.g. 50 bags Broiler Finisher feed purchased"
+              placeholder={
+                type === "payout"
+                  ? "e.g. First tranche payout via Moniepoint"
+                  : "e.g. 50 bags Broiler Finisher feed purchased"
+              }
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
@@ -709,7 +911,7 @@ function PartnerFinancialsSubPanel({
           {msg && (
             <div
               className={`rounded-xl p-2.5 text-xs font-semibold ${
-                msg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+                msg.includes("reflected") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
               }`}
             >
               {msg}
@@ -721,31 +923,36 @@ function PartnerFinancialsSubPanel({
             disabled={submitting}
             className="w-full rounded-xl bg-[#0F3D24] py-2.5 font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition"
           >
-            {submitting ? "Recording..." : "Record Transaction"}
+            {submitting ? "Recording..." : `Record ${type === "payout" ? "Payout" : "Transaction"}`}
           </button>
         </form>
       </div>
 
       {/* Financial Ledger Table */}
       <div className="lg:col-span-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-black text-[#0F3D24]">Itemized Investment Ledger</h3>
-            <p className="text-xs text-slate-500">Every naira recorded for this investment.</p>
+            <p className="text-xs text-slate-500">
+              Line-by-line expenses, sales, and payouts. Removed entries stay visible with reason for transparency.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-800">
-              Total Costs: {naira(partner.totalExpenses)}
+              Expenses: {naira(s.totalExpenses)}
             </span>
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
-              Total Inflows: {naira(partner.totalIncome)}
+              Sales: {naira(s.totalIncome)}
+            </span>
+            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-[#0F3D24]">
+              Paid Out: {naira(s.paidOut)}
             </span>
           </div>
         </div>
 
         {financials.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">
-            No financial entries have been recorded yet for this partner. Use the form on the left to key in expenses or revenue.
+            No financial entries have been recorded yet for this partner.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -761,40 +968,68 @@ function PartnerFinancialsSubPanel({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {financials.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50/60">
-                    <td className="py-2.5 font-medium text-slate-600 whitespace-nowrap">{row.transactionDate}</td>
-                    <td className="py-2.5">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                          row.type === "expense" ? "bg-rose-100 text-rose-800" : "bg-emerald-100 text-emerald-800"
+                {financials.map((row) => {
+                  const removed = Boolean(row.removedAt);
+                  return (
+                    <tr key={row.id} className={removed ? "bg-slate-50 opacity-60" : "hover:bg-slate-50/60"}>
+                      <td className="py-2.5 font-medium text-slate-600 whitespace-nowrap">
+                        {row.transactionDate}
+                      </td>
+                      <td className="py-2.5">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                            removed
+                              ? "bg-slate-200 text-slate-600"
+                              : row.type === "expense"
+                                ? "bg-rose-100 text-rose-800"
+                                : row.type === "income"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {removed ? "removed" : row.type}
+                        </span>
+                      </td>
+                      <td className={`py-2.5 font-bold text-[#0F3D24] ${removed ? "line-through" : ""}`}>
+                        {row.category}
+                      </td>
+                      <td className="py-2.5 text-slate-700 max-w-xs">
+                        <span className={removed ? "line-through" : ""}>{row.description}</span>
+                        {removed && (
+                          <span className="block text-[10px] font-semibold text-rose-700">
+                            Removed ({row.removalReason || "no reason"})
+                          </span>
+                        )}
+                      </td>
+                      <td
+                        className={`py-2.5 text-right font-black ${
+                          removed
+                            ? "line-through text-slate-400"
+                            : row.type === "expense"
+                              ? "text-rose-700"
+                              : row.type === "income"
+                                ? "text-emerald-700"
+                                : "text-blue-700"
                         }`}
                       >
-                        {row.type}
-                      </span>
-                    </td>
-                    <td className="py-2.5 font-bold text-[#0F3D24]">{row.category}</td>
-                    <td className="py-2.5 text-slate-700 max-w-xs truncate">{row.description}</td>
-                    <td
-                      className={`py-2.5 text-right font-black ${
-                        row.type === "expense" ? "text-rose-700" : "text-emerald-700"
-                      }`}
-                    >
-                      {row.type === "expense" ? "-" : "+"}
-                      {naira(row.amount)}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(row.id)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                        title="Delete entry"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        {row.type === "expense" ? "-" : row.type === "income" ? "+" : ""}
+                        {naira(row.amount)}
+                      </td>
+                      <td className="py-2.5 text-right">
+                        {!removed && !isClosed && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(row.id)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                            title="Remove entry (with reason)"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -810,13 +1045,13 @@ function PartnerActivitiesSubPanel({
   passcode,
   partner,
   activities,
-  batches,
+  summary,
   onRefresh,
 }: {
   passcode: string;
   partner: FarmPartner;
   activities: PartnerActivity[];
-  batches: any[];
+  summary: { currentStockCount: number; totalFeedConsumedKg: number; totalMortalityCount: number; mortalityRatePercent: number };
   onRefresh: () => void;
 }) {
   const recordActivityFn = useServerFn(adminRecordPartnerActivity);
@@ -832,6 +1067,8 @@ function PartnerActivitiesSubPanel({
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  const isClosed = partner.cycleStatus === "closed";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -869,13 +1106,14 @@ function PartnerActivitiesSubPanel({
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this activity log?")) return;
+  const handleRemove = async (id: string) => {
+    const reason = prompt("Enter a reason for removing this activity log:");
+    if (!reason || reason.trim().length < 3) return;
     try {
-      await deleteActivityFn({ data: { passcode, activityId: id } });
+      await deleteActivityFn({ data: { passcode, activityId: id, reason: reason.trim() } });
       onRefresh();
     } catch (err: any) {
-      alert(err instanceof Error ? err.message : "Could not delete activity.");
+      alert(err instanceof Error ? err.message : "Could not remove activity.");
     }
   };
 
@@ -889,7 +1127,8 @@ function PartnerActivitiesSubPanel({
           </span>
           <h3 className="text-base font-black text-[#0F3D24]">Log Farm Activity / Stock</h3>
           <p className="text-xs text-slate-500">
-            Log birds stocked, feeding, mortality, and health updates for {partner.fullName}.
+            Live birds: <strong>{summary.currentStockCount}</strong> · Mortality:{" "}
+            <strong>{summary.totalMortalityCount} ({summary.mortalityRatePercent}%)</strong>
           </p>
         </div>
 
@@ -1013,10 +1252,10 @@ function PartnerActivitiesSubPanel({
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || isClosed}
             className="w-full rounded-xl bg-[#0F3D24] py-2.5 font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition"
           >
-            {submitting ? "Logging..." : "Log Activity"}
+            {isClosed ? "Cycle Settled (Locked)" : submitting ? "Logging..." : "Log Activity"}
           </button>
         </form>
       </div>
@@ -1030,51 +1269,80 @@ function PartnerActivitiesSubPanel({
 
         {activities.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">
-            No activity logs have been recorded for this partner yet. Use the form on the left to log feeding, mortality, or stock arrivals.
+            No activity logs have been recorded for this partner yet.
           </div>
         ) : (
           <div className="space-y-3">
-            {activities.map((act) => (
-              <div
-                key={act.id}
-                className="flex items-start justify-between rounded-2xl border border-slate-200 bg-[#F7F5F0]/50 p-4 transition-all hover:bg-[#F7F5F0]"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-500">{act.activityDate}</span>
-                    <span className="inline-flex items-center rounded-full bg-[#3F8F3F]/15 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0F3D24]">
-                      {act.activityType}
-                    </span>
-                    {act.mortalityCount > 0 && (
-                      <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800">
-                        {act.mortalityCount} Mortality
-                      </span>
-                    )}
-                    {act.stockHeadcount > 0 && (
-                      <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-800">
-                        +{act.stockHeadcount} Birds Stocked
-                      </span>
-                    )}
-                  </div>
-                  {act.notes && <p className="text-xs font-medium text-slate-800">{act.notes}</p>}
-                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
-                    {act.feedConsumedKg > 0 && <span>Feed: <strong>{act.feedConsumedKg} kg</strong></span>}
-                    {act.averageWeightKg > 0 && <span>Avg Weight: <strong>{act.averageWeightKg} kg</strong></span>}
-                    {act.causeOfMortality && <span>Cause: {act.causeOfMortality}</span>}
-                    <span>Recorded by: @{act.recordedBy || "owner"}</span>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleDelete(act.id)}
-                  className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
-                  title="Delete log"
+            {activities.map((act) => {
+              const removed = Boolean(act.removedAt);
+              return (
+                <div
+                  key={act.id}
+                  className={`flex items-start justify-between rounded-2xl border p-4 transition-all ${
+                    removed
+                      ? "border-slate-200 bg-slate-50 opacity-60"
+                      : "border-slate-200 bg-[#F7F5F0]/50 hover:bg-[#F7F5F0]"
+                  }`}
                 >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-500">{act.activityDate}</span>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                          removed ? "bg-slate-200 text-slate-600 line-through" : "bg-[#3F8F3F]/15 text-[#0F3D24]"
+                        }`}
+                      >
+                        {act.activityType}
+                      </span>
+                      {act.mortalityCount > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800">
+                          {act.mortalityCount} Mortality
+                        </span>
+                      )}
+                      {act.stockHeadcount > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-800">
+                          +{act.stockHeadcount} Birds Stocked
+                        </span>
+                      )}
+                    </div>
+                    {act.notes && (
+                      <p className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}>
+                        {act.notes}
+                      </p>
+                    )}
+                    {removed && (
+                      <p className="text-[11px] font-semibold text-rose-700">
+                        Removed ({act.removalReason || "no reason"})
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                      {act.feedConsumedKg > 0 && (
+                        <span>
+                          Feed: <strong>{act.feedConsumedKg} kg</strong>
+                        </span>
+                      )}
+                      {act.averageWeightKg > 0 && (
+                        <span>
+                          Avg Weight: <strong>{act.averageWeightKg} kg</strong>
+                        </span>
+                      )}
+                      {act.causeOfMortality && <span>Cause: {act.causeOfMortality}</span>}
+                    </div>
+                  </div>
+
+                  {!removed && !isClosed && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemove(act.id)}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition"
+                      title="Remove log"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1082,22 +1350,47 @@ function PartnerActivitiesSubPanel({
   );
 }
 
-// ─── SUBPANEL: CREDENTIALS & SETTINGS ─────────────────────────────────────────
+// ─── SUBPANEL: EDIT TERMS, CYCLE & PORTAL ACCESS ─────────────────────────────
 
 function PartnerCredentialsSubPanel({
   passcode,
   partner,
+  batches,
+  hasEntries,
   onRefresh,
   onDeleted,
 }: {
   passcode: string;
   partner: FarmPartner;
+  batches: any[];
+  hasEntries: boolean;
   onRefresh: () => void;
   onDeleted: () => void;
 }) {
+  const updatePartnerFn = useServerFn(adminUpdatePartner);
   const resetPasscodeFn = useServerFn(adminResetPartnerPasscode);
   const toggleActiveFn = useServerFn(adminTogglePartnerActive);
   const deletePartnerFn = useServerFn(adminDeletePartner);
+
+  // Edit Partner & Terms state
+  const [fullName, setFullName] = useState(partner.fullName);
+  const [phone, setPhone] = useState(partner.phone);
+  const [email, setEmail] = useState(partner.email || "");
+  const [address, setAddress] = useState(partner.address || "");
+  const [projectName, setProjectName] = useState(partner.projectName);
+  const [cycleName, setCycleName] = useState(partner.cycleName);
+  const [cycleStartDate, setCycleStartDate] = useState(partner.cycleStartDate || partner.investmentDate);
+  const [cycleEndDate, setCycleEndDate] = useState(partner.cycleEndDate || "");
+  const [initialInvestment, setInitialInvestment] = useState(String(partner.initialInvestment));
+  const [investmentDate, setInvestmentDate] = useState(partner.investmentDate);
+  const [profitShare, setProfitShare] = useState(String(partner.profitSharePercentage));
+  const [lossShare, setLossShare] = useState(String(partner.lossSharePercentage));
+  const [agreedTerms, setAgreedTerms] = useState(partner.agreedTerms || "");
+  const [batchId, setBatchId] = useState(partner.batchId || "");
+  const [status, setStatus] = useState<FarmPartner["status"]>(partner.status);
+  const [amendReason, setAmendReason] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editMsg, setEditMsg] = useState<string | null>(null);
 
   const [newPassword, setNewPassword] = useState("");
   const [resetMsg, setResetMsg] = useState<string | null>(null);
@@ -1105,6 +1398,49 @@ function PartnerCredentialsSubPanel({
   const [copied, setCopied] = useState(false);
 
   const portalUrl = typeof window !== "undefined" ? `${window.location.origin}/for-partners` : "/for-partners";
+
+  const termsChanged =
+    Number(profitShare) !== partner.profitSharePercentage ||
+    Number(lossShare) !== partner.lossSharePercentage ||
+    Number(initialInvestment) !== partner.initialInvestment;
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingEdit(true);
+    setEditMsg(null);
+    try {
+      await updatePartnerFn({
+        data: {
+          passcode,
+          partnerId: partner.id,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          email: email.trim() || null,
+          address: address.trim() || null,
+          initialInvestment: Number(initialInvestment) || 0,
+          investmentDate,
+          profitSharePercentage: Number(profitShare),
+          lossSharePercentage: Number(lossShare),
+          agreedTerms: agreedTerms.trim() || null,
+          projectName: projectName.trim(),
+          cycleName: cycleName.trim(),
+          cycleStartDate,
+          cycleEndDate: cycleEndDate || null,
+          batchId: batchId || null,
+          status,
+          amendReason: amendReason.trim() || null,
+        },
+      });
+      setAmendReason("");
+      setEditMsg("Partner profile & sharing terms updated successfully!");
+      setTimeout(() => setEditMsg(null), 3500);
+      onRefresh();
+    } catch (err: any) {
+      setEditMsg(err instanceof Error ? err.message : "Could not update partner.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleResetPasscode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1165,122 +1501,273 @@ function PartnerCredentialsSubPanel({
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* Portal Credentials Card */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+    <div className="grid gap-6 lg:grid-cols-12">
+      {/* Left: Edit Partner, Cycle & Profit/Loss Sharing Split */}
+      <form
+        onSubmit={handleSaveEdit}
+        className="lg:col-span-7 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4 text-xs"
+      >
+        <div className="flex items-center gap-2">
+          <Pencil size={15} className="text-[#3F8F3F]" />
+          <h3 className="text-base font-black text-[#0F3D24]">
+            Edit Partner Profile, Cycle & Profit/Loss Split
+          </h3>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Full Name *</label>
+            <input
+              type="text"
+              required
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-medium text-[#0F3D24]"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Phone *</label>
+            <input
+              type="tel"
+              required
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-medium text-[#0F3D24]"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Capital Invested (₦) *</label>
+            <input
+              type="number"
+              required
+              min={0}
+              value={initialInvestment}
+              onChange={(e) => setInitialInvestment(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-bold text-[#0F3D24]"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-emerald-800 mb-1">Partner Profit Share (%)</label>
+            <input
+              type="number"
+              required
+              min={0}
+              max={100}
+              step="0.5"
+              value={profitShare}
+              onChange={(e) => setProfitShare(e.target.value)}
+              className="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2 font-black text-emerald-900"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-rose-800 mb-1">Partner Loss Share (%)</label>
+            <input
+              type="number"
+              required
+              min={0}
+              max={100}
+              step="0.5"
+              value={lossShare}
+              onChange={(e) => setLossShare(e.target.value)}
+              className="w-full rounded-xl border border-rose-300 bg-rose-50/40 px-3 py-2 font-black text-rose-900"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Cycle Name *</label>
+            <input
+              type="text"
+              required
+              value={cycleName}
+              onChange={(e) => setCycleName(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold text-[#0F3D24]"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Cycle Start Date *</label>
+            <input
+              type="date"
+              required
+              value={cycleStartDate}
+              onChange={(e) => setCycleStartDate(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-medium text-[#0F3D24]"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Cycle End / Maturity Date</label>
+            <input
+              type="date"
+              value={cycleEndDate}
+              onChange={(e) => setCycleEndDate(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-medium text-[#0F3D24]"
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Project Name</label>
+            <input
+              type="text"
+              required
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2 font-semibold text-[#0F3D24]"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-[#0F3D24] mb-1">Linked Farm Batch</label>
+            <select
+              value={batchId}
+              onChange={(e) => setBatchId(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-medium text-[#0F3D24]"
+            >
+              <option value="">No linked batch (independent slot)</option>
+              {batches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.batchName} ({b.batchType})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div>
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F]">
-            Partner Login Credentials
-          </span>
-          <h3 className="text-base font-black text-[#0F3D24]">Portal Access Info</h3>
-          <p className="text-xs text-slate-500">
-            Share these login credentials with {partner.fullName} so they can access their Partners Account.
-          </p>
+          <label className="block font-bold text-[#0F3D24] mb-1">Agreed Terms & Notes</label>
+          <textarea
+            rows={2}
+            value={agreedTerms}
+            onChange={(e) => setAgreedTerms(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2 text-[#0F3D24]"
+          />
         </div>
 
-        <div className="rounded-2xl bg-[#F7F5F0] p-4 space-y-2 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Portal Login URL:</span>
-            <span className="font-mono font-bold text-[#0F3D24]">{portalUrl}</span>
+        {termsChanged && hasEntries && (
+          <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3.5 space-y-1.5">
+            <label className="block font-extrabold text-amber-950">
+              Reason for Amending Capital / Profit-Loss Split (Required — visible to partner) *
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Mutual agreement on 05 Nov to adjust profit split to 70%"
+              value={amendReason}
+              onChange={(e) => setAmendReason(e.target.value)}
+              className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 font-semibold text-[#0F3D24]"
+            />
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Username:</span>
-            <span className="font-mono font-extrabold text-[#0F3D24]">@{partner.username}</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-600">Account Status:</span>
-            <span className={`font-bold ${partner.active ? "text-emerald-700" : "text-rose-700"}`}>
-              {partner.active ? "Active & Authorized" : "Deactivated / Locked"}
-            </span>
-          </div>
-        </div>
+        )}
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(
-                `Dignity Agro Farms Partner Portal\nURL: ${portalUrl}\nUsername: ${partner.username}\n(Please use your assigned password to login)`,
-              );
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-[#0F3D24] hover:bg-slate-50 transition shadow-sm"
-          >
-            <Copy size={13} /> {copied ? "Copied Access Info!" : "Copy Portal Access Info"}
-          </button>
-          <button
-            type="button"
-            onClick={handleToggleActive}
-            className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
-              partner.active
-                ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
-                : "bg-emerald-600 text-white hover:bg-emerald-700"
+        {editMsg && (
+          <div
+            className={`rounded-xl p-2.5 text-xs font-semibold ${
+              editMsg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
             }`}
           >
-            {partner.active ? "Deactivate Account" : "Activate Account"}
-          </button>
-        </div>
-
-        {/* Reset Password Form */}
-        <form onSubmit={handleResetPasscode} className="space-y-3 pt-3 border-t border-slate-100 text-xs">
-          <label className="block font-bold text-[#0F3D24]">Reset Partner Password</label>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              placeholder="Enter new 6+ char password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
-            />
-            <button
-              type="submit"
-              disabled={resetting}
-              className="rounded-xl bg-[#0F3D24] px-4 py-2 font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition shadow-sm"
-            >
-              {resetting ? "Saving..." : "Update Password"}
-            </button>
+            {editMsg}
           </div>
-          {resetMsg && (
-            <div
-              className={`rounded-xl p-2.5 text-xs font-semibold ${
-                resetMsg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
-              }`}
-            >
-              {resetMsg}
-            </div>
-          )}
-        </form>
-      </div>
+        )}
 
-      {/* Contract & Agreement Card */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4 flex flex-col justify-between">
-        <div className="space-y-3">
+        <button
+          type="submit"
+          disabled={savingEdit}
+          className="rounded-xl bg-[#0F3D24] px-6 py-2.5 font-extrabold text-white hover:bg-[#165232] disabled:opacity-50 transition"
+        >
+          {savingEdit ? "Saving Changes..." : "Save Partner & Sharing Terms"}
+        </button>
+      </form>
+
+      {/* Right: Portal Credentials & Delete */}
+      <div className="lg:col-span-5 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4 flex flex-col justify-between">
+        <div className="space-y-4">
           <div>
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F]">
-              Investment Terms
+              Partner Login Credentials
             </span>
-            <h3 className="text-base font-black text-[#0F3D24]">Agreement & Notes</h3>
+            <h3 className="text-base font-black text-[#0F3D24]">Portal Access Info</h3>
+            <p className="text-xs text-slate-500">
+              Share these login credentials with {partner.fullName} so they can access their Partners Account.
+            </p>
           </div>
 
-          <div className="rounded-2xl bg-[#F7F5F0] p-4 text-xs space-y-2">
+          <div className="rounded-2xl bg-[#F7F5F0] p-4 space-y-2 text-xs">
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-semibold">Investment Date:</span>
-              <span className="font-bold text-[#0F3D24]">{partner.investmentDate}</span>
+              <span className="text-slate-600">Portal Login URL:</span>
+              <span className="font-mono font-bold text-[#0F3D24]">{portalUrl}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-semibold">Target ROI:</span>
-              <span className="font-bold text-emerald-700">{partner.targetRoiPercentage}%</span>
+              <span className="text-slate-600">Username:</span>
+              <span className="font-mono font-extrabold text-[#0F3D24]">@{partner.username}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-slate-500 font-semibold">Associated Batch:</span>
-              <span className="font-bold text-[#0F3D24]">{partner.batchName || "Unlinked / Dedicated Project"}</span>
-            </div>
-            <div className="pt-2 border-t border-slate-200">
-              <span className="text-slate-500 font-semibold block mb-1">Agreed Terms & Notes:</span>
-              <p className="text-slate-800 whitespace-pre-wrap">{partner.agreedTerms || "No specific terms written."}</p>
+              <span className="text-slate-600">Account Status:</span>
+              <span className={`font-bold ${partner.active ? "text-emerald-700" : "text-rose-700"}`}>
+                {partner.active ? "Active & Authorized" : "Deactivated / Locked"}
+              </span>
             </div>
           </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  `Dignity Agro Farms Partner Portal\nURL: ${portalUrl}\nUsername: ${partner.username}\n(Please use your assigned password to login)`,
+                );
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white py-2 text-xs font-bold text-[#0F3D24] hover:bg-slate-50 transition shadow-sm"
+            >
+              <Copy size={13} /> {copied ? "Copied Access Info!" : "Copy Portal Access Info"}
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleActive}
+              className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+                partner.active
+                  ? "bg-amber-100 text-amber-900 hover:bg-amber-200"
+                  : "bg-emerald-600 text-white hover:bg-emerald-700"
+              }`}
+            >
+              {partner.active ? "Deactivate" : "Activate"}
+            </button>
+          </div>
+
+          {/* Reset Password Form */}
+          <form onSubmit={handleResetPasscode} className="space-y-3 pt-3 border-t border-slate-100 text-xs">
+            <label className="block font-bold text-[#0F3D24]">Reset Partner Password</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                placeholder="Enter new 6+ char password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+              />
+              <button
+                type="submit"
+                disabled={resetting}
+                className="rounded-xl bg-[#0F3D24] px-4 py-2 font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition shadow-sm"
+              >
+                {resetting ? "Saving..." : "Update Password"}
+              </button>
+            </div>
+            {resetMsg && (
+              <div
+                className={`rounded-xl p-2.5 text-xs font-semibold ${
+                  resetMsg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+                }`}
+              >
+                {resetMsg}
+              </div>
+            )}
+          </form>
         </div>
 
         <div className="pt-4 border-t border-slate-100">
@@ -1312,14 +1799,19 @@ function AddPartnerModal({
 }) {
   const createPartnerFn = useServerFn(adminCreatePartner);
 
+  const today = new Date().toISOString().slice(0, 10);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
   const [projectName, setProjectName] = useState("Broiler Cycle Partnership");
+  const [cycleName, setCycleName] = useState("Cycle 1 — 6-Week Broilers");
+  const [cycleStartDate, setCycleStartDate] = useState(today);
+  const [cycleEndDate, setCycleEndDate] = useState("");
   const [initialInvestment, setInitialInvestment] = useState("");
-  const [investmentDate, setInvestmentDate] = useState(new Date().toISOString().slice(0, 10));
-  const [targetRoiPercentage, setTargetRoiPercentage] = useState("25");
+  const [investmentDate, setInvestmentDate] = useState(today);
+  const [profitSharePercentage, setProfitSharePercentage] = useState("70");
+  const [lossSharePercentage, setLossSharePercentage] = useState("100");
   const [agreedTerms, setAgreedTerms] = useState("");
   const [batchId, setBatchId] = useState<string>("");
   const [username, setUsername] = useState("");
@@ -1327,6 +1819,9 @@ function AddPartnerModal({
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const pPct = Math.min(100, Math.max(0, Number(profitSharePercentage) || 0));
+  const lPct = Math.min(100, Math.max(0, Number(lossSharePercentage) || 0));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1348,9 +1843,13 @@ function AddPartnerModal({
           email: email.trim() || null,
           address: address.trim() || null,
           projectName: projectName.trim(),
+          cycleName: cycleName.trim(),
+          cycleStartDate,
+          cycleEndDate: cycleEndDate || null,
           initialInvestment: numCapital,
           investmentDate,
-          targetRoiPercentage: Number(targetRoiPercentage) || 0,
+          profitSharePercentage: pPct,
+          lossSharePercentage: lPct,
           agreedTerms: agreedTerms.trim() || null,
           batchId: batchId || null,
           username: username.trim().toLowerCase(),
@@ -1367,7 +1866,7 @@ function AddPartnerModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10 overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="w-full max-w-2xl rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10 overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="bg-[#0F3D24] px-6 py-4 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
@@ -1376,7 +1875,9 @@ function AddPartnerModal({
             </div>
             <div>
               <h3 className="text-base font-extrabold">Register New Partner</h3>
-              <p className="text-[11px] text-white/70">Create an investor profile and portal login.</p>
+              <p className="text-[11px] text-white/70">
+                Set capital, profit & loss split, cycle window, and portal login.
+              </p>
             </div>
           </div>
           <button
@@ -1417,29 +1918,6 @@ function AddPartnerModal({
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Email Address (Optional)</label>
-              <input
-                type="email"
-                placeholder="e.g. emeka@gmail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 text-[#0F3D24] outline-none"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Location / City</label>
-              <input
-                type="text"
-                placeholder="e.g. Owerri / Lagos"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 text-[#0F3D24] outline-none"
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div>
               <label className="block font-bold text-[#0F3D24] mb-1">Capital Invested (₦) *</label>
               <input
                 type="number"
@@ -1457,20 +1935,115 @@ function AddPartnerModal({
                 type="date"
                 required
                 value={investmentDate}
-                onChange={(e) => setInvestmentDate(e.target.value)}
+                onChange={(e) => {
+                  setInvestmentDate(e.target.value);
+                  setCycleStartDate(e.target.value);
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
+              />
+            </div>
+          </div>
+
+          {/* Profit & Loss Partitioning Box */}
+          <div className="rounded-2xl border border-[#0F3D24]/15 bg-[#F7F5F0] p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F3D24]">
+                Profit & Loss Partitioning (Customizable Per Partner)
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: "70% Profit / 100% Loss", p: "70", l: "100" },
+                  { label: "50% / 50%", p: "50", l: "50" },
+                  { label: "70% / 70%", p: "70", l: "70" },
+                  { label: "100% / 100%", p: "100", l: "100" },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setProfitSharePercentage(preset.p);
+                      setLossSharePercentage(preset.l);
+                    }}
+                    className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#0F3D24] ring-1 ring-slate-200 hover:bg-[#3F8F3F] hover:text-white transition"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block font-bold text-emerald-800 mb-1">
+                  Partner Profit Share (%) — Farm keeps {100 - pPct}%
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={profitSharePercentage}
+                  onChange={(e) => setProfitSharePercentage(e.target.value)}
+                  className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2 font-black text-emerald-900"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-rose-800 mb-1">
+                  Partner Loss Responsibility (%) — Capped at Capital
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={lossSharePercentage}
+                  onChange={(e) => setLossSharePercentage(e.target.value)}
+                  className="w-full rounded-xl border border-rose-300 bg-white px-3.5 py-2 font-black text-rose-900"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white p-2.5 text-[11px] text-slate-700 border border-slate-200/80">
+              <strong>Live Example on ₦1,000,000 result:</strong> If the cycle makes{" "}
+              <span className="font-bold text-emerald-700">+₦1,000,000 profit</span>, partner receives{" "}
+              <strong>{naira(1_000_000 * (pPct / 100))}</strong> and farm keeps{" "}
+              <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>. If the cycle makes{" "}
+              <span className="font-bold text-rose-700">-₦1,000,000 loss</span>, partner bears{" "}
+              <strong>{naira(1_000_000 * (lPct / 100))}</strong> (never exceeding capital).
+            </div>
+          </div>
+
+          {/* Cycle Configuration */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="block font-bold text-[#0F3D24] mb-1">Cycle Name *</label>
+              <input
+                type="text"
+                required
+                value={cycleName}
+                onChange={(e) => setCycleName(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-semibold text-[#0F3D24]"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-[#0F3D24] mb-1">Cycle Start Date *</label>
+              <input
+                type="date"
+                required
+                value={cycleStartDate}
+                onChange={(e) => setCycleStartDate(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
               />
             </div>
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Target ROI (%)</label>
+              <label className="block font-bold text-[#0F3D24] mb-1">Target End / Maturity Date</label>
               <input
-                type="number"
-                min={0}
-                max={500}
-                placeholder="e.g. 25"
-                value={targetRoiPercentage}
-                onChange={(e) => setTargetRoiPercentage(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-bold text-emerald-700 outline-none"
+                type="date"
+                value={cycleEndDate}
+                onChange={(e) => setCycleEndDate(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
               />
             </div>
           </div>
@@ -1507,7 +2080,7 @@ function AddPartnerModal({
             <label className="block font-bold text-[#0F3D24] mb-1">Contract / Agreed Terms & Notes</label>
             <textarea
               rows={2}
-              placeholder="e.g. 6-week broiler cycle, 25% profit share on harvest offload, capital returning at maturity..."
+              placeholder="e.g. 6-week broiler cycle, partner funds expenses, payouts remitted upon bird offload..."
               value={agreedTerms}
               onChange={(e) => setAgreedTerms(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 text-[#0F3D24] outline-none"
