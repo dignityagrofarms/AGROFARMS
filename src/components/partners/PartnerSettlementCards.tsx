@@ -435,7 +435,7 @@ export function ResultHero({ partner }: { partner: FarmPartner }) {
             {isProfit &&
               `Your ${partner.profitSharePercentage}% allocation of ${naira(s.net)} net operational profit`}
             {isLoss &&
-              `Your ${partner.lossSharePercentage}% allocation of ${naira(Math.abs(s.net))} net operational deficit`}
+              `Net operational deficit of ${naira(Math.abs(s.net))} (protected by capital cap under Agreement)`}
             {!isProfit && !isLoss && "Revenue currently matches operational expenditure (100% capital intact)"}
           </div>
         </div>
@@ -476,7 +476,7 @@ export function SettlementBreakdown({ partner }: { partner: FarmPartner }) {
     },
     {
       label: isLoss
-        ? `Partner Allocated Loss (${partner.lossSharePercentage}%)`
+        ? "Partner Allocated Loss (Governed by Agreement)"
         : `Partner Allocated Profit (${partner.profitSharePercentage}%)`,
       value: signed(s.partnerSignedResult),
       tone: isLoss ? "text-rose-700" : "text-emerald-700",

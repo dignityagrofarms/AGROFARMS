@@ -142,6 +142,7 @@ export function PartnersManagementPanel({
 
   const partners = partnersQuery.data || [];
   const batches = batchesQuery.data || [];
+  const selectedPartner = partners.find((p) => p.id === selectedPartnerId);
 
   const handleDeletePartnerCard = async (pId: string, pName: string) => {
     if (
@@ -186,23 +187,44 @@ export function PartnersManagementPanel({
               </span>
             )}
           </div>
-          <h2 className="text-2xl font-black tracking-tight sm:text-3xl">For Partners</h2>
+          <h2 className="text-2xl font-black tracking-tight sm:text-3xl flex flex-wrap items-center gap-2">
+            <span>For Partners</span>
+            {selectedPartner && (
+              <>
+                <span className="text-white/40 font-light">/</span>
+                <span className="text-white font-extrabold text-xl sm:text-2xl">{selectedPartner.fullName}</span>
+              </>
+            )}
+          </h2>
           <p className="max-w-2xl text-xs text-white/80">
-            {effectiveRole === "owner"
-              ? "Manage partner cycles, profit & loss splits, batch synchronization, manager entry approvals, and certified settlement statements."
-              : "Record partner operational expenses, sales receipts, and daily flock logs. All manager entries are verified by the Farm Owner before publishing to the partner portal."}
+            {selectedPartner
+              ? `Viewing active co-financing workspace, settlement ledgers, and flock logs for ${selectedPartner.fullName} (@${selectedPartner.username}).`
+              : effectiveRole === "owner"
+                ? "Manage partner cycles, profit splits, batch synchronization, manager entry approvals, and certified settlement statements."
+                : "Record partner operational expenses, sales receipts, and daily flock logs. All manager entries are verified by the Farm Owner before publishing to the partner portal."}
           </p>
         </div>
 
-        {effectiveRole === "owner" && (
-          <button
-            type="button"
-            onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-2 self-start rounded-xl bg-white px-5 py-2.5 text-xs font-black text-[#0F3D24] shadow-sm transition hover:bg-[#FAF9F6]"
-          >
-            <Plus size={15} /> Onboard New Partner
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 self-start">
+          {selectedPartnerId && (
+            <button
+              type="button"
+              onClick={() => setSelectedPartnerId(null)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-xs font-black text-white hover:bg-white hover:text-[#0F3D24] transition shadow-xs cursor-pointer"
+            >
+              <ArrowLeft size={14} /> Back to Directory
+            </button>
+          )}
+          {effectiveRole === "owner" && (
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2 text-xs font-black text-[#0F3D24] shadow-sm transition hover:bg-[#FAF9F6]"
+            >
+              <Plus size={15} /> Onboard New Partner
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Executive Portfolio Health Strip */}
@@ -309,10 +331,7 @@ export function PartnersManagementPanel({
                       {/* Governance Badges */}
                       <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
                         <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-emerald-800 tabular-nums">
-                          {partner.profitSharePercentage}% Profit
-                        </span>
-                        <span className="rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-rose-800 tabular-nums">
-                          {partner.lossSharePercentage}% Loss
+                          {partner.profitSharePercentage}% Profit Share
                         </span>
                         {pendingCount > 0 && (
                           <span className="rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-amber-900 font-extrabold">
@@ -656,6 +675,23 @@ function PartnerDetailView({
 
   return (
     <div className="space-y-5">
+      {/* Prominent Directory Return Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#0F3D24]/15 bg-white p-4 shadow-xs">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-2 rounded-xl bg-[#0F3D24] px-4 py-2.5 text-xs font-black text-white shadow-sm hover:bg-[#165232] transition cursor-pointer"
+        >
+          <ArrowLeft size={16} /> &larr; Back to Partners Directory
+        </button>
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          <span>Current Partner Workspace:</span>
+          <strong className="rounded-lg bg-[#0F3D24]/10 px-2.5 py-1 font-black text-[#0F3D24]">
+            {livePartner.fullName} (@{livePartner.username})
+          </strong>
+        </div>
+      </div>
+
       {/* Multi-Cycle Switcher Bar */}
       <CycleSwitcherBar
         partner={livePartner}
@@ -688,9 +724,9 @@ function PartnerDetailView({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#0F3D24] hover:underline"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-[#FAF9F6] px-4 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition shadow-xs cursor-pointer"
           >
-            <ArrowLeft size={15} /> Back to All Partners
+            <ArrowLeft size={14} /> &larr; Back to All Partners
           </button>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -846,9 +882,6 @@ function PartnerDetailView({
               <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800 tabular-nums">
                 {partner.profitSharePercentage}% Profit Share
               </span>
-              <span className="rounded-md bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800 tabular-nums">
-                {partner.lossSharePercentage}% Loss Share
-              </span>
               {partner.batchName && (
                 <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
                   Batch: {partner.batchName}
@@ -882,7 +915,7 @@ function PartnerDetailView({
               >
                 Partner Net Share (
                 {s.result === "loss"
-                  ? `${partner.lossSharePercentage}% loss`
+                  ? "Downside Capped"
                   : `${partner.profitSharePercentage}% profit`}
                 )
               </div>
@@ -2074,7 +2107,6 @@ function PartnerCredentialsSubPanel({
 
   const termsChanged =
     Number(profitShare) !== partner.profitSharePercentage ||
-    Number(lossShare) !== partner.lossSharePercentage ||
     Number(initialInvestment) !== partner.initialInvestment;
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -2093,7 +2125,7 @@ function PartnerCredentialsSubPanel({
           initialInvestment: Number(initialInvestment) || 0,
           investmentDate,
           profitSharePercentage: Number(profitShare),
-          lossSharePercentage: Number(lossShare),
+          lossSharePercentage: Number(lossShare) || partner.lossSharePercentage || 100,
           agreedTerms: agreedTerms.trim() || null,
           projectName: projectName.trim(),
           cycleName: cycleName.trim(),
@@ -2210,7 +2242,7 @@ function PartnerCredentialsSubPanel({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Capital Invested (₦) *</label>
             <input
@@ -2233,19 +2265,6 @@ function PartnerCredentialsSubPanel({
               value={profitShare}
               onChange={(e) => setProfitShare(e.target.value)}
               className="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2 font-black text-emerald-900"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-rose-800 mb-1">Partner Loss Share (%)</label>
-            <input
-              type="number"
-              required
-              min={0}
-              max={100}
-              step="0.5"
-              value={lossShare}
-              onChange={(e) => setLossShare(e.target.value)}
-              className="w-full rounded-xl border border-rose-300 bg-rose-50/40 px-3 py-2 font-black text-rose-900"
             />
           </div>
         </div>
@@ -2664,7 +2683,7 @@ function AddPartnerModal({
             {[
               { num: 1, label: "Identity & Login" },
               { num: 2, label: "Capital & Cycle" },
-              { num: 3, label: "Profit / Loss Split" },
+              { num: 3, label: "Profit Sharing" },
               { num: 4, label: "Terms & Review" },
             ].map((s) => {
               const active = step === s.num;
@@ -2931,30 +2950,27 @@ function AddPartnerModal({
             </div>
           )}
 
-          {/* ───────── STEP 3: PROFIT & LOSS PARTITIONING ───────── */}
+          {/* ───────── STEP 3: PROFIT SHARING & TERMS ───────── */}
           {step === 3 && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-[#0F3D24]/15 bg-[#F7F5F0] p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F3D24]">
-                    Select Agreed Partitioning Preset
+                    Select Agreed Profit Split Preset
                   </span>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      { label: "70% Profit / 100% Loss", p: "70", l: "100" },
-                      { label: "50% / 50% (Standard)", p: "50", l: "50" },
-                      { label: "80% Profit / 100% Loss", p: "80", l: "100" },
-                      { label: "100% Profit / 100% Loss", p: "100", l: "100" },
+                      { label: "70% Profit Share (Co-Financier)", p: "70" },
+                      { label: "50% Profit Share (Equal Split)", p: "50" },
+                      { label: "80% Profit Share", p: "80" },
+                      { label: "60% Profit Share", p: "60" },
                     ].map((preset) => (
                       <button
                         key={preset.label}
                         type="button"
-                        onClick={() => {
-                          setProfitSharePercentage(preset.p);
-                          setLossSharePercentage(preset.l);
-                        }}
+                        onClick={() => setProfitSharePercentage(preset.p)}
                         className={`rounded-full px-3 py-1 text-[10px] font-bold transition ${
-                          profitSharePercentage === preset.p && lossSharePercentage === preset.l
+                          profitSharePercentage === preset.p
                             ? "bg-[#0F3D24] text-white"
                             : "bg-white text-[#0F3D24] ring-1 ring-slate-200 hover:bg-[#3F8F3F] hover:text-white"
                         }`}
@@ -2965,11 +2981,13 @@ function AddPartnerModal({
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 pt-2">
-                  <div className="rounded-2xl bg-white p-3.5 border border-emerald-200 space-y-2">
+                <div className="pt-2">
+                  <div className="rounded-2xl bg-white p-4 border border-emerald-200 space-y-2.5">
                     <div className="flex items-center justify-between">
-                      <label className="font-bold text-emerald-900">Partner Profit Share (%)</label>
-                      <span className="text-base font-black text-emerald-800">{pPct}%</span>
+                      <label className="font-extrabold text-emerald-950 text-sm">
+                        Partner Profit Share (%)
+                      </label>
+                      <span className="text-xl font-black text-emerald-800">{pPct}%</span>
                     </div>
                     <input
                       type="range"
@@ -2980,101 +2998,48 @@ function AddPartnerModal({
                       onChange={(e) => setProfitSharePercentage(e.target.value)}
                       className="w-full accent-emerald-700"
                     />
-                    <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                    <div className="flex justify-between text-[11px] text-slate-600 font-semibold">
                       <span>0%</span>
-                      <span>Farm Keeps: {100 - pPct}%</span>
-                      <span>100%</span>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-white p-3.5 border border-rose-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="font-bold text-rose-900">Partner Loss Responsibility (%)</label>
-                      <span className="text-base font-black text-rose-800">{lPct}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={lPct}
-                      onChange={(e) => setLossSharePercentage(e.target.value)}
-                      className="w-full accent-rose-700"
-                    />
-                    <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-                      <span>0%</span>
-                      <span>Farm Absorbs: {100 - lPct}%</span>
+                      <span>Farm Retained Profit: {100 - pPct}%</span>
                       <span>100%</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Interactive Live Simulator */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-extrabold text-[#0F3D24] text-xs">
-                    Live Calculation Simulation
-                  </span>
-                  <div className="flex rounded-full bg-slate-100 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setSimMode("profit")}
-                      className={`rounded-full px-3 py-1 text-[10px] font-black transition ${
-                        simMode === "profit" ? "bg-emerald-700 text-white shadow-sm" : "text-slate-600"
-                      }`}
-                    >
-                      +₦1,000,000 Profit Scenario
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSimMode("loss")}
-                      className={`rounded-full px-3 py-1 text-[10px] font-black transition ${
-                        simMode === "loss" ? "bg-rose-700 text-white shadow-sm" : "text-slate-600"
-                      }`}
-                    >
-                      -₦500,000 Loss Scenario
-                    </button>
-                  </div>
+              {/* Downside Protection & Agreement Terms Notice */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
+                <div className="flex items-center gap-2 font-black text-[#0F3D24]">
+                  <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0" />
+                  <span>Downside Risk & Capital Protection Terms</span>
                 </div>
+                <p className="text-slate-600 leading-relaxed">
+                  As requested by Dignity Agro Farms co-financing policy, downside operational risk and capital protection are governed strictly by Section 4 of the legal <strong>Partnership Agreement</strong>. Partner liability is strictly capped at their initial deposited capital (<strong>{naira(numCapital)}</strong>), with zero negative liability.
+                </p>
+              </div>
 
-                {simMode === "profit" ? (
-                  <div className="rounded-xl bg-emerald-50/70 p-3.5 border border-emerald-200 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-emerald-950 font-bold">
-                        Partner Receives ({pPct}% of Profit):
-                      </span>
-                      <strong className="text-base font-black text-emerald-900">
-                        {naira(1_000_000 * (pPct / 100))}
-                      </strong>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-emerald-800">
-                      <span>Farm Retained Share:</span>
-                      <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>
-                    </div>
-                    <p className="text-[10px] text-emerald-900/80 pt-1 border-t border-emerald-200/60">
-                      Total Capital Return to Partner: Capital ({naira(numCapital)}) + Profit ({naira(1_000_000 * (pPct / 100))}) = <strong>{naira(numCapital + 1_000_000 * (pPct / 100))}</strong>.
-                    </p>
+              {/* Live Profit Simulation */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+                <span className="font-extrabold text-[#0F3D24] text-xs block">
+                  Projected Return on ₦1,000,000 Net Cycle Profit
+                </span>
+                <div className="rounded-xl bg-emerald-50/70 p-3.5 border border-emerald-200 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-950 font-bold">
+                      Partner Receives ({pPct}% of Profit):
+                    </span>
+                    <strong className="text-base font-black text-emerald-900">
+                      {naira(1_000_000 * (pPct / 100))}
+                    </strong>
                   </div>
-                ) : (
-                  <div className="rounded-xl bg-rose-50/70 p-3.5 border border-rose-200 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-rose-950 font-bold">
-                        Partner Loss Responsibility ({lPct}% of Loss):
-                      </span>
-                      <strong className="text-base font-black text-rose-900">
-                        -{naira(Math.min(numCapital || 500_000, 500_000 * (lPct / 100)))}
-                      </strong>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-rose-800">
-                      <span>Farm Absorbed Loss:</span>
-                      <strong>{naira(500_000 * ((100 - lPct) / 100))}</strong>
-                    </div>
-                    <p className="text-[10px] text-rose-900/80 pt-1 border-t border-rose-200/60 font-semibold">
-                      Capital Protection Active: Partner loss is strictly capped at their invested capital. The partner can never owe money.
-                    </p>
+                  <div className="flex items-center justify-between text-[11px] text-emerald-800">
+                    <span>Farm Retained Share ({100 - pPct}%):</span>
+                    <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>
                   </div>
-                )}
+                  <p className="text-[10px] text-emerald-900/80 pt-1 border-t border-emerald-200/60">
+                    Total Estimated Return: Capital ({naira(numCapital)}) + Profit ({naira(1_000_000 * (pPct / 100))}) = <strong>{naira(numCapital + 1_000_000 * (pPct / 100))}</strong>.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -3104,7 +3069,8 @@ function AddPartnerModal({
                   </div>
                   <div>
                     <span className="text-white/70 block text-[10px]">Agreed Sharing Ratio:</span>
-                    <strong className="text-white">{pPct}% Profit / {lPct}% Loss</strong>
+                    <strong className="text-white">{pPct}% Profit Share</strong>
+                    <div className="text-white/70 text-[10px]">Downside protection in Agreement</div>
                   </div>
                 </div>
               </div>
@@ -3366,7 +3332,6 @@ export function EditPartnerModal({
 
   const termsChanged =
     Number(profitShare) !== partner.profitSharePercentage ||
-    Number(lossShare) !== partner.lossSharePercentage ||
     Number(initialInvestment) !== partner.initialInvestment;
 
   const handleGeneratePassword = () => {
@@ -3532,7 +3497,7 @@ export function EditPartnerModal({
                 : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
-            <TrendingUp size={13} /> Profit & Loss Split
+            <TrendingUp size={13} /> Profit Share & Terms
           </button>
           <button
             type="button"
@@ -3771,50 +3736,27 @@ export function EditPartnerModal({
             </div>
           )}
 
-          {/* TAB 3: SHARING MATRIX */}
+          {/* TAB 3: PROFIT SHARING & TERMS */}
           {activeTab === "sharing" && (
             <div className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-extrabold text-emerald-950">Partner Profit Share %</label>
-                    <span className="font-mono text-base font-black text-emerald-800 tabular-nums">
-                      {profitShare}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={profitShare}
-                    onChange={(e) => setProfitShare(e.target.value)}
-                    className="w-full accent-[#0F3D24]"
-                  />
-                  <div className="text-[10px] text-emerald-900/80">
-                    Farm retains remaining <strong>{100 - (Number(profitShare) || 0)}%</strong> of net profits.
-                  </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold text-emerald-950">Partner Profit Share %</label>
+                  <span className="font-mono text-base font-black text-emerald-800 tabular-nums">
+                    {profitShare}%
+                  </span>
                 </div>
-
-                <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="font-extrabold text-rose-950">Partner Loss Share %</label>
-                    <span className="font-mono text-base font-black text-rose-800 tabular-nums">
-                      {lossShare}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={lossShare}
-                    onChange={(e) => setLossShare(e.target.value)}
-                    className="w-full accent-rose-700"
-                  />
-                  <div className="text-[10px] text-rose-900/80">
-                    Farm absorbs remaining <strong>{100 - (Number(lossShare) || 0)}%</strong> of downside.
-                  </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={profitShare}
+                  onChange={(e) => setProfitShare(e.target.value)}
+                  className="w-full accent-[#0F3D24]"
+                />
+                <div className="text-[10px] text-emerald-900/80">
+                  Farm retains remaining <strong>{100 - (Number(profitShare) || 0)}%</strong> of net profits.
                 </div>
               </div>
 
@@ -3822,7 +3764,7 @@ export function EditPartnerModal({
                 <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-[#0F3D24] block">Downside Capital Protection Rule</strong>
-                  Under institutional co-financing standards, partner loss is strictly capped at their initial committed capital ({naira(Number(initialInvestment) || 0)}). Partners never owe the farm out-of-pocket money.
+                  Under Section 4 of the legal Partnership Agreement, partner loss is strictly capped at their initial committed capital ({naira(Number(initialInvestment) || 0)}). Partners never owe the farm out-of-pocket money.
                 </div>
               </div>
 

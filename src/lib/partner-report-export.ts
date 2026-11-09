@@ -87,7 +87,7 @@ export function exportPartnerReportPDF(
   doc.setFont("helvetica", "normal");
   doc.setTextColor(40, 50, 40);
   doc.text(
-    `Capital Invested: ${naira(partner.initialInvestment)}   •   Profit Share: ${partner.profitSharePercentage}% of Net Profit   •   Loss Share: ${partner.lossSharePercentage}% of Net Loss (Capped at capital)`,
+    `Capital Invested: ${naira(partner.initialInvestment)}   •   Profit Share: ${partner.profitSharePercentage}% of Net Profit   •   Downside Risk: Governed by Agreement (Capped at capital)`,
     18,
     y + 12,
   );
@@ -318,7 +318,7 @@ export function exportPartnerReportCSV(
   lines.push(`"Cycle Status: ${partner.cycleStatus.toUpperCase()}"`);
   lines.push(`"Initial Investment: NGN ${partner.initialInvestment.toLocaleString()}"`);
   lines.push(`"Agreed Profit Share: ${partner.profitSharePercentage}%"`);
-  lines.push(`"Agreed Loss Share: ${partner.lossSharePercentage}% (Capped at capital)"`);
+  lines.push(`"Agreed Downside Protection: Loss capped at capital per Agreement Section 4"`);
   lines.push(
     `"Agreement Status: ${partner.agreementSigned ? `Signed by ${partner.agreementSignedBy || partner.fullName} on ${partner.agreementSignedAt?.slice(0, 10)}` : "Pending Signature"}"`,
   );
