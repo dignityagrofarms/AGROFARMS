@@ -814,8 +814,8 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
         partnerId: z.string().uuid(),
         fullName: z.string().trim().min(2),
         phone: z.string().trim().min(7),
-        email: z.string().trim().email().optional().nullable(),
-        address: z.string().trim().optional().nullable(),
+        email: z.string().trim().email().optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
+        address: z.string().trim().optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
         initialInvestment: z.number().min(0),
         investmentDate: dateStr,
         profitSharePercentage: pct,
@@ -824,10 +824,11 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
         projectName: z.string().trim().min(2),
         cycleName: z.string().trim().min(2),
         cycleStartDate: dateStr,
-        cycleEndDate: dateStr.optional().nullable(),
-        batchId: z.string().uuid().optional().nullable(),
+        cycleEndDate: dateStr.optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
+        batchId: z.string().uuid().optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
         status: z.enum(["active", "matured", "completed", "paused"]),
         amendReason: z.string().trim().max(500).optional().nullable(),
+        newPassword: z.string().trim().min(6).optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
       })
       .parse(data),
   )
@@ -861,50 +862,65 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
       if (current.cycle_status === "closed") {
         throw new Error("This cycle is closed and settled. Re-open the cycle before amending terms or capital.");
       }
-      const { count } = await supabaseAdmin
-        .from("partner_financials")
-        .select("id", { count: "exact", head: true })
-        .eq("partner_id", data.partnerId)
-        .is("removed_at", null);
-      if ((count || 0) > 0) {
-        if (!data.amendReason || data.amendReason.length < 3) {
-          throw new Error("Entries already exist. Please give a reason for amending the sharing terms or capital.");
-        }
-      }
+      const effectiveAmendReason = data.amendReason?.trim() || "Terms and details updated by farm owner";
       auditLog.push({
         at: new Date().toISOString(),
         by: cred.username || "owner",
         kind: "terms_amended",
-        reason: data.amendReason || "Terms updated before any entries were recorded",
+        reason: effectiveAmendReason,
         from: { profit: oldProfit, loss: oldLoss },
         to: { profit: data.profitSharePercentage, loss: data.lossSharePercentage },
       });
     }
 
-    const { error } = await supabaseAdmin
-      .from("farm_partners")
-      .update({
-        full_name: data.fullName,
-        phone: data.phone,
-        email: data.email || null,
-        address: data.address || null,
-        initial_investment: data.initialInvestment,
-        investment_date: data.investmentDate,
-        profit_share_percentage: data.profitSharePercentage,
-        loss_share_percentage: data.lossSharePercentage,
-        agreed_terms: data.agreedTerms || null,
-        project_name: data.projectName,
-        cycle_name: data.cycleName,
-        cycle_start_date: data.cycleStartDate,
-        cycle_end_date: data.cycleEndDate || null,
-        batch_id: data.batchId || null,
-        status: data.status,
-        terms_history: auditLog,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", data.partnerId);
+    const updatePayload: Record<string, any> = {
+      full_name: data.fullName,
+      phone: data.phone,
+      email: data.email || null,
+      address: data.address || null,
+      initial_investment: data.initialInvestment,
+      investment_date: data.investmentDate,
+      profit_share_percentage: data.profitSharePercentage,
+      loss_share_percentage: data.lossSharePercentage,
+      agreed_terms: data.agreedTerms || null,
+      project_name: data.projectName,
+      cycle_name: data.cycleName,
+      cycle_start_date: data.cycleStartDate,
+      cycle_end_date: data.cycleEndDate || null,
+      batch_id: data.batchId || null,
+      status: data.status,
+      terms_history: auditLog,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (error) throw new Error(error.message);
+    if (data.newPassword) {
+      updatePayload.passcode_hash = await hashPasscode(data.newPassword);
+    }
+
+    let lastError: any = null;
+    let updated = false;
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { error } = await supabaseAdmin
+        .from("farm_partners")
+        .update(updatePayload)
+        .eq("id", data.partnerId);
+
+      if (!error) {
+        updated = true;
+        break;
+      }
+
+      lastError = error;
+      const match = error?.message?.match(/Could not find the '([^']+)' column of 'farm_partners'/i);
+      if (match && match[1] && match[1] in updatePayload) {
+        delete updatePayload[match[1]];
+        continue;
+      }
+      break;
+    }
+
+    if (!updated) throw new Error(lastError?.message || "Failed to update partner details");
     return { ok: true };
   });
 
@@ -1177,6 +1193,10 @@ export const adminDeletePartner = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Clean up all related financial entries and activity logs first
+    await supabaseAdmin.from("partner_financials").delete().eq("partner_id", data.partnerId);
+    await supabaseAdmin.from("partner_activities").delete().eq("partner_id", data.partnerId);
 
     const { error } = await supabaseAdmin.from("farm_partners").delete().eq("id", data.partnerId);
     if (error) throw new Error(error.message);

@@ -46,6 +46,7 @@ import {
   Upload,
   Award,
   Clock,
+  X,
 } from "lucide-react";
 import {
   adminListPartners,
@@ -109,6 +110,7 @@ export function PartnersManagementPanel({
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingPartner, setEditingPartner] = useState<FarmPartner | null>(null);
   const [createdPartnerInfo, setCreatedPartnerInfo] = useState<{
     id: string;
     fullName: string;
@@ -124,6 +126,7 @@ export function PartnersManagementPanel({
 
   const listPartnersFn = useServerFn(adminListPartners);
   const listBatchesFn = useServerFn(adminListBatches);
+  const deletePartnerFn = useServerFn(adminDeletePartner);
 
   const partnersQuery = useQuery({
     queryKey: ["admin-partners", passcode],
@@ -139,6 +142,22 @@ export function PartnersManagementPanel({
 
   const partners = partnersQuery.data || [];
   const batches = batchesQuery.data || [];
+
+  const handleDeletePartnerCard = async (pId: string, pName: string) => {
+    if (
+      !confirm(
+        `Are you completely sure you want to permanently delete ${pName}? All associated financial entries, activity records, and login credentials will be removed. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await deletePartnerFn({ data: { passcode, partnerId: pId } });
+      qc.invalidateQueries({ queryKey: ["admin-partners"] });
+    } catch (err: any) {
+      alert(err instanceof Error ? err.message : "Failed to delete partner.");
+    }
+  };
 
   const filteredPartners = partners.filter(
     (p) =>
@@ -362,11 +381,36 @@ export function PartnersManagementPanel({
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#0F3D24]">
-                      <span>Open Partner Workspace</span>
-                      <ChevronRight
-                        size={15}
-                        className="group-hover:translate-x-1 transition-transform"
-                      />
+                      <div className="flex items-center gap-1.5">
+                        <span>Open Partner Workspace</span>
+                        <ChevronRight
+                          size={15}
+                          className="group-hover:translate-x-1 transition-transform"
+                        />
+                      </div>
+                      {effectiveRole === "owner" && (
+                        <div
+                          className="flex items-center gap-1.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setEditingPartner(partner)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold text-slate-700 bg-slate-100 hover:bg-[#0F3D24] hover:text-white transition"
+                            title="Edit Partner Details"
+                          >
+                            <Pencil size={11} /> Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePartnerCard(partner.id, partner.fullName)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-600 hover:text-white transition"
+                            title="Delete Partner Entirely"
+                          >
+                            <Trash2 size={11} /> Delete
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -374,6 +418,24 @@ export function PartnersManagementPanel({
             </div>
           )}
         </div>
+      )}
+
+      {/* Edit Partner Modal (Owner Only) */}
+      {editingPartner && effectiveRole === "owner" && (
+        <EditPartnerModal
+          passcode={passcode}
+          partner={editingPartner}
+          batches={batches}
+          onClose={() => setEditingPartner(null)}
+          onSuccess={() => {
+            setEditingPartner(null);
+            qc.invalidateQueries({ queryKey: ["admin-partners"] });
+          }}
+          onDeleted={() => {
+            setEditingPartner(null);
+            qc.invalidateQueries({ queryKey: ["admin-partners"] });
+          }}
+        />
       )}
 
       {/* Register New Partner Modal (Owner Only) */}
@@ -429,6 +491,7 @@ function PartnerDetailView({
   const getPartnerDetailFn = useServerFn(adminGetPartnerDetail);
   const closeCycleFn = useServerFn(adminClosePartnerCycle);
   const reopenCycleFn = useServerFn(adminReopenPartnerCycle);
+  const deletePartnerFn = useServerFn(adminDeletePartner);
 
   const [settling, setSettling] = useState(false);
   const [showSignModal, setShowSignModal] = useState(false);
@@ -438,6 +501,7 @@ function PartnerDetailView({
   const [showRolloverModal, setShowRolloverModal] = useState(false);
   const [showBatchSyncModal, setShowBatchSyncModal] = useState(false);
   const [showDigestModal, setShowDigestModal] = useState(false);
+  const [showEditPartnerModal, setShowEditPartnerModal] = useState(false);
   const [lightboxData, setLightboxData] = useState<{
     url: string;
     title: string;
@@ -573,6 +637,23 @@ function PartnerDetailView({
     }
   };
 
+  const handleDeleteThisPartner = async () => {
+    if (
+      !confirm(
+        `Are you completely sure you want to permanently delete ${livePartner.fullName}? All associated financial entries, activity records, and login credentials will be removed. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await deletePartnerFn({ data: { passcode, partnerId: livePartner.id } });
+      qc.invalidateQueries({ queryKey: ["admin-partners"] });
+      onBack();
+    } catch (err: any) {
+      alert(err instanceof Error ? err.message : "Failed to delete partner.");
+    }
+  };
+
   return (
     <div className="space-y-5">
       {/* Multi-Cycle Switcher Bar */}
@@ -693,8 +774,16 @@ function PartnerDetailView({
               <>
                 <button
                   type="button"
+                  onClick={() => setShowEditPartnerModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:border-[#0F3D24] hover:text-[#0F3D24] transition shadow-xs"
+                >
+                  <Pencil size={13} /> Edit Details
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowRolloverModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#FAF9F6] transition"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#FAF9F6] transition shadow-xs"
                 >
                   <RefreshCw size={13} /> New Cycle
                 </button>
@@ -713,11 +802,20 @@ function PartnerDetailView({
                     type="button"
                     disabled={settling}
                     onClick={handleReopenCycle}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 border border-amber-200 px-4 py-2 text-xs font-extrabold text-amber-900 hover:bg-amber-200 disabled:opacity-50 transition"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 border border-amber-200 px-4 py-2 text-xs font-extrabold text-amber-900 hover:bg-amber-200 disabled:opacity-50 transition shadow-xs"
                   >
                     <Unlock size={13} /> Re-open Cycle
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  onClick={handleDeleteThisPartner}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2 text-xs font-bold text-rose-700 hover:bg-rose-600 hover:text-white transition shadow-xs"
+                  title="Permanently Delete Partner Entirely"
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
               </>
             )}
           </div>
@@ -925,6 +1023,25 @@ function PartnerDetailView({
       )}
 
       {/* Modals */}
+      {showEditPartnerModal && (
+        <EditPartnerModal
+          passcode={passcode}
+          partner={livePartner}
+          batches={batches}
+          hasEntries={liveFinancials.some((f) => !f.removedAt)}
+          onClose={() => setShowEditPartnerModal(false)}
+          onSuccess={() => {
+            setShowEditPartnerModal(false);
+            refreshDetail();
+          }}
+          onDeleted={() => {
+            setShowEditPartnerModal(false);
+            qc.invalidateQueries({ queryKey: ["admin-partners"] });
+            onBack();
+          }}
+        />
+      )}
+
       {showSignModal && (
         <SignAgreementModal
           partner={partner}
@@ -3175,6 +3292,721 @@ Please sign in to read and digitally sign your Partnership Terms & Conditions.`;
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MODAL: COMPREHENSIVE PARTNER EDIT & ACCOUNT DELETION ─────────────────────
+
+export function EditPartnerModal({
+  passcode,
+  partner,
+  batches,
+  hasEntries,
+  onClose,
+  onSuccess,
+  onDeleted,
+}: {
+  passcode: string;
+  partner: FarmPartner;
+  batches: any[];
+  hasEntries?: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  onDeleted?: () => void;
+}) {
+  const qc = useQueryClient();
+  const updatePartnerFn = useServerFn(adminUpdatePartner);
+  const deletePartnerFn = useServerFn(adminDeletePartner);
+  const toggleActiveFn = useServerFn(adminTogglePartnerActive);
+
+  const [activeTab, setActiveTab] = useState<
+    "profile" | "cycle" | "sharing" | "credentials" | "danger"
+  >("profile");
+
+  // Profile fields
+  const [fullName, setFullName] = useState(partner.fullName);
+  const [phone, setPhone] = useState(partner.phone);
+  const [email, setEmail] = useState(partner.email || "");
+  const [address, setAddress] = useState(partner.address || "");
+  const [status, setStatus] = useState<FarmPartner["status"]>(partner.status);
+  const [isActive, setIsActive] = useState<boolean>(partner.active);
+
+  // Capital & Cycle fields
+  const [initialInvestment, setInitialInvestment] = useState(String(partner.initialInvestment || 0));
+  const [investmentDate, setInvestmentDate] = useState(
+    partner.investmentDate || new Date().toISOString().slice(0, 10),
+  );
+  const [projectName, setProjectName] = useState(partner.projectName);
+  const [cycleName, setCycleName] = useState(partner.cycleName);
+  const [cycleStartDate, setCycleStartDate] = useState(
+    partner.cycleStartDate || partner.investmentDate || new Date().toISOString().slice(0, 10),
+  );
+  const [cycleEndDate, setCycleEndDate] = useState(partner.cycleEndDate || "");
+  const [batchId, setBatchId] = useState(partner.batchId || "");
+
+  // Sharing Matrix
+  const [profitShare, setProfitShare] = useState(String(partner.profitSharePercentage ?? 70));
+  const [lossShare, setLossShare] = useState(String(partner.lossSharePercentage ?? 100));
+  const [agreedTerms, setAgreedTerms] = useState(partner.agreedTerms || "");
+  const [amendReason, setAmendReason] = useState("");
+
+  // Credentials
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const portalUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/for-partners` : "/for-partners";
+
+  const termsChanged =
+    Number(profitShare) !== partner.profitSharePercentage ||
+    Number(lossShare) !== partner.lossSharePercentage ||
+    Number(initialInvestment) !== partner.initialInvestment;
+
+  const handleGeneratePassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let rand = "";
+    for (let i = 0; i < 4; i++) {
+      rand += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(`Daf-${rand}`);
+    setShowPassword(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullName.trim()) {
+      setErrorMsg("Please provide the partner's full name.");
+      setActiveTab("profile");
+      return;
+    }
+    if (!phone.trim()) {
+      setErrorMsg("Please provide a contact phone number.");
+      setActiveTab("profile");
+      return;
+    }
+    if (newPassword.trim() && newPassword.trim().length < 6) {
+      setErrorMsg("New password must be at least 6 characters.");
+      setActiveTab("credentials");
+      return;
+    }
+
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      await updatePartnerFn({
+        data: {
+          passcode,
+          partnerId: partner.id,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          email: email.trim() || null,
+          address: address.trim() || null,
+          initialInvestment: Number(initialInvestment) || 0,
+          investmentDate,
+          profitSharePercentage: Number(profitShare) || 0,
+          lossSharePercentage: Number(lossShare) || 0,
+          agreedTerms: agreedTerms.trim() || null,
+          projectName: projectName.trim() || "Broiler Cycle Partnership",
+          cycleName: cycleName.trim() || "Cycle 1",
+          cycleStartDate,
+          cycleEndDate: cycleEndDate || null,
+          batchId: batchId || null,
+          status,
+          amendReason: amendReason.trim() || (termsChanged ? "Amended details and terms by farm owner" : null),
+          newPassword: newPassword.trim() || null,
+        },
+      });
+
+      if (isActive !== partner.active) {
+        await toggleActiveFn({
+          data: {
+            passcode,
+            partnerId: partner.id,
+            active: isActive,
+          },
+        });
+      }
+
+      qc.invalidateQueries({ queryKey: ["admin-partners"] });
+      qc.invalidateQueries({ queryKey: ["admin-partner-detail", passcode, partner.id] });
+      onSuccess();
+    } catch (err: any) {
+      setErrorMsg(err instanceof Error ? err.message : "Could not update partner details.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePartner = async () => {
+    if (
+      !confirm(
+        `Are you completely sure you want to permanently delete ${partner.fullName}? All associated financial entries, receipts, activity records, and login credentials will be completely erased. This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    setErrorMsg(null);
+    try {
+      await deletePartnerFn({ data: { passcode, partnerId: partner.id } });
+      qc.invalidateQueries({ queryKey: ["admin-partners"] });
+      if (onDeleted) {
+        onDeleted();
+      } else {
+        onSuccess();
+      }
+    } catch (err: any) {
+      setErrorMsg(err instanceof Error ? err.message : "Could not delete partner.");
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/10 my-8 overflow-hidden flex flex-col max-h-[92vh]">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 bg-[#0F3D24] p-5 text-white">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10 text-white font-black text-sm">
+              <Pencil size={18} />
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-white">Edit Partner Details</h3>
+                <span className="rounded-md bg-white/15 px-2 py-0.5 text-[10px] font-mono font-bold text-white/90">
+                  @{partner.username}
+                </span>
+              </div>
+              <p className="text-xs text-white/75 mt-0.5">
+                Update profile, sharing split, batch link, or portal login credentials
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className="flex border-b border-slate-200 bg-[#FAF9F6] px-4 pt-2 overflow-x-auto gap-1 text-xs font-bold scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition whitespace-nowrap ${
+              activeTab === "profile"
+                ? "border-[#0F3D24] text-[#0F3D24]"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <User size={13} /> Profile & Contact
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("cycle")}
+            className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition whitespace-nowrap ${
+              activeTab === "cycle"
+                ? "border-[#0F3D24] text-[#0F3D24]"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <Wallet size={13} /> Capital & Cycle
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("sharing")}
+            className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition whitespace-nowrap ${
+              activeTab === "sharing"
+                ? "border-[#0F3D24] text-[#0F3D24]"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <TrendingUp size={13} /> Profit & Loss Split
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("credentials")}
+            className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition whitespace-nowrap ${
+              activeTab === "credentials"
+                ? "border-[#0F3D24] text-[#0F3D24]"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            <KeyRound size={13} /> Password & Access
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("danger")}
+            className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 transition whitespace-nowrap ${
+              activeTab === "danger"
+                ? "border-rose-600 text-rose-700 bg-rose-50/50 rounded-t-lg"
+                : "border-transparent text-rose-600/70 hover:text-rose-700"
+            }`}
+          >
+            <Trash2 size={13} /> Delete Partner
+          </button>
+        </div>
+
+        {/* Tab Body */}
+        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+          {errorMsg && (
+            <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs font-semibold text-rose-800">
+              <AlertTriangle size={15} className="shrink-0 text-rose-600" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* TAB 1: PROFILE & CONTACT */}
+          {activeTab === "profile" && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Full Legal / Business Name *</label>
+                  <div className="relative">
+                    <User size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Chief John Okafor"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Phone Number (WhatsApp) *</label>
+                  <div className="relative">
+                    <Phone size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="tel"
+                      required
+                      placeholder="e.g. +234 803 123 4567"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Email Address (Optional)</label>
+                  <div className="relative">
+                    <Mail size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="email"
+                      placeholder="e.g. partner@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Contact / Residential Address</label>
+                  <div className="relative">
+                    <MapPin size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="e.g. 14 Farm Road, Epe, Lagos"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2">
+                <label className="block font-bold text-[#0F3D24]">Partner Account Status</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(
+                    [
+                      { id: "active", label: "Active", desc: "Open cycle" },
+                      { id: "paused", label: "Paused", desc: "On hold" },
+                      { id: "matured", label: "Matured", desc: "Ready to settle" },
+                      { id: "completed", label: "Completed", desc: "Settled & closed" },
+                    ] as const
+                  ).map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setStatus(s.id)}
+                      className={`p-2.5 rounded-xl border text-left transition ${
+                        status === s.id
+                          ? "border-[#0F3D24] bg-[#0F3D24]/5 text-[#0F3D24] font-black"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="font-extrabold capitalize">{s.label}</div>
+                      <div className="text-[10px] text-slate-400 font-normal">{s.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CAPITAL & CYCLE */}
+          {activeTab === "cycle" && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Committed Investment Capital (₦) *</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-slate-500 font-bold">₦</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      required
+                      placeholder="e.g. 500000"
+                      value={initialInvestment}
+                      onChange={(e) => setInitialInvestment(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-[#0F3D24] font-mono font-bold outline-none focus:border-[#0F3D24]"
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    Formally registered capital: {naira(Number(initialInvestment) || 0)}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Investment Capital Deposit Date *</label>
+                  <div className="relative">
+                    <Calendar size={14} className="absolute left-3 top-3 text-slate-400" />
+                    <input
+                      type="date"
+                      required
+                      value={investmentDate}
+                      onChange={(e) => setInvestmentDate(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Project / Venture Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Broiler Cycle Partnership"
+                    value={projectName}
+                    onChange={(e) => setProjectName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Cycle Name / Label *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Cycle 1 — 6-Week Broilers"
+                    value={cycleName}
+                    onChange={(e) => setCycleName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Cycle Start Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={cycleStartDate}
+                    onChange={(e) => setCycleStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block font-bold text-[#0F3D24]">Cycle Target End Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={cycleEndDate}
+                    onChange={(e) => setCycleEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[#0F3D24]">Linked Farm Production Batch</label>
+                <select
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                >
+                  <option value="">No Batch Linked (Standalone Flock)</option>
+                  {batches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.batch_name} ({b.breed || "Broilers"} · {b.initial_chicks_count ?? b.current_chicks_count ?? 0} birds · Status: {b.status})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">
+                  Linking a batch allows 1-click proportional syncing of farm operational expenses and bird sales receipts into this partner's ledger.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: SHARING MATRIX */}
+          {activeTab === "sharing" && (
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-extrabold text-emerald-950">Partner Profit Share %</label>
+                    <span className="font-mono text-base font-black text-emerald-800 tabular-nums">
+                      {profitShare}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={profitShare}
+                    onChange={(e) => setProfitShare(e.target.value)}
+                    className="w-full accent-[#0F3D24]"
+                  />
+                  <div className="text-[10px] text-emerald-900/80">
+                    Farm retains remaining <strong>{100 - (Number(profitShare) || 0)}%</strong> of net profits.
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-rose-200 bg-rose-50/50 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="font-extrabold text-rose-950">Partner Loss Share %</label>
+                    <span className="font-mono text-base font-black text-rose-800 tabular-nums">
+                      {lossShare}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={lossShare}
+                    onChange={(e) => setLossShare(e.target.value)}
+                    className="w-full accent-rose-700"
+                  />
+                  <div className="text-[10px] text-rose-900/80">
+                    Farm absorbs remaining <strong>{100 - (Number(lossShare) || 0)}%</strong> of downside.
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-[#FAF9F6] p-3 text-slate-700 text-xs flex items-start gap-2">
+                <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-[#0F3D24] block">Downside Capital Protection Rule</strong>
+                  Under institutional co-financing standards, partner loss is strictly capped at their initial committed capital ({naira(Number(initialInvestment) || 0)}). Partners never owe the farm out-of-pocket money.
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block font-bold text-[#0F3D24]">Agreed Partnership Terms / Specific Clauses</label>
+                <textarea
+                  rows={3}
+                  placeholder="e.g. Broiler cycle lasts 6 weeks. Mortality above 7% triggers mutual review."
+                  value={agreedTerms}
+                  onChange={(e) => setAgreedTerms(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                />
+              </div>
+
+              {termsChanged && hasEntries && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-3.5 space-y-1.5">
+                  <label className="block font-extrabold text-amber-950">
+                    Reason for Amending Terms / Capital (Visible in partner audit timeline)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Mutual agreement to increase profit share from 60% to 70%"
+                    value={amendReason}
+                    onChange={(e) => setAmendReason(e.target.value)}
+                    className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: PASSWORD & PORTAL CREDENTIALS */}
+          {activeTab === "credentials" && (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-slate-200 bg-[#FAF9F6] p-4 space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-600">Portal Login URL:</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-[#0F3D24] text-xs">{portalUrl}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(portalUrl);
+                        setCopiedUrl(true);
+                        setTimeout(() => setCopiedUrl(false), 2000);
+                      }}
+                      className="text-slate-400 hover:text-[#0F3D24] p-1"
+                    >
+                      {copiedUrl ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <span className="text-slate-600">Username:</span>
+                  <span className="font-mono font-extrabold text-[#0F3D24] text-sm">@{partner.username}</span>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-slate-600">Portal Access State:</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsActive(!isActive)}
+                    className={`rounded-lg px-2.5 py-1 text-[11px] font-extrabold transition ${
+                      isActive
+                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                        : "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                    }`}
+                  >
+                    {isActive ? "Active / Authorized" : "Deactivated / Locked"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Reset Password Field */}
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <label className="block font-bold text-[#0F3D24]">Reset Partner Password</label>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-[#3F8F3F] hover:underline"
+                  >
+                    <Sparkles size={12} /> Auto-Generate
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Leave blank to keep current, or enter 6+ chars"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pr-10 text-[#0F3D24] font-mono outline-none focus:border-[#0F3D24]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500">
+                  If entered, saving will instantly hash and replace their login passcode.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: DANGER ZONE (PERMANENT DELETION) */}
+          {activeTab === "danger" && (
+            <div className="space-y-4">
+              <div className="rounded-3xl border-2 border-rose-300 bg-rose-50/60 p-5 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-rose-950">
+                      Permanently Delete Partner Account & Records
+                    </h4>
+                    <p className="mt-1 text-xs text-rose-900/80 leading-relaxed">
+                      You are about to permanently delete <strong>{partner.fullName}</strong> (@{partner.username}). This will completely erase:
+                    </p>
+                    <ul className="mt-2 list-disc list-inside text-xs text-rose-950 space-y-1 font-medium">
+                      <li>Their partner profile, contact data, and portal credentials.</li>
+                      <li>All recorded operational expenses, sales receipts, and payouts.</li>
+                      <li>All bird stock records, feeding logs, and pen photo attachments.</li>
+                      <li>Signed partnership agreements and settlement certificates.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-rose-200/80 flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold text-rose-900">
+                    This action is immediate and cannot be undone.
+                  </span>
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={handleDeletePartner}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white hover:bg-rose-700 disabled:opacity-50 transition shadow-sm"
+                  >
+                    {deleting ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" /> Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={13} /> Delete Partner Entirely
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer Controls */}
+          <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#0F3D24] px-6 py-2.5 text-xs font-black text-white hover:bg-[#165232] disabled:opacity-50 transition shadow-sm"
+            >
+              {saving ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" /> Saving Changes...
+                </>
+              ) : (
+                <>
+                  <Check size={14} /> Save Partner Changes
+                </>
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
