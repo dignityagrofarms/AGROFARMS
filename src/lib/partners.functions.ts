@@ -491,7 +491,7 @@ function mapPartner(p: any, finRows: any[], actRows: any[] = []): FarmPartner {
     cycleStatus: p.cycle_status === "closed" ? "closed" : "open",
     settledAt: p.settled_at ?? null,
     auditLog: visibleAuditLog,
-    agreementTerms: p.agreement_terms ?? p.agreed_terms ?? null,
+    agreementTerms: p.agreed_terms ?? p.agreement_terms ?? null,
     agreementSigned: Boolean(p.agreement_signed),
     agreementSignedAt: p.agreement_signed_at ?? null,
     agreementSignedBy: p.agreement_signed_by ?? null,
@@ -755,35 +755,55 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
         lossSharePercentage: data.lossSharePercentage,
       });
 
-    const { data: inserted, error } = await supabaseAdmin
-      .from("farm_partners")
-      .insert({
-        full_name: data.fullName,
-        phone: data.phone,
-        email: data.email || null,
-        address: data.address || null,
-        username: data.username,
-        passcode_hash: hash,
-        initial_investment: data.initialInvestment,
-        investment_date: data.investmentDate,
-        profit_share_percentage: data.profitSharePercentage,
-        loss_share_percentage: data.lossSharePercentage,
-        agreed_terms: terms,
-        agreement_terms: terms,
-        project_name: data.projectName,
-        cycle_name: data.cycleName,
-        cycle_start_date: data.cycleStartDate,
-        cycle_end_date: data.cycleEndDate || null,
-        cycle_status: "open",
-        batch_id: data.batchId || null,
-        status: "active",
-        active: true,
-      })
-      .select("id")
-      .single();
+    const insertPayload: Record<string, any> = {
+      full_name: data.fullName,
+      phone: data.phone,
+      email: data.email || null,
+      address: data.address || null,
+      username: data.username,
+      passcode_hash: hash,
+      initial_investment: data.initialInvestment,
+      investment_date: data.investmentDate,
+      profit_share_percentage: data.profitSharePercentage,
+      loss_share_percentage: data.lossSharePercentage,
+      agreed_terms: terms,
+      project_name: data.projectName,
+      cycle_name: data.cycleName,
+      cycle_start_date: data.cycleStartDate,
+      cycle_end_date: data.cycleEndDate || null,
+      cycle_status: "open",
+      batch_id: data.batchId || null,
+      status: "active",
+      active: true,
+    };
 
-    if (error) throw new Error(error.message);
-    return { ok: true, partnerId: inserted.id };
+    let insertedId: string | null = null;
+    let lastError: any = null;
+
+    // Schema-resilient insert loop: automatically prunes any column missing in older DB schemas
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: inserted, error } = await supabaseAdmin
+        .from("farm_partners")
+        .insert(insertPayload)
+        .select("id")
+        .single();
+
+      if (!error && inserted) {
+        insertedId = inserted.id;
+        break;
+      }
+
+      lastError = error;
+      const match = error?.message?.match(/Could not find the '([^']+)' column of 'farm_partners'/i);
+      if (match && match[1] && match[1] in insertPayload) {
+        delete insertPayload[match[1]];
+        continue;
+      }
+      break;
+    }
+
+    if (!insertedId) throw new Error(lastError?.message || "Failed to create partner account");
+    return { ok: true, partnerId: insertedId };
   });
 
 export const adminUpdatePartner = createServerFn({ method: "POST" })
@@ -1084,7 +1104,6 @@ export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
       settled_at: null,
       settlement_snapshot: null,
       agreed_terms: newTerms,
-      agreement_terms: newTerms,
       agreement_signed: false,
       agreement_signed_at: null,
       agreement_signed_by: null,
@@ -2013,7 +2032,6 @@ export const adminUpdatePartnerAgreementTerms = createServerFn({ method: "POST" 
     const { error } = await supabaseAdmin
       .from("farm_partners")
       .update({
-        agreement_terms: data.terms,
         agreed_terms: data.terms,
       })
       .eq("id", data.partnerId);
