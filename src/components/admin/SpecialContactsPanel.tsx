@@ -140,7 +140,7 @@ export function SpecialContactsPanel({
           onClick={() => setIsAddModalOpen(true)}
           className="inline-flex items-center gap-2 self-start rounded-full bg-white px-5 py-2.5 text-xs font-black text-[#0F3D24] shadow-md hover:bg-[#FAF9F6] transition"
         >
-          <Plus size={16} /> Impute New Contact
+          <Plus size={16} /> Input New Contact
         </button>
       </div>
 
@@ -328,7 +328,7 @@ export function SpecialContactsPanel({
               <p className="mx-auto max-w-md text-xs text-slate-500">
                 {searchTerm || typeFilter !== "all" || balanceFilter !== "all"
                   ? "No contacts match your current search or filters."
-                  : "You have not imputed any bulk buyers or suppliers yet. Click below to add your first special contact."}
+                  : "You have not added any bulk buyers or suppliers yet. Click below to input your first special contact."}
               </p>
               {!searchTerm && (
                 <button
@@ -336,7 +336,7 @@ export function SpecialContactsPanel({
                   onClick={() => setIsAddModalOpen(true)}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#165232]"
                 >
-                  <Plus size={14} /> Impute New Contact
+                  <Plus size={14} /> Input New Contact
                 </button>
               )}
             </div>
@@ -909,7 +909,7 @@ function ContactDetailView({
   );
 }
 
-// ─── Modal 1: Impute New Special Contact ──────────────────────────────────────
+// ─── Modal 1: Input New Special Contact ───────────────────────────────────────
 
 function AddSpecialContactModal({
   passcode,
@@ -1006,7 +1006,7 @@ function AddSpecialContactModal({
       <div className="relative my-8 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div className="flex items-center gap-2 text-base font-black text-[#0F3D24]">
-            <Contact size={20} className="text-[#3F8F3F]" /> Impute New Special Contact
+            <Contact size={20} className="text-[#3F8F3F]" /> Input New Special Contact
           </div>
           <button
             type="button"
