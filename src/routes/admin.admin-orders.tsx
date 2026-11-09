@@ -29,6 +29,7 @@ import { AdminLoginView } from "@/components/admin/AdminLoginView";
 import { AdminQuickOrderModal } from "@/components/admin/AdminQuickOrderModal";
 import { PartnersManagementPanel } from "@/components/admin/PartnersManagementPanel";
 import { SpecialContactsPanel } from "@/components/admin/SpecialContactsPanel";
+import { adminGetPartnerSettings } from "@/lib/partners.functions";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -306,17 +307,26 @@ function AdminOrders() {
 
   const role = (query.data?.role as AdminRole) || "owner";
 
+  const getPartnerSettingsFn = useServerFn(adminGetPartnerSettings);
+  const partnerSettingsQuery = useQuery({
+    queryKey: ["admin-partner-settings", passcode],
+    queryFn: () => getPartnerSettingsFn({ data: { passcode: passcode! } }),
+    enabled: !!passcode && (role === "owner" || role === "manager"),
+    staleTime: 10_000,
+  });
+  const hidePartnersFromManager = partnerSettingsQuery.data?.hideFromManager ?? false;
+
   useEffect(() => {
     if (role === "staff") {
       if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr", "partners", "contacts"].includes(activeTab)) {
         setActiveTab("tasks");
       }
     } else if (role === "manager") {
-      if (["vouchers", "flyers"].includes(activeTab)) {
+      if (["vouchers", "flyers"].includes(activeTab) || (hidePartnersFromManager && activeTab === "partners")) {
         setActiveTab("orders");
       }
     }
-  }, [role, activeTab]);
+  }, [role, activeTab, hidePartnersFromManager]);
 
   // Effect to detect newly arrived orders during polling
   useEffect(() => {
@@ -692,8 +702,8 @@ function AdminOrders() {
             </div>
           )}
 
-          {/* Partnership & Investor Relations (Owner & Manager) */}
-          {(role === "owner" || role === "manager") && (
+          {/* Partnership & Investor Relations (Owner & Manager if not hidden) */}
+          {(role === "owner" || (role === "manager" && !hidePartnersFromManager)) && (
             <div>
               {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Partnership</h3>}
               <ul className="space-y-1">
@@ -956,7 +966,7 @@ function AdminOrders() {
                   <StaffTasksPanel passcode={passcode!} role={query.data.role} username={currentUsername} />
                 ) : activeTab === "complaints" ? (
                   <ComplaintsDashboardPanel passcode={passcode!} />
-                ) : activeTab === "partners" && (role === "owner" || role === "manager") ? (
+                ) : activeTab === "partners" && (role === "owner" || (role === "manager" && !hidePartnersFromManager)) ? (
                   <PartnersManagementPanel passcode={passcode!} role={role} />
                 ) : null}
               </>

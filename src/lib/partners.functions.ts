@@ -195,6 +195,17 @@ async function checkOwnerOrManager(
   if (role !== "owner" && role !== "manager") {
     throw new Error("Access denied. Partner operations are restricted to Owner and Manager only.");
   }
+  if (role === "manager") {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: settingRow } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "hide_partners_from_manager")
+      .maybeSingle();
+    if (settingRow?.value === "true") {
+      throw new Error("Access denied. Partner dashboard and records have been restricted to Owner-only by the Farm Owner.");
+    }
+  }
   const cred = parseAdminCredential(value);
   return { role, username: cred.username || role };
 }
@@ -2058,4 +2069,55 @@ export const adminUpdatePartnerAgreementTerms = createServerFn({ method: "POST" 
 
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ─── Partner System Visibility Controls ─────────────────────────────────────
+
+export const adminGetPartnerSettings = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1).max(200) }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const role = await checkPasscode(data.passcode);
+    if (role !== "owner" && role !== "manager") {
+      throw new Error("Access denied.");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: row } = await supabaseAdmin
+      .from("app_settings")
+      .select("value")
+      .eq("key", "hide_partners_from_manager")
+      .maybeSingle();
+
+    const hideFromManager = row?.value === "true";
+    return { hideFromManager, role };
+  });
+
+export const adminSetPartnerManagerVisibility = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1).max(200),
+        hide: z.boolean(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("app_settings")
+      .upsert(
+        {
+          key: "hide_partners_from_manager",
+          value: data.hide ? "true" : "false",
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "key" },
+      );
+
+    if (error) {
+      throw new Error(`Failed to update setting: ${error.message}`);
+    }
+    return { success: true, hideFromManager: data.hide };
   });

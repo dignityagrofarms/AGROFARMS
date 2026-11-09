@@ -62,6 +62,8 @@ import {
   adminDeletePartnerFinancial,
   adminRecordPartnerActivity,
   adminDeletePartnerActivity,
+  adminGetPartnerSettings,
+  adminSetPartnerManagerVisibility,
   type FarmPartner,
   type PartnerFinancial,
   type PartnerActivity,
@@ -127,6 +129,8 @@ export function PartnersManagementPanel({
   const listPartnersFn = useServerFn(adminListPartners);
   const listBatchesFn = useServerFn(adminListBatches);
   const deletePartnerFn = useServerFn(adminDeletePartner);
+  const getPartnerSettingsFn = useServerFn(adminGetPartnerSettings);
+  const setPartnerManagerVisibilityFn = useServerFn(adminSetPartnerManagerVisibility);
 
   const partnersQuery = useQuery({
     queryKey: ["admin-partners", passcode],
@@ -139,6 +143,39 @@ export function PartnersManagementPanel({
     queryFn: () => listBatchesFn({ data: { passcode } }),
     staleTime: 60_000,
   });
+
+  const partnerSettingsQuery = useQuery({
+    queryKey: ["admin-partner-settings", passcode],
+    queryFn: () => getPartnerSettingsFn({ data: { passcode } }),
+    staleTime: 10_000,
+  });
+
+  const isHiddenFromManager = partnerSettingsQuery.data?.hideFromManager ?? false;
+  const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+
+  const handleToggleManagerVisibility = async () => {
+    if (effectiveRole !== "owner") return;
+    const targetHide = !isHiddenFromManager;
+    const confirmationPrompt = targetHide
+      ? "Hide Partner Dashboard from Manager?\n\nThe Farm Manager will not see the 'For Partners' tab and will not be able to view any partner details, capital, or agreements."
+      : "Allow Manager Access to Partners?\n\nThe Farm Manager will be able to see the 'For Partners' tab and submit operational logs (which will still require Farm Owner verification).";
+
+    if (!confirm(confirmationPrompt)) {
+      return;
+    }
+
+    try {
+      setIsTogglingVisibility(true);
+      await setPartnerManagerVisibilityFn({
+        data: { passcode, hide: targetHide },
+      });
+      await qc.invalidateQueries({ queryKey: ["admin-partner-settings"] });
+    } catch (err: any) {
+      alert(err instanceof Error ? err.message : "Failed to update manager visibility setting.");
+    } finally {
+      setIsTogglingVisibility(false);
+    }
+  };
 
   const partners = partnersQuery.data || [];
   const batches = batchesQuery.data || [];
@@ -186,6 +223,11 @@ export function PartnersManagementPanel({
                 Manager Mode · Owner Approval Gate Active
               </span>
             )}
+            {effectiveRole === "owner" && isHiddenFromManager && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-400/20 border border-amber-300/40 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-200">
+                <EyeOff size={11} /> Hidden from Farm Manager
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-black tracking-tight sm:text-3xl flex flex-wrap items-center gap-2">
             <span>For Partners</span>
@@ -213,6 +255,41 @@ export function PartnersManagementPanel({
               className="inline-flex items-center gap-1.5 rounded-xl bg-white/20 border border-white/30 px-4 py-2 text-xs font-black text-white hover:bg-white hover:text-[#0F3D24] transition shadow-xs cursor-pointer"
             >
               <ArrowLeft size={14} /> Back to Directory
+            </button>
+          )}
+          {effectiveRole === "owner" && (
+            <button
+              type="button"
+              onClick={handleToggleManagerVisibility}
+              disabled={isTogglingVisibility}
+              title={
+                isHiddenFromManager
+                  ? "Partner dashboard is currently hidden from the farm manager. Click to allow manager access."
+                  : "Click to hide the partner dashboard and all investor information from the farm manager."
+              }
+              className={`inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-black transition cursor-pointer border ${
+                isHiddenFromManager
+                  ? "bg-amber-400 text-[#0F3D24] border-amber-300 shadow-sm hover:bg-amber-300"
+                  : "bg-white/10 text-white/90 border-white/20 hover:bg-white/20"
+              }`}
+            >
+              {isTogglingVisibility ? (
+                <Loader2 size={14} className="animate-spin text-current" />
+              ) : isHiddenFromManager ? (
+                <EyeOff size={14} className="text-[#0F3D24]" />
+              ) : (
+                <Eye size={14} className="text-white" />
+              )}
+              <span>{isHiddenFromManager ? "Hidden from Manager" : "Hide from Manager"}</span>
+              <span
+                className={`ml-1 rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                  isHiddenFromManager
+                    ? "bg-[#0F3D24] text-amber-300"
+                    : "bg-white/20 text-white"
+                }`}
+              >
+                {isHiddenFromManager ? "Locked" : "Visible"}
+              </span>
             </button>
           )}
           {effectiveRole === "owner" && (
@@ -261,6 +338,31 @@ export function PartnersManagementPanel({
               />
             </div>
           </div>
+
+          {effectiveRole === "owner" && isHiddenFromManager && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-50/80 p-4 text-xs text-amber-950 shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-700">
+                  <ShieldCheck size={16} />
+                </span>
+                <div>
+                  <span className="font-extrabold text-amber-900">Confidential Mode Active:</span>{" "}
+                  <span className="text-amber-800">
+                    The &ldquo;For Partners&rdquo; dashboard, navigation tab, and all investor information are completely hidden and blocked from the Farm Manager.
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleToggleManagerVisibility}
+                disabled={isTogglingVisibility}
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-white border border-amber-300 px-3 py-1.5 text-[11px] font-bold text-amber-900 hover:bg-amber-100/60 transition cursor-pointer shadow-xs"
+              >
+                <Eye size={13} className="text-amber-700" />
+                <span>Allow Manager Access</span>
+              </button>
+            </div>
+          )}
 
           {partnersQuery.isLoading ? (
             <div className="flex items-center justify-center py-16">
