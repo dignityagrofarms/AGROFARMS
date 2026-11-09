@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone, Plus, Handshake } from "lucide-react";
+import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone, Plus, Handshake, Contact } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
@@ -28,6 +28,7 @@ import { PreorderFinancialChart } from "@/components/admin/PreorderFinancialChar
 import { AdminLoginView } from "@/components/admin/AdminLoginView";
 import { AdminQuickOrderModal } from "@/components/admin/AdminQuickOrderModal";
 import { PartnersManagementPanel } from "@/components/admin/PartnersManagementPanel";
+import { SpecialContactsPanel } from "@/components/admin/SpecialContactsPanel";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -278,7 +279,7 @@ function AdminOrders() {
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr" | "partners">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "contacts" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr" | "partners">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -307,7 +308,7 @@ function AdminOrders() {
 
   useEffect(() => {
     if (role === "staff") {
-      if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr", "partners"].includes(activeTab)) {
+      if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr", "partners", "contacts"].includes(activeTab)) {
         setActiveTab("tasks");
       }
     } else if (role === "manager") {
@@ -614,6 +615,12 @@ function AdminOrders() {
                       {!isSidebarCollapsed && <span>Order Clients</span>}
                     </button>
                   </li>
+                  <li>
+                    <button onClick={() => { setActiveTab("contacts"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "contacts" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                      <Contact size={18} className="shrink-0" />
+                      {!isSidebarCollapsed && <span>Special Contacts</span>}
+                    </button>
+                  </li>
                 </>
               )}
               <li>
@@ -885,6 +892,8 @@ function AdminOrders() {
                   <ClientCrmPanel passcode={passcode} />
                 ) : activeTab === "leads" ? (
                   <LeadCrmPanel passcode={passcode} role={role} />
+                ) : activeTab === "contacts" && (role === "owner" || role === "manager") ? (
+                  <SpecialContactsPanel passcode={passcode!} role={role} batches={batchesQuery.data || []} />
                 ) : activeTab === "vouchers" ? (
                   <VoucherPanel passcode={passcode} />
                 ) : activeTab === "december" ? (
