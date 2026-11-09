@@ -311,7 +311,7 @@ function AdminOrders() {
         setActiveTab("tasks");
       }
     } else if (role === "manager") {
-      if (["vouchers", "flyers", "partners"].includes(activeTab)) {
+      if (["vouchers", "flyers"].includes(activeTab)) {
         setActiveTab("orders");
       }
     }
@@ -685,8 +685,8 @@ function AdminOrders() {
             </div>
           )}
 
-          {/* Partnership & Investor Relations (Owner Only) */}
-          {role === "owner" && (
+          {/* Partnership & Investor Relations (Owner & Manager) */}
+          {(role === "owner" || role === "manager") && (
             <div>
               {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Partnership</h3>}
               <ul className="space-y-1">
@@ -947,7 +947,7 @@ function AdminOrders() {
                   <StaffTasksPanel passcode={passcode!} role={query.data.role} username={currentUsername} />
                 ) : activeTab === "complaints" ? (
                   <ComplaintsDashboardPanel passcode={passcode!} />
-                ) : activeTab === "partners" && role === "owner" ? (
+                ) : activeTab === "partners" && (role === "owner" || role === "manager") ? (
                   <PartnersManagementPanel passcode={passcode!} role={role} />
                 ) : null}
               </>

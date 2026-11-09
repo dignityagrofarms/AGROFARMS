@@ -40,6 +40,12 @@ import {
   ExternalLink,
   ShieldCheck,
   FileCheck2,
+  Layers,
+  RefreshCw,
+  MessageCircle,
+  Upload,
+  Award,
+  Clock,
 } from "lucide-react";
 import {
   adminListPartners,
@@ -58,7 +64,9 @@ import {
   type FarmPartner,
   type PartnerFinancial,
   type PartnerActivity,
+  type PartnerDashboardSummary,
 } from "@/lib/partners.functions";
+import { buildChartData } from "@/lib/partner-settlement";
 import { adminListBatches } from "@/lib/farm.functions";
 import type { AdminRole } from "@/lib/orders.functions";
 import { PartnerCharts } from "@/components/partners/PartnerCharts";
@@ -72,7 +80,19 @@ import {
   AgreementCard,
   SignAgreementModal,
   UploadWrittenAgreementModal,
+  UnitEconomicsStrip,
+  CycleElectionCard,
+  CycleSwitcherBar,
+  PartnershipCertificateModal,
+  EvidenceLightboxModal,
 } from "@/components/partners/PartnerSettlementCards";
+import {
+  ExecutivePortfolioStrip,
+  PendingPartnerApprovalsBanner,
+  RolloverCycleModal,
+  BatchSyncModal,
+  WeeklyWhatsAppDigestModal,
+} from "@/components/admin/PartnerOperationsModals";
 import { exportPartnerReportPDF, exportPartnerReportCSV } from "@/lib/partner-report-export";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
@@ -100,6 +120,8 @@ export function PartnersManagementPanel({
     cycleName: string;
   } | null>(null);
 
+  const effectiveRole: "owner" | "manager" = role === "manager" ? "manager" : "owner";
+
   const listPartnersFn = useServerFn(adminListPartners);
   const listBatchesFn = useServerFn(adminListBatches);
 
@@ -118,16 +140,6 @@ export function PartnersManagementPanel({
   const partners = partnersQuery.data || [];
   const batches = batchesQuery.data || [];
 
-  // Summary Metrics across all partners
-  const totalCapitalInvested = partners.reduce((sum, p) => sum + p.initialInvestment, 0);
-  const totalExpenses = partners.reduce((sum, p) => sum + p.settlement.totalExpenses, 0);
-  const totalIncome = partners.reduce((sum, p) => sum + p.settlement.totalIncome, 0);
-  const totalPayoutBalanceOwed = partners.reduce(
-    (sum, p) => sum + Math.max(0, p.settlement.balanceOwed),
-    0,
-  );
-  const activePartnersCount = partners.filter((p) => p.cycleStatus === "open" && p.active).length;
-
   const filteredPartners = partners.filter(
     (p) =>
       p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -139,92 +151,43 @@ export function PartnersManagementPanel({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner & Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl bg-gradient-to-r from-[#0F3D24] via-[#165232] to-[#0F3D24] p-6 text-white shadow-md">
+      {/* Top Executive Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-2xl border border-[#0F3D24] bg-[#0F3D24] p-6 text-white shadow-sm">
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/10 text-[#a8e6a8]">
-              <Handshake size={18} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+              <Handshake size={16} />
             </span>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#a8e6a8]">
-              Investor Relations & Profit/Loss Transparency
+            <span className="text-[11px] font-bold uppercase tracking-widest text-white/75">
+              Investor Governance & Co-Financing Operations
             </span>
+            {effectiveRole === "manager" && (
+              <span className="rounded-md bg-amber-400/20 border border-amber-300/40 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-200">
+                Manager Mode · Owner Approval Gate Active
+              </span>
+            )}
           </div>
           <h2 className="text-2xl font-black tracking-tight sm:text-3xl">For Partners</h2>
           <p className="max-w-2xl text-xs text-white/80">
-            Configure custom profit & loss sharing splits per partner, key in expenses, sales & payouts, and give every investor live charts and transparent settlement statements.
+            {effectiveRole === "owner"
+              ? "Manage partner cycles, profit & loss splits, batch synchronization, manager entry approvals, and certified settlement statements."
+              : "Record partner operational expenses, sales receipts, and daily flock logs. All manager entries are verified by the Farm Owner before publishing to the partner portal."}
           </p>
         </div>
 
-        {role === "owner" && (
+        {effectiveRole === "owner" && (
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center gap-2 self-start rounded-full bg-[#3F8F3F] px-5 py-3 text-xs font-bold text-white shadow-lg transition hover:bg-[#4ea94e] hover:shadow-xl"
+            className="inline-flex items-center gap-2 self-start rounded-xl bg-white px-5 py-2.5 text-xs font-black text-[#0F3D24] shadow-sm transition hover:bg-[#FAF9F6]"
           >
-            <Plus size={16} /> Register New Partner
+            <Plus size={15} /> Onboard New Partner
           </button>
         )}
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
-              Total Partner Capital
-            </span>
-            <div className="rounded-xl bg-[#0F3D24]/10 p-2 text-[#0F3D24]">
-              <Wallet size={16} />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-black text-[#0F3D24]">{naira(totalCapitalInvested)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">
-            {activePartnersCount} open cycle(s) · {partners.length} total partner(s)
-          </span>
-        </div>
-
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
-              Partner Expenses Keyed
-            </span>
-            <div className="rounded-xl bg-rose-50 p-2 text-rose-700">
-              <Receipt size={16} />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-black text-rose-900">{naira(totalExpenses)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Funded by partner capital</span>
-        </div>
-
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
-              Partner Sales Keyed
-            </span>
-            <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
-              <TrendingUp size={16} />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-black text-emerald-900">{naira(totalIncome)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">
-            Cycle Net: {signedNaira(totalIncome - totalExpenses)}
-          </span>
-        </div>
-
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
-              Payout Balance Due
-            </span>
-            <div className="rounded-xl bg-amber-50 p-2 text-amber-700">
-              <Banknote size={16} />
-            </div>
-          </div>
-          <div className="mt-2 text-2xl font-black text-amber-900">{naira(totalPayoutBalanceOwed)}</div>
-          <span className="text-[10px] text-slate-500 font-medium">Remaining owed across partners</span>
-        </div>
-      </div>
+      {/* Executive Portfolio Health Strip */}
+      <ExecutivePortfolioStrip partners={partners} role={effectiveRole} />
 
       {/* Main Workspace */}
       {selectedPartnerId ? (
@@ -232,43 +195,44 @@ export function PartnersManagementPanel({
           passcode={passcode}
           partnerId={selectedPartnerId}
           batches={batches}
+          viewerRole={effectiveRole}
           onBack={() => {
             setSelectedPartnerId(null);
             qc.invalidateQueries({ queryKey: ["admin-partners"] });
           }}
         />
       ) : (
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-5">
+        <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-lg font-bold text-[#0F3D24]">All Partners Over Time</h3>
-              <p className="text-xs text-[#0F3D24]/65">
-                Click any partner to inspect their live charts, key in expenses/income/payouts, or settle their cycle.
+              <h3 className="text-base font-black text-[#0F3D24]">Registered Partners Directory</h3>
+              <p className="text-xs text-slate-500">
+                Select a partner to inspect unit economics, approve logs, sync batch records, or manage cycles.
               </p>
             </div>
             <div className="w-full sm:w-72">
               <input
                 type="text"
-                placeholder="Search by name, username, cycle..."
+                placeholder="Search partner name, @username, cycle..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-full border border-slate-200 bg-[#F7F5F0]/60 px-4 py-2 text-xs font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-4 py-2 text-xs font-medium text-[#0F3D24] outline-none focus:border-[#0F3D24] focus:bg-white"
               />
             </div>
           </div>
 
           {partnersQuery.isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="animate-spin text-[#3F8F3F]" size={32} />
+              <Loader2 className="animate-spin text-[#0F3D24]" size={28} />
             </div>
           ) : filteredPartners.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-              <Handshake className="mx-auto text-slate-400" size={40} />
-              <h4 className="mt-3 text-base font-bold text-slate-700">No Partners Found</h4>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-[#FAF9F6] p-12 text-center">
+              <Handshake className="mx-auto text-slate-400" size={36} />
+              <h4 className="mt-3 text-sm font-bold text-slate-700">No Partners Found</h4>
               <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
                 {searchTerm
-                  ? "No partners match your search criteria. Try a different query."
-                  : "You have not registered any partners yet. Click 'Register New Partner' above to onboard your first investor."}
+                  ? "No partners match your search criteria."
+                  : "No partners have been onboarded yet."}
               </p>
             </div>
           ) : (
@@ -277,19 +241,29 @@ export function PartnersManagementPanel({
                 const s = partner.settlement;
                 const isLoss = s.result === "loss";
                 const isProfit = s.result === "profit";
+                const pendingCount = partner.pendingApprovalsCount || 0;
+                const totalCycles = (partner.archivedCycles?.length || 0) + 1;
+
                 return (
                   <div
                     key={partner.id}
                     onClick={() => setSelectedPartnerId(partner.id)}
-                    className="group relative cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-[#3F8F3F]/50 hover:shadow-md flex flex-col justify-between"
+                    className="group relative cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-[#0F3D24]/40 hover:shadow-md flex flex-col justify-between"
                   >
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-[#3F8F3F]">
-                            {partner.projectName} · {partner.cycleName}
-                          </span>
-                          <h4 className="text-base font-black text-[#0F3D24] group-hover:text-[#3F8F3F] transition-colors">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#3F8F3F]">
+                              {partner.projectName} · {partner.cycleName}
+                            </span>
+                            {totalCycles > 1 && (
+                              <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[9px] font-bold text-slate-600">
+                                {totalCycles} Cycles
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="mt-0.5 text-base font-black text-[#0F3D24] group-hover:text-[#3F8F3F] transition-colors">
                             {partner.fullName}
                           </h4>
                           <div className="text-[11px] font-medium text-slate-500">
@@ -300,7 +274,7 @@ export function PartnersManagementPanel({
                           className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
                             partner.cycleStatus === "closed"
                               ? "bg-slate-800 text-white"
-                              : "bg-emerald-100 text-emerald-800"
+                              : "bg-emerald-50 text-emerald-800 border border-emerald-200"
                           }`}
                         >
                           {partner.cycleStatus === "closed" ? (
@@ -308,38 +282,56 @@ export function PartnersManagementPanel({
                               <Lock size={10} /> Settled
                             </>
                           ) : (
-                            "Open"
+                            "Active"
                           )}
                         </span>
                       </div>
 
-                      {/* Sharing Split Badge */}
-                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-extrabold">
-                        <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-emerald-800">
-                          {partner.profitSharePercentage}% Profit Share
+                      {/* Governance Badges */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold">
+                        <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-emerald-800 tabular-nums">
+                          {partner.profitSharePercentage}% Profit
                         </span>
-                        <span className="rounded-lg bg-rose-50 border border-rose-200 px-2 py-0.5 text-rose-800">
-                          {partner.lossSharePercentage}% Loss Responsibility
+                        <span className="rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-rose-800 tabular-nums">
+                          {partner.lossSharePercentage}% Loss
                         </span>
+                        {pendingCount > 0 && (
+                          <span className="rounded-md bg-amber-100 border border-amber-300 px-2 py-0.5 text-amber-900 font-extrabold">
+                            {pendingCount} Awaiting Approval
+                          </span>
+                        )}
+                        {partner.payoutElection && (
+                          <span className="rounded-md bg-[#0F3D24]/10 px-2 py-0.5 text-[#0F3D24]">
+                            {partner.payoutElection.choice === "bank_payout"
+                              ? "Payout Requested"
+                              : "Rollover Elected"}
+                          </span>
+                        )}
                       </div>
 
-                      <div className="rounded-xl bg-[#F7F5F0] p-3 text-xs space-y-1.5">
+                      <div className="rounded-xl border border-slate-200/70 bg-[#FAF9F6] p-3 text-xs space-y-1.5 tabular-nums">
                         <div className="flex items-center justify-between text-slate-600">
-                          <span>Invested Capital:</span>
-                          <strong className="text-[#0F3D24] font-bold">{naira(partner.initialInvestment)}</strong>
+                          <span>Committed Capital:</span>
+                          <strong className="text-[#0F3D24] font-bold">
+                            {naira(partner.initialInvestment)}
+                          </strong>
                         </div>
                         <div className="flex items-center justify-between text-slate-600">
-                          <span>Partner Result ({isLoss ? `${partner.lossSharePercentage}% loss` : `${partner.profitSharePercentage}% profit`}):</span>
+                          <span>Partner Net Share:</span>
                           <strong
                             className={`font-black ${
-                              isLoss ? "text-rose-700" : isProfit ? "text-emerald-700" : "text-slate-700"
+                              isLoss
+                                ? "text-rose-700"
+                                : isProfit
+                                  ? "text-emerald-700"
+                                  : "text-slate-700"
                             }`}
                           >
                             {signedNaira(s.partnerSignedResult)}
                           </strong>
                         </div>
                         <div className="flex items-center justify-between text-slate-600">
-                          <span>Payout Due / Balance:</span>
+                          <span>Entitlement / Balance:</span>
                           <span className="font-bold text-[#0F3D24]">
                             {naira(s.payoutDue)}{" "}
                             <span className="text-[10px] text-slate-500">
@@ -349,21 +341,32 @@ export function PartnersManagementPanel({
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-center text-xs pt-1">
-                        <div className="rounded-xl bg-rose-50/70 p-2 border border-rose-100">
-                          <span className="text-[10px] font-bold uppercase text-rose-800 block">Expenses</span>
-                          <strong className="text-rose-950 font-black">{naira(s.totalExpenses)}</strong>
+                      <div className="grid grid-cols-2 gap-2 text-center text-xs pt-0.5 tabular-nums">
+                        <div className="rounded-xl bg-rose-50/50 p-2 border border-rose-100">
+                          <span className="text-[10px] font-bold uppercase text-rose-800 block">
+                            Verified Spend
+                          </span>
+                          <strong className="text-rose-950 font-black">
+                            {naira(s.totalExpenses)}
+                          </strong>
                         </div>
-                        <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100">
-                          <span className="text-[10px] font-bold uppercase text-emerald-800 block">Sales</span>
-                          <strong className="text-emerald-950 font-black">{naira(s.totalIncome)}</strong>
+                        <div className="rounded-xl bg-emerald-50/50 p-2 border border-emerald-100">
+                          <span className="text-[10px] font-bold uppercase text-emerald-800 block">
+                            Verified Sales
+                          </span>
+                          <strong className="text-emerald-950 font-black">
+                            {naira(s.totalIncome)}
+                          </strong>
                         </div>
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#3F8F3F]">
+                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-[#0F3D24]">
                       <span>Open Partner Workspace</span>
-                      <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                      <ChevronRight
+                        size={15}
+                        className="group-hover:translate-x-1 transition-transform"
+                      />
                     </div>
                   </div>
                 );
@@ -373,8 +376,8 @@ export function PartnersManagementPanel({
         </div>
       )}
 
-      {/* Register New Partner Modal */}
-      {isAddModalOpen && (
+      {/* Register New Partner Modal (Owner Only) */}
+      {isAddModalOpen && effectiveRole === "owner" && (
         <AddPartnerModal
           passcode={passcode}
           batches={batches}
@@ -408,17 +411,20 @@ function PartnerDetailView({
   passcode,
   partnerId,
   batches,
+  viewerRole,
   onBack,
 }: {
   passcode: string;
   partnerId: string;
   batches: any[];
+  viewerRole: "owner" | "manager";
   onBack: () => void;
 }) {
   const qc = useQueryClient();
   const [activeSubTab, setActiveSubTab] = useState<
     "overview" | "financials" | "activities" | "credentials"
   >("overview");
+  const [selectedCycleId, setSelectedCycleId] = useState<string>("current");
 
   const getPartnerDetailFn = useServerFn(adminGetPartnerDetail);
   const closeCycleFn = useServerFn(adminClosePartnerCycle);
@@ -428,6 +434,15 @@ function PartnerDetailView({
   const [showSignModal, setShowSignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [showRolloverModal, setShowRolloverModal] = useState(false);
+  const [showBatchSyncModal, setShowBatchSyncModal] = useState(false);
+  const [showDigestModal, setShowDigestModal] = useState(false);
+  const [lightboxData, setLightboxData] = useState<{
+    url: string;
+    title: string;
+    subtitle?: string;
+  } | null>(null);
 
   const detailQuery = useQuery({
     queryKey: ["admin-partner-detail", passcode, partnerId],
@@ -442,8 +457,8 @@ function PartnerDetailView({
 
   if (detailQuery.isLoading) {
     return (
-      <div className="rounded-3xl bg-white p-12 text-center shadow-sm">
-        <Loader2 className="mx-auto animate-spin text-[#3F8F3F]" size={36} />
+      <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-12 text-center shadow-sm">
+        <Loader2 className="mx-auto animate-spin text-[#0F3D24]" size={32} />
         <p className="mt-3 text-xs text-slate-500 font-semibold">Loading partner workspace...</p>
       </div>
     );
@@ -451,12 +466,12 @@ function PartnerDetailView({
 
   if (!detailQuery.data?.partner) {
     return (
-      <div className="rounded-3xl bg-white p-12 text-center shadow-sm">
-        <AlertTriangle className="mx-auto text-amber-500" size={36} />
+      <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-12 text-center shadow-sm">
+        <AlertTriangle className="mx-auto text-amber-500" size={32} />
         <p className="mt-2 text-sm font-bold text-slate-800">Partner not found.</p>
         <button
           onClick={onBack}
-          className="mt-4 rounded-full bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white"
+          className="mt-4 rounded-xl bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white"
         >
           Return to Partners List
         </button>
@@ -464,19 +479,76 @@ function PartnerDetailView({
     );
   }
 
-  const { partner, financials, activities, charts, summary } = detailQuery.data;
+  const {
+    partner: livePartner,
+    financials: liveFinancials,
+    activities: liveActivities,
+    charts: liveCharts,
+    summary: liveSummary,
+  } = detailQuery.data;
+
+  // Resolve whether we are viewing the current active cycle or an archived historical cycle
+  const selectedArchive =
+    selectedCycleId === "current"
+      ? null
+      : (livePartner.archivedCycles || []).find((c) => c.cycleId === selectedCycleId) || null;
+
+  const partner: FarmPartner = selectedArchive
+    ? {
+        ...livePartner,
+        cycleName: selectedArchive.cycleName,
+        projectName: selectedArchive.projectName,
+        batchId: selectedArchive.batchId,
+        batchName: selectedArchive.batchName ?? null,
+        initialInvestment: selectedArchive.initialInvestment,
+        profitSharePercentage: selectedArchive.profitSharePercentage,
+        lossSharePercentage: selectedArchive.lossSharePercentage,
+        cycleStartDate: selectedArchive.cycleStartDate,
+        cycleEndDate: selectedArchive.cycleEndDate,
+        cycleStatus: "closed",
+        settledAt: selectedArchive.settledAt,
+        settlement: selectedArchive.settlement,
+        agreementSigned: selectedArchive.agreementSigned,
+        agreementSignedAt: selectedArchive.agreementSignedAt,
+        agreementSignedBy: selectedArchive.agreementSignedBy,
+      }
+    : livePartner;
+
+  const financials = selectedArchive ? selectedArchive.financials : liveFinancials;
+  const activities = selectedArchive ? selectedArchive.activities : liveActivities;
+  const summary = selectedArchive ? selectedArchive.summary : liveSummary;
+  const charts = selectedArchive
+    ? buildChartData(
+        selectedArchive.financials.map((f) => ({
+          type: f.type,
+          amount: f.amount,
+          removedAt: f.removedAt,
+          category: f.category,
+          transactionDate: f.transactionDate,
+        })),
+        selectedArchive.activities.map((a) => ({
+          activityDate: a.activityDate,
+          stockHeadcount: a.stockHeadcount,
+          mortalityCount: a.mortalityCount,
+          feedConsumedKg: a.feedConsumedKg,
+          removedAt: a.removedAt,
+        })),
+      )
+    : liveCharts;
+
   const s = partner.settlement;
+  const isViewingArchive = Boolean(selectedArchive);
 
   const handleCloseCycle = async () => {
     if (
       !confirm(
-        `Close & Settle ${partner.cycleName} for ${partner.fullName}?\n\nThis will stamp the final settlement statement (Partner Result: ${signedNaira(s.partnerSignedResult)}, Payout Due: ${naira(s.payoutDue)}) and lock new expenses/income unless re-opened.`,
+        `Close & Settle ${livePartner.cycleName} for ${livePartner.fullName}?\n\nThis will stamp the final settlement statement (Partner Result: ${signedNaira(livePartner.settlement.partnerSignedResult)}, Payout Due: ${naira(livePartner.settlement.payoutDue)}) and lock new expenses/income unless re-opened.`,
       )
     )
       return;
     setSettling(true);
     try {
-      await closeCycleFn({ data: { passcode, partnerId: partner.id } });
+      await closeCycleFn({ data: { passcode, partnerId: livePartner.id } });
       refreshDetail();
     } catch (err: any) {
       alert(err instanceof Error ? err.message : "Could not close cycle.");
@@ -486,11 +558,13 @@ function PartnerDetailView({
   };
 
   const handleReopenCycle = async () => {
-    const reason = prompt("Enter a reason for re-opening this settled cycle (visible in the partner's audit log):");
+    const reason = prompt(
+      "Enter a reason for re-opening this settled cycle (visible in the partner's governance audit log):",
+    );
     if (!reason || reason.trim().length < 3) return;
     setSettling(true);
     try {
-      await reopenCycleFn({ data: { passcode, partnerId: partner.id, reason: reason.trim() } });
+      await reopenCycleFn({ data: { passcode, partnerId: livePartner.id, reason: reason.trim() } });
       refreshDetail();
     } catch (err: any) {
       alert(err instanceof Error ? err.message : "Could not re-open cycle.");
@@ -500,40 +574,92 @@ function PartnerDetailView({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
+      {/* Multi-Cycle Switcher Bar */}
+      <CycleSwitcherBar
+        partner={livePartner}
+        selectedCycleId={selectedCycleId}
+        onSelectCycle={(id) => {
+          setSelectedCycleId(id);
+          if (id !== "current" && activeSubTab === "credentials") {
+            setActiveSubTab("overview");
+          }
+        }}
+        canRollover={viewerRole === "owner"}
+        onOpenRolloverModal={() => setShowRolloverModal(true)}
+      />
+
+      {/* Pending Manager Approvals Queue */}
+      {!isViewingArchive && (
+        <PendingPartnerApprovalsBanner
+          passcode={passcode}
+          financials={liveFinancials}
+          activities={liveActivities}
+          viewerRole={viewerRole}
+          onPreviewAttachment={(url, title, subtitle) => setLightboxData({ url, title, subtitle })}
+          onUpdated={refreshDetail}
+        />
+      )}
+
       {/* Top Navigation & Profile Card */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+      <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-xs font-bold text-[#3F8F3F] hover:underline"
+            className="inline-flex items-center gap-2 text-xs font-bold text-[#0F3D24] hover:underline"
           >
             <ArrowLeft size={15} /> Back to All Partners
           </button>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* 1-Click Batch Sync Button */}
+            {!isViewingArchive && livePartner.batchId && livePartner.cycleStatus === "open" && (
+              <button
+                type="button"
+                onClick={() => setShowBatchSyncModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/15 bg-[#FAF9F6] px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition"
+              >
+                <Layers size={13} /> Sync Batch ({livePartner.batchName || "Linked"})
+              </button>
+            )}
+
+            {/* Weekly WhatsApp Digest Button */}
+            <button
+              type="button"
+              onClick={() => setShowDigestModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/15 bg-[#FAF9F6] px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition"
+            >
+              <MessageCircle size={13} /> WhatsApp Digest
+            </button>
+
             {/* Export Statement Dropdown */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowExportMenu((v) => !v)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#F7F5F0] border border-[#0F3D24]/15 px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#0F3D24]/10 transition"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#FAF9F6] border border-[#0F3D24]/15 px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-slate-100 transition"
               >
-                <FileDown size={13} className="text-[#3F8F3F]" />
+                <FileDown size={13} />
                 Export Statement
                 <ChevronDown size={11} className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
               </button>
 
               {showExportMenu && (
                 <div
-                  className="absolute right-0 mt-2 w-52 rounded-2xl bg-white p-2 text-xs font-semibold text-[#0F3D24] shadow-2xl ring-1 ring-black/10 z-30 space-y-1"
+                  className="absolute right-0 mt-2 w-52 rounded-xl bg-white p-1.5 text-xs font-semibold text-[#0F3D24] shadow-xl ring-1 ring-black/10 z-30 space-y-1"
                   onClick={() => setShowExportMenu(false)}
                 >
                   <button
                     type="button"
-                    onClick={() => exportPartnerReportPDF(partner, financials, activities)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
+                    onClick={() =>
+                      exportPartnerReportPDF(
+                        partner,
+                        financials.filter((f) => f.approvalStatus === "approved"),
+                        activities.filter((a) => a.approvalStatus === "approved"),
+                      )
+                    }
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-[#FAF9F6] transition"
                   >
                     <Download size={13} className="text-emerald-700" />
                     <div>
@@ -544,8 +670,14 @@ function PartnerDetailView({
 
                   <button
                     type="button"
-                    onClick={() => exportPartnerReportCSV(partner, financials, activities)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
+                    onClick={() =>
+                      exportPartnerReportCSV(
+                        partner,
+                        financials.filter((f) => f.approvalStatus === "approved"),
+                        activities.filter((a) => a.approvalStatus === "approved"),
+                      )
+                    }
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-[#FAF9F6] transition"
                   >
                     <Download size={13} className="text-blue-700" />
                     <div>
@@ -557,40 +689,73 @@ function PartnerDetailView({
               )}
             </div>
 
-            {partner.cycleStatus === "open" ? (
-              <button
-                type="button"
-                disabled={settling}
-                onClick={handleCloseCycle}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-[#165232] disabled:opacity-50 transition"
-              >
-                <Lock size={13} /> {settling ? "Settling..." : "Close & Settle Cycle"}
-              </button>
-            ) : (
-              <button
-                type="button"
-                disabled={settling}
-                onClick={handleReopenCycle}
-                className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-4 py-2 text-xs font-extrabold text-amber-900 hover:bg-amber-200 disabled:opacity-50 transition"
-              >
-                <Unlock size={13} /> Re-open Settled Cycle
-              </button>
+            {viewerRole === "owner" && !isViewingArchive && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowRolloverModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/20 bg-white px-3.5 py-2 text-xs font-bold text-[#0F3D24] hover:bg-[#FAF9F6] transition"
+                >
+                  <RefreshCw size={13} /> New Cycle
+                </button>
+
+                {livePartner.cycleStatus === "open" ? (
+                  <button
+                    type="button"
+                    disabled={settling}
+                    onClick={handleCloseCycle}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#0F3D24] px-4 py-2 text-xs font-extrabold text-white shadow-sm hover:bg-[#165232] disabled:opacity-50 transition"
+                  >
+                    <Lock size={13} /> {settling ? "Settling..." : "Close & Settle Cycle"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={settling}
+                    onClick={handleReopenCycle}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 border border-amber-200 px-4 py-2 text-xs font-extrabold text-amber-900 hover:bg-amber-200 disabled:opacity-50 transition"
+                  >
+                    <Unlock size={13} /> Re-open Cycle
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
 
+        {isViewingArchive && (
+          <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-[#FAF9F6] px-4 py-2.5 text-xs">
+            <span className="font-semibold text-slate-700">
+              Viewing Historical Archive: <strong className="text-[#0F3D24]">{partner.cycleName}</strong> (Settled{" "}
+              {partner.settledAt ? new Date(partner.settledAt).toLocaleDateString("en-GB") : ""})
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedCycleId("current")}
+              className="font-bold text-[#0F3D24] underline"
+            >
+              Return to Active Cycle &rarr;
+            </button>
+          </div>
+        )}
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-5">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F] bg-[#3F8F3F]/10 px-2.5 py-0.5 rounded-full">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0F3D24] bg-[#FAF9F6] border border-slate-200 px-2.5 py-0.5 rounded-md">
                 {partner.projectName} · {partner.cycleName}
               </span>
-              <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800">
+              <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800 tabular-nums">
                 {partner.profitSharePercentage}% Profit Share
               </span>
-              <span className="rounded-full bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800">
+              <span className="rounded-md bg-rose-50 border border-rose-200 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800 tabular-nums">
                 {partner.lossSharePercentage}% Loss Share
               </span>
+              {partner.batchName && (
+                <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
+                  Batch: {partner.batchName}
+                </span>
+              )}
             </div>
             <h2 className="text-2xl font-black text-[#0F3D24]">{partner.fullName}</h2>
             <p className="text-xs text-slate-600">
@@ -600,16 +765,16 @@ function PartnerDetailView({
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-2xl bg-[#0F3D24]/5 px-4 py-2.5 border border-[#0F3D24]/10 text-right">
-              <div className="text-[10px] font-bold uppercase text-slate-500">Capital Invested</div>
+          <div className="flex flex-wrap items-center gap-3 tabular-nums">
+            <div className="rounded-xl bg-[#FAF9F6] px-4 py-2.5 border border-slate-200 text-right">
+              <div className="text-[10px] font-bold uppercase text-slate-500">Committed Capital</div>
               <div className="text-lg font-black text-[#0F3D24]">{naira(partner.initialInvestment)}</div>
             </div>
             <div
-              className={`rounded-2xl px-4 py-2.5 border text-right ${
+              className={`rounded-xl px-4 py-2.5 border text-right ${
                 s.result === "loss"
-                  ? "bg-rose-50 border-rose-200"
-                  : "bg-emerald-50 border-emerald-200"
+                  ? "bg-rose-50/70 border-rose-200"
+                  : "bg-emerald-50/70 border-emerald-200"
               }`}
             >
               <div
@@ -617,7 +782,11 @@ function PartnerDetailView({
                   s.result === "loss" ? "text-rose-700" : "text-emerald-700"
                 }`}
               >
-                Partner Net Share ({s.result === "loss" ? `${partner.lossSharePercentage}% loss` : `${partner.profitSharePercentage}% profit`})
+                Partner Net Share (
+                {s.result === "loss"
+                  ? `${partner.lossSharePercentage}% loss`
+                  : `${partner.profitSharePercentage}% profit`}
+                )
               </div>
               <div
                 className={`text-lg font-black ${
@@ -641,7 +810,7 @@ function PartnerDetailView({
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <BarChart3 size={14} /> Charts, Settlement & Payouts
+            <BarChart3 size={14} /> Overview, Unit Economics & Settlement
           </button>
           <button
             type="button"
@@ -652,7 +821,7 @@ function PartnerDetailView({
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Receipt size={14} /> Key In Expenses, Income & Payouts ({financials.length})
+            <Receipt size={14} /> Financial Ledger & Receipts ({financials.length})
           </button>
           <button
             type="button"
@@ -663,76 +832,99 @@ function PartnerDetailView({
                 : "text-slate-600 hover:bg-slate-100"
             }`}
           >
-            <Activity size={14} /> Key In Daily Activities & Stock ({activities.length})
+            <Activity size={14} /> Flock Logs & Pen Photos ({activities.length})
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("credentials")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
-              activeSubTab === "credentials"
-                ? "bg-[#0F3D24] text-white shadow-sm"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <KeyRound size={14} /> Edit Terms, Cycle & Portal Access
-          </button>
+          {viewerRole === "owner" && !isViewingArchive && (
+            <button
+              type="button"
+              onClick={() => setActiveSubTab("credentials")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition ${
+                activeSubTab === "credentials"
+                  ? "bg-[#0F3D24] text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <KeyRound size={14} /> Edit Terms, Cycle & Portal Access
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Sub-Tab 1: Overview, Charts & Settlement (Mirrors what the Partner sees!) */}
+      {/* Sub-Tab 1: Overview, Unit Economics, Charts & Settlement */}
       {activeSubTab === "overview" && (
-        <div className="space-y-6">
+        <div className="space-y-5">
           <ResultHero partner={partner} />
-          <TermsBanner partner={partner} onOpenAgreement={() => setShowSignModal(true)} />
+          <UnitEconomicsStrip partner={partner} summary={summary} />
+          <TermsBanner
+            partner={partner}
+            onOpenAgreement={() => setShowSignModal(true)}
+            onOpenCertificate={() => setShowCertificateModal(true)}
+          />
+          <div className="grid gap-5 lg:grid-cols-2">
+            <SettlementBreakdown partner={partner} />
+            <PayoutTracker partner={partner} financials={financials} />
+          </div>
+          <CycleElectionCard
+            partner={partner}
+            isAdminView={true}
+            onTriggerAdminRollover={
+              viewerRole === "owner" && !isViewingArchive
+                ? () => setShowRolloverModal(true)
+                : undefined
+            }
+          />
           <AgreementCard
             partner={partner}
             onOpenSignModal={() => setShowSignModal(true)}
             onOpenUploadModal={() => setShowUploadModal(true)}
+            onOpenCertificate={() => setShowCertificateModal(true)}
           />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <SettlementBreakdown partner={partner} />
-            <PayoutTracker partner={partner} financials={financials} />
-          </div>
           <PartnerCharts charts={charts} settlement={s} partnerLabel={partner.fullName} />
           <HowCalculated partner={partner} />
           <AuditTimeline partner={partner} />
         </div>
       )}
 
-      {/* Sub-Tab 2: Financials Keying (Expense, Income, Payout) */}
+      {/* Sub-Tab 2: Financials Keying (Expense, Income, Payout + Receipt Upload) */}
       {activeSubTab === "financials" && (
         <PartnerFinancialsSubPanel
           passcode={passcode}
           partner={partner}
           financials={financials}
+          viewerRole={viewerRole}
+          isArchiveView={isViewingArchive}
+          onPreviewAttachment={(url, title, subtitle) => setLightboxData({ url, title, subtitle })}
           onRefresh={refreshDetail}
         />
       )}
 
-      {/* Sub-Tab 3: Activities & Stock Logs */}
+      {/* Sub-Tab 3: Activities & Stock Logs (+ Pen Photo Upload) */}
       {activeSubTab === "activities" && (
         <PartnerActivitiesSubPanel
           passcode={passcode}
           partner={partner}
           activities={activities}
           summary={summary}
+          viewerRole={viewerRole}
+          isArchiveView={isViewingArchive}
+          onPreviewAttachment={(url, title, subtitle) => setLightboxData({ url, title, subtitle })}
           onRefresh={refreshDetail}
         />
       )}
 
-      {/* Sub-Tab 4: Edit Terms, Cycle & Portal Access */}
-      {activeSubTab === "credentials" && (
+      {/* Sub-Tab 4: Edit Terms, Cycle & Portal Access (Owner Only) */}
+      {activeSubTab === "credentials" && viewerRole === "owner" && !isViewingArchive && (
         <PartnerCredentialsSubPanel
           passcode={passcode}
-          partner={partner}
+          partner={livePartner}
           batches={batches}
-          hasEntries={financials.some((f) => !f.removedAt)}
+          hasEntries={liveFinancials.some((f) => !f.removedAt)}
           onRefresh={refreshDetail}
           onDeleted={onBack}
         />
       )}
 
-      {/* Modals for Terms & Agreements */}
+      {/* Modals */}
       {showSignModal && (
         <SignAgreementModal
           partner={partner}
@@ -743,27 +935,80 @@ function PartnerDetailView({
 
       {showUploadModal && (
         <UploadWrittenAgreementModal
-          partner={partner}
+          partner={livePartner}
           passcode={passcode}
           onClose={() => setShowUploadModal(false)}
           onSuccess={() => refreshDetail()}
+        />
+      )}
+
+      {showCertificateModal && (
+        <PartnershipCertificateModal
+          partner={partner}
+          onClose={() => setShowCertificateModal(false)}
+        />
+      )}
+
+      {showRolloverModal && viewerRole === "owner" && (
+        <RolloverCycleModal
+          passcode={passcode}
+          partner={livePartner}
+          batches={batches}
+          onClose={() => setShowRolloverModal(false)}
+          onSuccess={() => {
+            setSelectedCycleId("current");
+            refreshDetail();
+          }}
+        />
+      )}
+
+      {showBatchSyncModal && (
+        <BatchSyncModal
+          passcode={passcode}
+          partner={livePartner}
+          viewerRole={viewerRole}
+          onClose={() => setShowBatchSyncModal(false)}
+          onSuccess={refreshDetail}
+        />
+      )}
+
+      {showDigestModal && (
+        <WeeklyWhatsAppDigestModal
+          partner={partner}
+          summary={summary}
+          onClose={() => setShowDigestModal(false)}
+        />
+      )}
+
+      {lightboxData && (
+        <EvidenceLightboxModal
+          url={lightboxData.url}
+          title={lightboxData.title}
+          subtitle={lightboxData.subtitle}
+          onClose={() => setLightboxData(null)}
         />
       )}
     </div>
   );
 }
 
-// ─── SUBPANEL: FINANCIALS KEYING (EXPENSE / INCOME / PAYOUT) ─────────────────
+// ─── SUBPANEL: FINANCIALS KEYING (EXPENSE / INCOME / PAYOUT + RECEIPT) ───────
 
 function PartnerFinancialsSubPanel({
   passcode,
   partner,
   financials,
+  viewerRole,
+  isArchiveView,
+  onPreviewAttachment,
   onRefresh,
 }: {
   passcode: string;
   partner: FarmPartner;
   financials: PartnerFinancial[];
+  viewerRole: "owner" | "manager";
+  isArchiveView: boolean;
+  onPreviewAttachment: (url: string, title: string, subtitle?: string) => void;
   onRefresh: () => void;
 }) {
   const recordFinancialFn = useServerFn(adminRecordPartnerFinancial);
@@ -776,11 +1021,28 @@ function PartnerFinancialsSubPanel({
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
   const [referenceNo, setReferenceNo] = useState("");
+  const [receiptUrl, setReceiptUrl] = useState("");
+  const [attachmentName, setAttachmentName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const s = partner.settlement;
-  const isClosed = partner.cycleStatus === "closed";
+  const isClosed = partner.cycleStatus === "closed" || isArchiveView;
+
+  const handleReceiptFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setMsg("Receipt file exceeds 5MB. Please choose a smaller image or PDF.");
+      return;
+    }
+    setAttachmentName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setReceiptUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -797,7 +1059,7 @@ function PartnerFinancialsSubPanel({
     setSubmitting(true);
     setMsg(null);
     try {
-      await recordFinancialFn({
+      const res = await recordFinancialFn({
         data: {
           passcode,
           partnerId: partner.id,
@@ -809,13 +1071,21 @@ function PartnerFinancialsSubPanel({
           paymentMethod,
           transactionDate,
           referenceNo: referenceNo.trim() || null,
+          receiptUrl: receiptUrl.trim() || null,
+          attachmentName: attachmentName.trim() || null,
         },
       });
       setAmount("");
       setDescription("");
       setReferenceNo("");
-      setMsg("Entry recorded and reflected in partner portal.");
-      setTimeout(() => setMsg(null), 3000);
+      setReceiptUrl("");
+      setAttachmentName("");
+      setMsg(
+        res.approvalStatus === "pending_approval"
+          ? "Entry submitted and queued for Farm Owner approval."
+          : "Entry recorded and published to partner portal.",
+      );
+      setTimeout(() => setMsg(null), 4000);
       onRefresh();
     } catch (err: any) {
       setMsg(err instanceof Error ? err.message : "Could not record entry.");
@@ -840,20 +1110,22 @@ function PartnerFinancialsSubPanel({
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       {/* Key In Form */}
-      <div className="lg:col-span-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+      <div className="lg:col-span-4 rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-4">
         <div>
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F]">
-            Direct Key-In
+            {viewerRole === "manager" ? "Manager Entry (Owner Verified)" : "Direct Ledger Key-In"}
           </span>
           <h3 className="text-base font-black text-[#0F3D24]">Record Ledger Entry</h3>
           <p className="text-xs text-slate-500">
-            Expenses & sales update profit/loss; payouts reduce the balance owed to {partner.fullName}.
+            {viewerRole === "manager"
+              ? "Record expenses or sales with receipt proof. Entries publish after Owner approval."
+              : `Expenses & sales update profit/loss; payouts reduce the balance owed to ${partner.fullName}.`}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           {/* Expense / Income / Payout Toggle */}
-          <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-[#F7F5F0] p-1">
+          <div className={`grid ${viewerRole === "owner" ? "grid-cols-3" : "grid-cols-2"} gap-1.5 rounded-xl bg-[#FAF9F6] border border-slate-200 p-1`}>
             <button
               type="button"
               disabled={isClosed}
@@ -863,7 +1135,7 @@ function PartnerFinancialsSubPanel({
               }}
               className={`rounded-lg py-2 font-bold transition ${
                 type === "expense"
-                  ? "bg-rose-600 text-white shadow-sm"
+                  ? "bg-rose-700 text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-900 disabled:opacity-40"
               }`}
             >
@@ -878,31 +1150,34 @@ function PartnerFinancialsSubPanel({
               }}
               className={`rounded-lg py-2 font-bold transition ${
                 type === "income"
-                  ? "bg-emerald-600 text-white shadow-sm"
+                  ? "bg-emerald-700 text-white shadow-sm"
                   : "text-slate-600 hover:text-slate-900 disabled:opacity-40"
               }`}
             >
-              Income
+              Sale / Income
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setType("payout");
-                setCategory("Partner Payout / Remittance");
-              }}
-              className={`rounded-lg py-2 font-bold transition ${
-                type === "payout"
-                  ? "bg-[#0F3D24] text-white shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Payout
-            </button>
+            {viewerRole === "owner" && (
+              <button
+                type="button"
+                disabled={isArchiveView}
+                onClick={() => {
+                  setType("payout");
+                  setCategory("Partner Payout / Remittance");
+                }}
+                className={`rounded-lg py-2 font-bold transition ${
+                  type === "payout"
+                    ? "bg-[#0F3D24] text-white shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Payout
+              </button>
+            )}
           </div>
 
           {type === "payout" && (
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5">
-              <div className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center justify-between text-[11px] tabular-nums">
                 <span className="font-semibold text-amber-900">Balance currently owed:</span>
                 <strong className="font-black text-amber-950">{naira(Math.max(0, s.balanceOwed))}</strong>
               </div>
@@ -913,7 +1188,7 @@ function PartnerFinancialsSubPanel({
                     setAmount(String(Math.round(s.balanceOwed)));
                     if (!description) setDescription(`Settlement payout to ${partner.fullName}`);
                   }}
-                  className="text-[11px] font-bold text-[#3F8F3F] hover:underline"
+                  className="text-[11px] font-bold text-[#0F3D24] underline"
                 >
                   Fill full remaining balance ({naira(s.balanceOwed)})
                 </button>
@@ -966,7 +1241,7 @@ function PartnerFinancialsSubPanel({
               placeholder="e.g. 150000"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24] tabular-nums outline-none focus:border-[#0F3D24]"
             />
           </div>
 
@@ -982,7 +1257,7 @@ function PartnerFinancialsSubPanel({
               }
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none focus:border-[#0F3D24]"
             />
           </div>
 
@@ -1012,20 +1287,50 @@ function PartnerFinancialsSubPanel({
           </div>
 
           <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Reference / Receipt No. (Optional)</label>
+            <label className="block font-bold text-[#0F3D24] mb-1">Reference / Invoice No. (Optional)</label>
             <input
               type="text"
-              placeholder="e.g. TRF-9823412"
+              placeholder="e.g. INV-9823412"
               value={referenceNo}
               onChange={(e) => setReferenceNo(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none"
             />
           </div>
 
+          {/* Receipt / Invoice Proof Attachment */}
+          <div className="rounded-xl border border-dashed border-slate-300 bg-[#FAF9F6] p-3 space-y-2">
+            <label className="block font-bold text-[#0F3D24]">
+              Attach Receipt / Waybill Proof (Optional)
+            </label>
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={handleReceiptFileChange}
+              className="w-full text-[11px] text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-[#0F3D24] file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white cursor-pointer"
+            />
+            {attachmentName && (
+              <div className="flex items-center justify-between text-[11px] text-emerald-800 font-semibold">
+                <span className="truncate">Attached: {attachmentName}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReceiptUrl("");
+                    setAttachmentName("");
+                  }}
+                  className="text-rose-600 font-bold ml-2"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+
           {msg && (
             <div
               className={`rounded-xl p-2.5 text-xs font-semibold ${
-                msg.includes("reflected") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+                msg.includes("published") || msg.includes("queued")
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : "bg-rose-50 text-rose-800 border border-rose-200"
               }`}
             >
               {msg}
@@ -1034,39 +1339,45 @@ function PartnerFinancialsSubPanel({
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || isArchiveView}
             className="w-full rounded-xl bg-[#0F3D24] py-2.5 font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition"
           >
-            {submitting ? "Recording..." : `Record ${type === "payout" ? "Payout" : "Transaction"}`}
+            {isArchiveView
+              ? "Archived Cycle (Read-Only)"
+              : submitting
+                ? "Recording..."
+                : viewerRole === "manager"
+                  ? "Submit for Owner Approval"
+                  : `Record ${type === "payout" ? "Payout" : "Transaction"}`}
           </button>
         </form>
       </div>
 
       {/* Financial Ledger Table */}
-      <div className="lg:col-span-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+      <div className="lg:col-span-8 rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-black text-[#0F3D24]">Itemized Investment Ledger</h3>
             <p className="text-xs text-slate-500">
-              Line-by-line expenses, sales, and payouts. Removed entries stay visible with reason for transparency.
+              Line-by-line expenses, sales, receipts, and payouts. Removed entries retain audit reasons.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-bold text-rose-800">
+          <div className="flex flex-wrap items-center gap-2 tabular-nums">
+            <span className="rounded-lg bg-rose-50 border border-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-800">
               Expenses: {naira(s.totalExpenses)}
             </span>
-            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
+            <span className="rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-[11px] font-bold text-emerald-800">
               Sales: {naira(s.totalIncome)}
             </span>
-            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-[#0F3D24]">
-              Paid Out: {naira(s.paidOut)}
+            <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-[#0F3D24]">
+              Disbursed: {naira(s.paidOut)}
             </span>
           </div>
         </div>
 
         {financials.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">
-            No financial entries have been recorded yet for this partner.
+            No financial entries have been recorded for this cycle yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1074,9 +1385,9 @@ function PartnerFinancialsSubPanel({
               <thead>
                 <tr className="border-b border-slate-100 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   <th className="py-2.5">Date</th>
-                  <th className="py-2.5">Type</th>
+                  <th className="py-2.5">Type & Status</th>
                   <th className="py-2.5">Category</th>
-                  <th className="py-2.5">Description</th>
+                  <th className="py-2.5">Description & Proof</th>
                   <th className="py-2.5 text-right">Amount</th>
                   <th className="py-2.5 text-right">Action</th>
                 </tr>
@@ -1084,31 +1395,63 @@ function PartnerFinancialsSubPanel({
               <tbody className="divide-y divide-slate-100">
                 {financials.map((row) => {
                   const removed = Boolean(row.removedAt);
+                  const pending = row.approvalStatus === "pending_approval" && !removed;
                   return (
-                    <tr key={row.id} className={removed ? "bg-slate-50 opacity-60" : "hover:bg-slate-50/60"}>
-                      <td className="py-2.5 font-medium text-slate-600 whitespace-nowrap">
+                    <tr
+                      key={row.id}
+                      className={
+                        removed
+                          ? "bg-slate-50 opacity-60"
+                          : pending
+                            ? "bg-amber-50/40"
+                            : "hover:bg-slate-50/60"
+                      }
+                    >
+                      <td className="py-2.5 font-medium text-slate-600 whitespace-nowrap tabular-nums">
                         {row.transactionDate}
                       </td>
                       <td className="py-2.5">
-                        <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${
-                            removed
-                              ? "bg-slate-200 text-slate-600"
-                              : row.type === "expense"
-                                ? "bg-rose-100 text-rose-800"
-                                : row.type === "income"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-blue-100 text-blue-800"
-                          }`}
-                        >
-                          {removed ? "removed" : row.type}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1">
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase ${
+                              removed
+                                ? "bg-slate-200 text-slate-600"
+                                : row.type === "expense"
+                                  ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                  : row.type === "income"
+                                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                    : "bg-blue-50 text-blue-800 border border-blue-200"
+                            }`}
+                          >
+                            {removed ? "removed" : row.type}
+                          </span>
+                          {pending && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900">
+                              Pending Owner
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className={`py-2.5 font-bold text-[#0F3D24] ${removed ? "line-through" : ""}`}>
                         {row.category}
                       </td>
-                      <td className="py-2.5 text-slate-700 max-w-xs">
-                        <span className={removed ? "line-through" : ""}>{row.description}</span>
+                      <td className="py-2.5 text-slate-700 max-w-xs space-y-1">
+                        <span className={`block ${removed ? "line-through" : ""}`}>{row.description}</span>
+                        {row.receiptUrl && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onPreviewAttachment(
+                                row.receiptUrl!,
+                                row.attachmentName || `${row.category} Receipt`,
+                                `${naira(row.amount)} · ${row.transactionDate}`,
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded-md border border-[#0F3D24]/20 bg-[#FAF9F6] px-2 py-0.5 text-[10px] font-bold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition"
+                          >
+                            <Eye size={11} /> View Receipt
+                          </button>
+                        )}
                         {removed && (
                           <span className="block text-[10px] font-semibold text-rose-700">
                             Removed ({row.removalReason || "no reason"})
@@ -1116,7 +1459,7 @@ function PartnerFinancialsSubPanel({
                         )}
                       </td>
                       <td
-                        className={`py-2.5 text-right font-black ${
+                        className={`py-2.5 text-right font-black tabular-nums ${
                           removed
                             ? "line-through text-slate-400"
                             : row.type === "expense"
@@ -1130,7 +1473,7 @@ function PartnerFinancialsSubPanel({
                         {naira(row.amount)}
                       </td>
                       <td className="py-2.5 text-right">
-                        {!removed && !isClosed && (
+                        {!removed && !isClosed && viewerRole === "owner" && (
                           <button
                             type="button"
                             onClick={() => handleRemove(row.id)}
@@ -1153,19 +1496,25 @@ function PartnerFinancialsSubPanel({
   );
 }
 
-// ─── SUBPANEL: ACTIVITIES KEYING ──────────────────────────────────────────────
+// ─── SUBPANEL: ACTIVITIES KEYING (+ PEN PHOTO ATTACHMENT) ────────────────────
 
 function PartnerActivitiesSubPanel({
   passcode,
   partner,
   activities,
   summary,
+  viewerRole,
+  isArchiveView,
+  onPreviewAttachment,
   onRefresh,
 }: {
   passcode: string;
   partner: FarmPartner;
   activities: PartnerActivity[];
-  summary: { currentStockCount: number; totalFeedConsumedKg: number; totalMortalityCount: number; mortalityRatePercent: number };
+  summary: PartnerDashboardSummary;
+  viewerRole: "owner" | "manager";
+  isArchiveView: boolean;
+  onPreviewAttachment: (url: string, title: string, subtitle?: string) => void;
   onRefresh: () => void;
 }) {
   const recordActivityFn = useServerFn(adminRecordPartnerActivity);
@@ -1179,17 +1528,34 @@ function PartnerActivitiesSubPanel({
   const [feedConsumedKg, setFeedConsumedKg] = useState("0");
   const [averageWeightKg, setAverageWeightKg] = useState("0");
   const [notes, setNotes] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoLabel, setPhotoLabel] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const isClosed = partner.cycleStatus === "closed";
+  const isClosed = partner.cycleStatus === "closed" || isArchiveView;
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setMsg("Photo exceeds 5MB. Please choose a smaller image.");
+      return;
+    }
+    setPhotoLabel(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPhotoUrl(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setMsg(null);
     try {
-      await recordActivityFn({
+      const res = await recordActivityFn({
         data: {
           passcode,
           partnerId: partner.id,
@@ -1202,6 +1568,7 @@ function PartnerActivitiesSubPanel({
           feedConsumedKg: Number(feedConsumedKg) || 0,
           averageWeightKg: Number(averageWeightKg) || 0,
           notes: notes.trim() || null,
+          photoUrl: photoUrl.trim() || null,
         },
       });
       setStockHeadcount("0");
@@ -1210,8 +1577,14 @@ function PartnerActivitiesSubPanel({
       setFeedConsumedKg("0");
       setAverageWeightKg("0");
       setNotes("");
-      setMsg("Activity log recorded successfully.");
-      setTimeout(() => setMsg(null), 3000);
+      setPhotoUrl("");
+      setPhotoLabel("");
+      setMsg(
+        res.approvalStatus === "pending_approval"
+          ? "Activity log submitted and queued for Farm Owner approval."
+          : "Activity log recorded and published to partner portal.",
+      );
+      setTimeout(() => setMsg(null), 4000);
       onRefresh();
     } catch (err: any) {
       setMsg(err instanceof Error ? err.message : "Could not record activity.");
@@ -1234,15 +1607,17 @@ function PartnerActivitiesSubPanel({
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       {/* Form */}
-      <div className="lg:col-span-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+      <div className="lg:col-span-4 rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-4">
         <div>
           <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#3F8F3F]">
-            Farm Transparency
+            {viewerRole === "manager" ? "Manager Flock Log" : "Farm Transparency"}
           </span>
           <h3 className="text-base font-black text-[#0F3D24]">Log Farm Activity / Stock</h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 tabular-nums">
             Live birds: <strong>{summary.currentStockCount}</strong> · Mortality:{" "}
-            <strong>{summary.totalMortalityCount} ({summary.mortalityRatePercent}%)</strong>
+            <strong>
+              {summary.totalMortalityCount} ({summary.mortalityRatePercent}%)
+            </strong>
           </p>
         </div>
 
@@ -1278,7 +1653,9 @@ function PartnerActivitiesSubPanel({
 
           {activityType === "Stock / Birds Received" && (
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Birds Received / Stocked (Headcount)</label>
+              <label className="block font-bold text-[#0F3D24] mb-1">
+                Birds Received / Stocked (Headcount)
+              </label>
               <input
                 type="number"
                 min={1}
@@ -1319,7 +1696,7 @@ function PartnerActivitiesSubPanel({
                 <label className="block font-bold text-slate-700 mb-1">Suspected Cause</label>
                 <input
                   type="text"
-                  placeholder="e.g. Weak chick"
+                  placeholder="e.g. Heat stress"
                   value={causeOfMortality}
                   onChange={(e) => setCauseOfMortality(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-800"
@@ -1330,12 +1707,12 @@ function PartnerActivitiesSubPanel({
 
           {activityType === "Weight Check" && (
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Average Weight (Kg)</label>
+              <label className="block font-bold text-[#0F3D24] mb-1">Average Bird Weight (Kg)</label>
               <input
                 type="number"
                 step="0.01"
                 min={0}
-                placeholder="e.g. 2.45"
+                placeholder="e.g. 2.15"
                 value={averageWeightKg}
                 onChange={(e) => setAverageWeightKg(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24]"
@@ -1347,17 +1724,47 @@ function PartnerActivitiesSubPanel({
             <label className="block font-bold text-[#0F3D24] mb-1">Notes / Observation Details</label>
             <textarea
               rows={3}
-              placeholder="e.g. Birds are active, pen temperature at 31C, healthy feeding behavior..."
+              placeholder="e.g. Birds are active, clean water administered, healthy feeding behavior..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] outline-none"
             />
           </div>
 
+          {/* Pen Photo Attachment */}
+          <div className="rounded-xl border border-dashed border-slate-300 bg-[#FAF9F6] p-3 space-y-2">
+            <label className="block font-bold text-[#0F3D24]">
+              Attach Live Pen / Flock Photo (Optional)
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+              className="w-full text-[11px] text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-[#0F3D24] file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white cursor-pointer"
+            />
+            {photoLabel && (
+              <div className="flex items-center justify-between text-[11px] text-emerald-800 font-semibold">
+                <span className="truncate">Attached: {photoLabel}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhotoUrl("");
+                    setPhotoLabel("");
+                  }}
+                  className="text-rose-600 font-bold ml-2"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+
           {msg && (
             <div
               className={`rounded-xl p-2.5 text-xs font-semibold ${
-                msg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+                msg.includes("published") || msg.includes("queued")
+                  ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  : "bg-rose-50 text-rose-800 border border-rose-200"
               }`}
             >
               {msg}
@@ -1369,52 +1776,72 @@ function PartnerActivitiesSubPanel({
             disabled={submitting || isClosed}
             className="w-full rounded-xl bg-[#0F3D24] py-2.5 font-bold text-white hover:bg-[#165232] disabled:opacity-50 transition"
           >
-            {isClosed ? "Cycle Settled (Locked)" : submitting ? "Logging..." : "Log Activity"}
+            {isClosed
+              ? "Cycle Settled (Locked)"
+              : submitting
+                ? "Logging..."
+                : viewerRole === "manager"
+                  ? "Submit Activity for Owner Approval"
+                  : "Log Activity"}
           </button>
         </form>
       </div>
 
       {/* Activities Timeline */}
-      <div className="lg:col-span-8 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+      <div className="lg:col-span-8 rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-4">
         <div>
-          <h3 className="text-base font-black text-[#0F3D24]">Live Activity Timeline</h3>
-          <p className="text-xs text-slate-500">Chronological farm logs shared with the partner.</p>
+          <h3 className="text-base font-black text-[#0F3D24]">Live Flock Activity Timeline</h3>
+          <p className="text-xs text-slate-500">
+            Chronological pen logs and visual flock evidence shared with the partner.
+          </p>
         </div>
 
         {activities.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-xs text-slate-500">
-            No activity logs have been recorded for this partner yet.
+            No activity logs have been recorded for this cycle yet.
           </div>
         ) : (
           <div className="space-y-3">
             {activities.map((act) => {
               const removed = Boolean(act.removedAt);
+              const pending = act.approvalStatus === "pending_approval" && !removed;
               return (
                 <div
                   key={act.id}
-                  className={`flex items-start justify-between rounded-2xl border p-4 transition-all ${
+                  className={`flex items-start justify-between rounded-xl border p-4 transition-all ${
                     removed
                       ? "border-slate-200 bg-slate-50 opacity-60"
-                      : "border-slate-200 bg-[#F7F5F0]/50 hover:bg-[#F7F5F0]"
+                      : pending
+                        ? "border-amber-200 bg-amber-50/40"
+                        : "border-slate-200 bg-[#FAF9F6] hover:bg-slate-50"
                   }`}
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-500">{act.activityDate}</span>
+                      <span className="text-[11px] font-bold text-slate-500 tabular-nums">
+                        {act.activityDate}
+                      </span>
                       <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                          removed ? "bg-slate-200 text-slate-600 line-through" : "bg-[#3F8F3F]/15 text-[#0F3D24]"
+                        className={`inline-flex items-center rounded-md px-2.5 py-0.5 text-[10px] font-extrabold ${
+                          removed
+                            ? "bg-slate-200 text-slate-600 line-through"
+                            : "bg-[#0F3D24]/10 text-[#0F3D24]"
                         }`}
                       >
                         {act.activityType}
                       </span>
+                      {pending && (
+                        <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                          Pending Owner Approval
+                        </span>
+                      )}
                       {act.mortalityCount > 0 && (
-                        <span className="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-extrabold text-rose-800">
+                        <span className="inline-flex items-center rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-extrabold text-rose-800">
                           {act.mortalityCount} Mortality
                         </span>
                       )}
                       {act.stockHeadcount > 0 && (
-                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-extrabold text-blue-800">
+                        <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
                           +{act.stockHeadcount} Birds Stocked
                         </span>
                       )}
@@ -1429,7 +1856,7 @@ function PartnerActivitiesSubPanel({
                         Removed ({act.removalReason || "no reason"})
                       </p>
                     )}
-                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 tabular-nums">
                       {act.feedConsumedKg > 0 && (
                         <span>
                           Feed: <strong>{act.feedConsumedKg} kg</strong>
@@ -1441,10 +1868,25 @@ function PartnerActivitiesSubPanel({
                         </span>
                       )}
                       {act.causeOfMortality && <span>Cause: {act.causeOfMortality}</span>}
+                      {act.photoUrl && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onPreviewAttachment(
+                              act.photoUrl!,
+                              `${act.activityType} Pen Photo`,
+                              act.activityDate,
+                            )
+                          }
+                          className="inline-flex items-center gap-1 rounded-md border border-[#0F3D24]/20 bg-white px-2.5 py-0.5 text-[10px] font-bold text-[#0F3D24] hover:bg-[#0F3D24] hover:text-white transition"
+                        >
+                          <Eye size={11} /> View Pen Photo
+                        </button>
+                      )}
                     </div>
                   </div>
 
-                  {!removed && !isClosed && (
+                  {!removed && !isClosed && viewerRole === "owner" && (
                     <button
                       type="button"
                       onClick={() => handleRemove(act.id)}

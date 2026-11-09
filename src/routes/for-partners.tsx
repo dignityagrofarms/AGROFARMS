@@ -21,11 +21,24 @@ import {
   Search,
   Filter,
   Sparkles,
+  Award,
+  Paperclip,
+  Camera,
+  Layers,
+  PieChart,
+  FileText,
+  HelpCircle,
+  ExternalLink,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { partnerVerifyLogin, partnerGetMyDashboard } from "@/lib/partners.functions";
 import { PartnerCharts } from "@/components/partners/PartnerCharts";
 import {
+  CycleSwitcherBar,
+  UnitEconomicsStrip,
+  CycleElectionCard,
+  PartnershipCertificateModal,
+  EvidenceLightboxModal,
   TermsBanner,
   ResultHero,
   SettlementBreakdown,
@@ -348,6 +361,7 @@ function PartnersAccountPortal({
   session: { token: string; username: string; fullName?: string };
   onLogout: () => void;
 }) {
+  const [selectedCycleId, setSelectedCycleId] = useState<string>("current");
   const [activeTab, setActiveTab] = useState<"financials" | "activities">("financials");
   const [finFilter, setFinFilter] = useState<"all" | "expense" | "income" | "payout">("all");
   const [finSearch, setFinSearch] = useState("");
@@ -355,6 +369,8 @@ function PartnersAccountPortal({
   const [showSignModal, setShowSignModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showCertificateModal, setShowCertificateModal] = useState(false);
+  const [lightboxMedia, setLightboxMedia] = useState<{ url: string; title: string; subtitle?: string } | null>(null);
 
   const getDashboardFn = useServerFn(partnerGetMyDashboard);
   const dashboardQuery = useQuery({
@@ -397,8 +413,25 @@ function PartnersAccountPortal({
 
   const { partner, financials, activities, charts, summary } = dashboardQuery.data;
 
+  // Multi-cycle resolution: check if partner selected an archived cycle
+  const activeArchive = partner.archivedCycles?.find((c) => c.cycleId === selectedCycleId);
+  const displayPartner = activeArchive
+    ? {
+        ...partner,
+        cycleName: activeArchive.cycleName,
+        projectName: activeArchive.projectName,
+        cycleStartDate: activeArchive.cycleStartDate || partner.cycleStartDate,
+        cycleEndDate: activeArchive.cycleEndDate || partner.cycleEndDate,
+        initialInvestment: activeArchive.initialInvestment,
+        profitSharePercentage: activeArchive.profitSharePercentage,
+        lossSharePercentage: activeArchive.lossSharePercentage,
+        cycleStatus: "closed" as const,
+        settlement: activeArchive.settlement,
+      }
+    : partner;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 sm:pb-8">
       {/* Top Welcome Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl bg-gradient-to-r from-[#0F3D24] via-[#165232] to-[#0F3D24] p-6 sm:p-8 text-white shadow-xl">
         <div className="space-y-1.5">
@@ -412,22 +445,32 @@ function PartnersAccountPortal({
           </div>
           <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{partner.fullName}</h2>
           <p className="text-xs text-white/80">
-            Project: <strong className="text-white">{partner.projectName}</strong> · Cycle:{" "}
-            <strong className="text-white">{partner.cycleName}</strong> · Started: {partner.investmentDate}
-            {partner.batchName && ` · Farm Batch: ${partner.batchName}`}
+            Project: <strong className="text-white">{displayPartner.projectName}</strong> · Cycle:{" "}
+            <strong className="text-white">{displayPartner.cycleName}</strong> · Started: {displayPartner.investmentDate}
+            {displayPartner.batchName && ` · Farm Batch: ${displayPartner.batchName}`}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 self-start sm:self-center">
           <span
             className={`rounded-full px-3.5 py-1 text-xs font-bold ring-1 ${
-              partner.cycleStatus === "closed"
+              displayPartner.cycleStatus === "closed"
                 ? "bg-slate-800 text-white ring-white/20"
                 : "bg-white/10 text-emerald-300 ring-white/20"
             }`}
           >
-            {partner.cycleStatus === "closed" ? "● Cycle Settled" : "● Live Cycle Open"}
+            {displayPartner.cycleStatus === "closed" ? "● Cycle Settled" : "● Live Cycle Open"}
           </span>
+
+          {/* Partnership Certificate Button */}
+          <button
+            type="button"
+            onClick={() => setShowCertificateModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/25 transition backdrop-blur-sm ring-1 ring-white/20 shadow-sm"
+          >
+            <Award size={14} className="text-[#a8e6a8]" />
+            Certificate
+          </button>
 
           {/* Export Report Dropdown */}
           <div className="relative">
@@ -448,7 +491,7 @@ function PartnersAccountPortal({
               >
                 <button
                   type="button"
-                  onClick={() => exportPartnerReportPDF(partner, financials, activities)}
+                  onClick={() => exportPartnerReportPDF(displayPartner, financials, activities)}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
                 >
                   <Download size={14} className="text-emerald-700" />
@@ -460,7 +503,7 @@ function PartnersAccountPortal({
 
                 <button
                   type="button"
-                  onClick={() => exportPartnerReportCSV(partner, financials, activities)}
+                  onClick={() => exportPartnerReportCSV(displayPartner, financials, activities)}
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
                 >
                   <Download size={14} className="text-blue-700" />
@@ -495,38 +538,77 @@ function PartnersAccountPortal({
         </div>
       </div>
 
+      {/* Cycle Switcher Bar (when partner has multiple cycles) */}
+      {partner.archivedCycles && partner.archivedCycles.length > 0 && (
+        <CycleSwitcherBar
+          partner={partner}
+          selectedCycleId={selectedCycleId}
+          onSelectCycle={(cId) => setSelectedCycleId(cId)}
+        />
+      )}
+
+      {/* Archived Notice Banner */}
+      {activeArchive && (
+        <div className="flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-medium text-amber-900 shadow-sm">
+          <Layers size={18} className="shrink-0 text-amber-700" />
+          <div className="flex-1">
+            <strong>Viewing Archived Cycle:</strong> {activeArchive.cycleName} (Archived on {activeArchive.archivedAt?.slice(0, 10)}).
+            This snapshot shows historical figures as settled. Switch back to current to view active cycle.
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedCycleId("current")}
+            className="shrink-0 rounded-xl bg-amber-800 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-900 shadow-sm"
+          >
+            Back to Active Cycle
+          </button>
+        </div>
+      )}
+
       {/* 1. Main Profit/Loss Result Hero */}
-      <ResultHero partner={partner} />
+      <ResultHero partner={displayPartner} />
+
+      {/* 1b. Biological & Unit Economics Strip (Cost per bird, FCR, Break-even price) */}
+      <UnitEconomicsStrip partner={displayPartner} summary={summary} />
 
       {/* 2. Terms Banner */}
-      <TermsBanner partner={partner} onOpenAgreement={() => setShowSignModal(true)} />
+      <TermsBanner partner={displayPartner} onOpenAgreement={() => setShowSignModal(true)} />
 
       {/* 2b. Terms & Conditions Agreement Card */}
       <AgreementCard
-        partner={partner}
+        partner={displayPartner}
         onOpenSignModal={() => setShowSignModal(true)}
         onOpenUploadModal={() => setShowUploadModal(true)}
       />
 
       {/* 3. Settlement Breakdown & Payout Tracker */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <SettlementBreakdown partner={partner} />
-        <PayoutTracker partner={partner} financials={financials} />
+        <SettlementBreakdown partner={displayPartner} />
+        <PayoutTracker partner={displayPartner} financials={financials} />
       </div>
 
+      {/* 3b. Partner Cycle Maturity Election (Bank Payout vs Rollover) */}
+      <CycleElectionCard
+        partner={displayPartner}
+        token={session.token}
+        onElectionUpdated={() => dashboardQuery.refetch()}
+      />
+
       {/* 4. Visual Financial & Health Charts */}
-      <PartnerCharts charts={charts} settlement={partner.settlement} partnerLabel={partner.fullName} />
+      <div id="charts-section">
+        <PartnerCharts charts={charts} settlement={displayPartner.settlement} partnerLabel={displayPartner.fullName} />
+      </div>
 
       {/* 5. How this is calculated explainer */}
-      <HowCalculated partner={partner} />
+      <HowCalculated partner={displayPartner} />
 
       {/* 6. Audit Timeline (visible if terms changed or settled) */}
-      <AuditTimeline partner={partner} />
+      <AuditTimeline partner={displayPartner} />
 
       {/* Modals */}
       {showSignModal && (
         <SignAgreementModal
-          partner={partner}
+          partner={displayPartner}
           token={session.token}
           onClose={() => setShowSignModal(false)}
           onSigned={() => dashboardQuery.refetch()}
@@ -535,15 +617,31 @@ function PartnersAccountPortal({
 
       {showUploadModal && (
         <UploadWrittenAgreementModal
-          partner={partner}
+          partner={displayPartner}
           token={session.token}
           onClose={() => setShowUploadModal(false)}
           onSuccess={() => dashboardQuery.refetch()}
         />
       )}
 
+      {showCertificateModal && (
+        <PartnershipCertificateModal
+          partner={displayPartner}
+          onClose={() => setShowCertificateModal(false)}
+        />
+      )}
+
+      {lightboxMedia && (
+        <EvidenceLightboxModal
+          url={lightboxMedia.url}
+          title={lightboxMedia.title}
+          subtitle={lightboxMedia.subtitle}
+          onClose={() => setLightboxMedia(null)}
+        />
+      )}
+
       {/* 7. Itemized Financials & Pen Activity Logs */}
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-6">
+      <div id="ledger-section" className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-6">
         <div className="flex border-b border-slate-200">
           <button
             type="button"
@@ -601,13 +699,13 @@ function PartnersAccountPortal({
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="rounded-full bg-rose-50 border border-rose-200 px-3 py-1 font-bold text-rose-800">
-                    Expenses: {naira(partner.settlement.totalExpenses)}
+                    Expenses: {naira(displayPartner.settlement.totalExpenses)}
                   </span>
                   <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-800">
-                    Sales: {naira(partner.settlement.totalIncome)}
+                    Sales: {naira(displayPartner.settlement.totalIncome)}
                   </span>
                   <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 font-bold text-blue-800">
-                    Paid Out: {naira(partner.settlement.paidOut)}
+                    Paid Out: {naira(displayPartner.settlement.paidOut)}
                   </span>
                 </div>
               </div>
@@ -663,8 +761,10 @@ function PartnersAccountPortal({
                         <th className="py-3 px-3">Type</th>
                         <th className="py-3 px-3">Category</th>
                         <th className="py-3 px-3">Description</th>
+                        <th className="py-3 px-3">Receipt / Invoice</th>
                         <th className="py-3 px-3">Payment Method</th>
                         <th className="py-3 px-3.5 text-right">Amount (₦)</th>
+                        <th className="py-3 px-2 text-center w-10">Ask</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -709,9 +809,30 @@ function PartnersAccountPortal({
                                 </span>
                               )}
                             </td>
+                            <td className="py-3 px-3 whitespace-nowrap">
+                              {row.receiptUrl ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setLightboxMedia({
+                                      url: row.receiptUrl!,
+                                      title: `Receipt: ${row.description}`,
+                                      subtitle: `${row.category} · ${row.paymentMethod} · ${row.transactionDate}`,
+                                    })
+                                  }
+                                  className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-xs"
+                                  title="View verified expense receipt / invoice attachment"
+                                >
+                                  <Paperclip size={10} className="text-emerald-700" />
+                                  <span>{row.attachmentName || "Receipt"}</span>
+                                </button>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-mono italic">No file</span>
+                              )}
+                            </td>
                             <td className="py-3 px-3 text-slate-600">{row.paymentMethod}</td>
                             <td
-                              className={`py-3 px-3.5 text-right font-black ${
+                              className={`py-3 px-3.5 text-right font-black tabular-nums ${
                                 removed
                                   ? "line-through text-slate-400"
                                   : row.type === "expense"
@@ -723,6 +844,19 @@ function PartnersAccountPortal({
                             >
                               {row.type === "expense" ? "-" : row.type === "income" ? "+" : ""}
                               {naira(row.amount)}
+                            </td>
+                            <td className="py-3 px-2 text-center whitespace-nowrap">
+                              <a
+                                href={`https://wa.me/2348167099492?text=${encodeURIComponent(
+                                  `Hello Dignity Agro Farms, I am reviewing my cycle statement for "${displayPartner.projectName}" (${displayPartner.cycleName}). Could you share more details regarding this entry: "${row.description}" (₦${row.amount.toLocaleString()} on ${row.transactionDate})?`
+                                )}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366] hover:text-white transition"
+                                title="Inquire about this entry on WhatsApp"
+                              >
+                                <MessageCircle size={12} />
+                              </a>
                             </td>
                           </tr>
                         );
@@ -860,6 +994,25 @@ function PartnersAccountPortal({
                           </p>
                         )}
 
+                        {act.photoUrl && (
+                          <div className="pt-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setLightboxMedia({
+                                  url: act.photoUrl!,
+                                  title: `Flock Pen Inspection: ${act.activityType} (${act.activityDate})`,
+                                  subtitle: act.notes || undefined,
+                                })
+                              }
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#0F3D24] shadow-xs hover:bg-[#0F3D24]/10 transition"
+                            >
+                              <Camera size={13} className="text-[#3F8F3F]" />
+                              <span>View Pen Photo</span>
+                            </button>
+                          </div>
+                        )}
+
                         {removed && (
                           <p className="text-[11px] font-semibold text-rose-700">
                             Removed on {act.removedAt?.slice(0, 10)} ({act.removalReason || "Correction"})
@@ -874,6 +1027,68 @@ function PartnersAccountPortal({
           );
         })()}
       </div>
+
+      {/* Mobile Sticky Bottom Navigation (Native App feel for investors on phones) */}
+      <nav
+        aria-label="Partner mobile navigation"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around text-[10px] font-bold text-slate-600"
+      >
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="flex flex-col items-center gap-0.5 text-slate-600 hover:text-[#0F3D24] active:scale-95 transition"
+        >
+          <Handshake size={18} />
+          <span>Overview</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const el = document.getElementById("charts-section");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}
+          className="flex flex-col items-center gap-0.5 text-slate-600 hover:text-[#0F3D24] active:scale-95 transition"
+        >
+          <PieChart size={18} />
+          <span>Charts</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("financials");
+            const el = document.getElementById("ledger-section");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}
+          className={`flex flex-col items-center gap-0.5 active:scale-95 transition ${
+            activeTab === "financials" ? "text-[#0F3D24] font-black" : "text-slate-600"
+          }`}
+        >
+          <Receipt size={18} />
+          <span>Ledger</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("activities");
+            const el = document.getElementById("ledger-section");
+            if (el) el.scrollIntoView({ behavior: "smooth" });
+          }}
+          className={`flex flex-col items-center gap-0.5 active:scale-95 transition ${
+            activeTab === "activities" ? "text-[#0F3D24] font-black" : "text-slate-600"
+          }`}
+        >
+          <Activity size={18} />
+          <span>Flock</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowCertificateModal(true)}
+          className="flex flex-col items-center gap-0.5 text-slate-600 hover:text-[#0F3D24] active:scale-95 transition"
+        >
+          <Award size={18} />
+          <span>Certificate</span>
+        </button>
+      </nav>
     </div>
   );
 }

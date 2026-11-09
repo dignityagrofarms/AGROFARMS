@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { checkOwner, parseAdminCredential } from "./orders.functions";
+import { checkOwner, checkPasscode, parseAdminCredential } from "./orders.functions";
 import {
   computeSettlement,
   buildChartData,
@@ -13,11 +13,65 @@ import {
 export type PartnerAuditEvent = {
   at: string;
   by: string;
-  kind: "terms_amended" | "cycle_closed" | "cycle_reopened" | "agreement_signed";
+  kind:
+    | "terms_amended"
+    | "cycle_closed"
+    | "cycle_reopened"
+    | "agreement_signed"
+    | "cycle_rollover"
+    | "payout_election"
+    | "cycle_archive_data";
   reason?: string | null;
   from?: { profit: number; loss: number } | null;
   to?: { profit: number; loss: number } | null;
+  meta?: any;
 };
+
+export interface PartnerPayoutElection {
+  choice: "bank_payout" | "rollover_principal" | "rollover_all";
+  bankName?: string | null;
+  accountNumber?: string | null;
+  accountName?: string | null;
+  notes?: string | null;
+  submittedAt: string;
+  status: "pending_review" | "acknowledged" | "completed";
+}
+
+export interface PartnerCycleArchive {
+  cycleId: string;
+  cycleName: string;
+  projectName: string;
+  batchId: string | null;
+  batchName?: string | null;
+  initialInvestment: number;
+  profitSharePercentage: number;
+  lossSharePercentage: number;
+  cycleStartDate: string | null;
+  cycleEndDate: string | null;
+  settledAt: string;
+  settledBy: string;
+  settlement: Settlement;
+  summary: PartnerDashboardSummary;
+  financials: PartnerFinancial[];
+  activities: PartnerActivity[];
+  agreementSigned: boolean;
+  agreementSignedAt: string | null;
+  agreementSignedBy: string | null;
+}
+
+export interface PartnerDashboardSummary {
+  initialStockCount: number;
+  currentStockCount: number;
+  totalFeedConsumedKg: number;
+  totalMortalityCount: number;
+  mortalityRatePercent: number;
+  latestAverageWeightKg: number;
+  estimatedBiomassKg: number;
+  fcr: number | null;
+  costPerLiveBird: number | null;
+  breakEvenPricePerBird: number | null;
+  pendingApprovalsCount: number;
+}
 
 export interface FarmPartner {
   id: string;
@@ -58,6 +112,10 @@ export interface FarmPartner {
   agreementDocumentSize: string | null;
   agreementDocumentUploadedAt: string | null;
   agreementDocumentUploadedBy: string | null;
+  // Multi-Cycle History & Partner Elections
+  archivedCycles: PartnerCycleArchive[];
+  payoutElection: PartnerPayoutElection | null;
+  pendingApprovalsCount?: number;
   // Live computed result (identical on admin and partner side)
   settlement: Settlement;
 }
@@ -78,6 +136,13 @@ export interface PartnerFinancial {
   removedAt: string | null;
   removedBy: string | null;
   removalReason: string | null;
+  // Approval & Evidence Attachments
+  approvalStatus: "approved" | "pending_approval" | "rejected";
+  approvedBy: string | null;
+  approvedAt: string | null;
+  receiptUrl: string | null;
+  attachmentName: string | null;
+  cycleName?: string | null;
 }
 
 export interface PartnerActivity {
@@ -105,6 +170,12 @@ export interface PartnerActivity {
   removedAt: string | null;
   removedBy: string | null;
   removalReason: string | null;
+  // Approval & Visual Evidence
+  approvalStatus: "approved" | "pending_approval" | "rejected";
+  approvedBy: string | null;
+  approvedAt: string | null;
+  photoUrl: string | null;
+  cycleName?: string | null;
 }
 
 export interface PartnerDashboardData {
@@ -112,23 +183,70 @@ export interface PartnerDashboardData {
   financials: PartnerFinancial[];
   activities: PartnerActivity[];
   charts: PartnerChartData;
-  summary: {
-    currentStockCount: number;
-    totalFeedConsumedKg: number;
-    totalMortalityCount: number;
-    mortalityRatePercent: number;
-  };
+  summary: PartnerDashboardSummary;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Role Guard: Owner or Manager Only (Staff Strictly Blocked) ───────────────
+
+async function checkOwnerOrManager(
+  value: string,
+): Promise<{ role: "owner" | "manager"; username: string }> {
+  const role = await checkPasscode(value);
+  if (role !== "owner" && role !== "manager") {
+    throw new Error("Access denied. Partner operations are restricted to Owner and Manager only.");
+  }
+  const cred = parseAdminCredential(value);
+  return { role, username: cred.username || role };
+}
+
+// ─── Helpers & Metadata Packing (Schema-Resilient) ────────────────────────────
+
+const ARCHIVED_PREFIX = "__ARCHIVED_CYCLE__:";
+const META_MARKER = "\n__DAF_META__:";
+
+interface EmbeddedRowMeta {
+  approvalStatus?: "approved" | "pending_approval" | "rejected";
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  receiptUrl?: string | null;
+  attachmentName?: string | null;
+  photoUrl?: string | null;
+  cycleName?: string | null;
+}
+
+function packTextWithMeta(text: string | null | undefined, meta: EmbeddedRowMeta): string {
+  const clean = (text || "").split(META_MARKER)[0];
+  const hasAny =
+    (meta.approvalStatus && meta.approvalStatus !== "approved") ||
+    meta.receiptUrl ||
+    meta.attachmentName ||
+    meta.photoUrl ||
+    meta.cycleName;
+  if (!hasAny) return clean;
+  return `${clean}${META_MARKER}${JSON.stringify(meta)}`;
+}
+
+function unpackTextAndMeta(raw: string | null | undefined): {
+  cleanText: string | null;
+  meta: EmbeddedRowMeta;
+} {
+  if (!raw) return { cleanText: null, meta: {} };
+  const idx = raw.indexOf(META_MARKER);
+  if (idx === -1) return { cleanText: raw, meta: {} };
+  const cleanText = raw.slice(0, idx) || null;
+  try {
+    const meta = JSON.parse(raw.slice(idx + META_MARKER.length)) as EmbeddedRowMeta;
+    return { cleanText, meta: meta || {} };
+  } catch {
+    return { cleanText: raw, meta: {} };
+  }
+}
 
 async function hashPasscode(passcode: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(passcode));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-// Signed partner session token (HMAC-SHA256, 12h expiry). The partner's
-// password is never stored in the browser or re-sent after login.
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 function sessionSecret(): string {
@@ -184,42 +302,69 @@ async function verifySession(token: string): Promise<{ pid: string; u: string }>
   return { pid: data.pid, u: data.u };
 }
 
-const mapFin = (r: any): PartnerFinancial => ({
-  id: r.id,
-  partnerId: r.partner_id,
-  batchId: r.batch_id,
-  type: r.type,
-  category: r.category,
-  amount: Number(r.amount) || 0,
-  description: r.description,
-  paymentMethod: r.payment_method || "Bank Transfer",
-  transactionDate: r.transaction_date,
-  referenceNo: r.reference_no,
-  recordedBy: r.recorded_by,
-  createdAt: r.created_at,
-  removedAt: r.removed_at ?? null,
-  removedBy: r.removed_by ?? null,
-  removalReason: r.removal_reason ?? null,
-});
+const mapFin = (r: any): PartnerFinancial => {
+  const { cleanText: cleanDesc, meta } = unpackTextAndMeta(r.description);
+  const approvalStatus: "approved" | "pending_approval" | "rejected" =
+    r.approval_status || meta.approvalStatus || "approved";
 
-const mapAct = (r: any): PartnerActivity => ({
-  id: r.id,
-  partnerId: r.partner_id,
-  batchId: r.batch_id,
-  activityDate: r.activity_date,
-  activityType: r.activity_type,
-  stockHeadcount: Number(r.stock_headcount) || 0,
-  mortalityCount: Number(r.mortality_count) || 0,
-  causeOfMortality: r.cause_of_mortality,
-  feedConsumedKg: Number(r.feed_consumed_kg) || 0,
-  averageWeightKg: Number(r.average_weight_kg) || 0,
-  notes: r.notes,
-  recordedBy: r.recorded_by,
-  createdAt: r.created_at,
-  removedAt: r.removed_at ?? null,
-  removedBy: r.removed_by ?? null,
-  removalReason: r.removal_reason ?? null,
-});
+  return {
+    id: r.id,
+    partnerId: r.partner_id,
+    batchId: r.batch_id,
+    type: r.type,
+    category: r.category,
+    amount: Number(r.amount) || 0,
+    description: cleanDesc || r.description || "",
+    paymentMethod: r.payment_method || "Bank Transfer",
+    transactionDate: r.transaction_date,
+    referenceNo: r.reference_no,
+    recordedBy: r.recorded_by,
+    createdAt: r.created_at,
+    removedAt: r.removed_at ?? null,
+    removedBy: r.removed_by ?? null,
+    removalReason: r.removal_reason ?? null,
+    approvalStatus,
+    approvedBy: r.approved_by ?? meta.approvedBy ?? null,
+    approvedAt: r.approved_at ?? meta.approvedAt ?? null,
+    receiptUrl: r.receipt_url ?? meta.receiptUrl ?? null,
+    attachmentName: r.attachment_name ?? meta.attachmentName ?? null,
+    cycleName: r.cycle_name ?? meta.cycleName ?? null,
+  };
+};
+
+const mapAct = (r: any): PartnerActivity => {
+  const { cleanText: cleanNotes, meta } = unpackTextAndMeta(r.notes);
+  const approvalStatus: "approved" | "pending_approval" | "rejected" =
+    r.approval_status || meta.approvalStatus || "approved";
+
+  return {
+    id: r.id,
+    partnerId: r.partner_id,
+    batchId: r.batch_id,
+    activityDate: r.activity_date,
+    activityType: r.activity_type,
+    stockHeadcount: Number(r.stock_headcount) || 0,
+    mortalityCount: Number(r.mortality_count) || 0,
+    causeOfMortality: r.cause_of_mortality,
+    feedConsumedKg: Number(r.feed_consumed_kg) || 0,
+    averageWeightKg: Number(r.average_weight_kg) || 0,
+    notes: cleanNotes,
+    recordedBy: r.recorded_by,
+    createdAt: r.created_at,
+    removedAt: r.removed_at ?? null,
+    removedBy: r.removed_by ?? null,
+    removalReason: r.removal_reason ?? null,
+    approvalStatus,
+    approvedBy: r.approved_by ?? meta.approvedBy ?? null,
+    approvedAt: r.approved_at ?? meta.approvedAt ?? null,
+    photoUrl: r.photo_url ?? meta.photoUrl ?? null,
+    cycleName: r.cycle_name ?? meta.cycleName ?? null,
+  };
+};
+
+function isArchivedCycleRow(removalReason: string | null | undefined): boolean {
+  return Boolean(removalReason && String(removalReason).startsWith(ARCHIVED_PREFIX));
+}
 
 export function generateDefaultAgreementTerms(data: {
   fullName: string;
@@ -264,7 +409,7 @@ a) If the cycle incurs a Net Operational Loss due to disease mortality, adverse 
    • Any loss beyond the Partner's capital is absorbed entirely by Dignity Agro Farms.
 
 5. SETTLEMENT & PAYOUT DISBURSEMENT
-Within five (5) to seven (7) business days following final bird offload, sales reconciliation, and cycle closure, the Partner's final settlement (Capital adjusted for agreed profit or loss, minus any interim payouts received) shall be disbursed to the Partner's verified bank account.
+Within five (5) to seven (7) business days following final bird offload, sales reconciliation, and cycle closure, the Partner's final settlement (Capital adjusted for agreed profit or loss, minus any interim payouts received) shall be disbursed to the Partner's verified bank account or rolled over into a subsequent cycle upon mutual election.
 
 6. BIOSECURITY & FARM CARE PROTOCOLS
 Dignity Agro Farms undertakes to exercise the highest standards of professional poultry management, biosecurity control, routine vaccination schedules, and sanitary pen maintenance throughout the flock lifecycle.
@@ -273,14 +418,53 @@ Dignity Agro Farms undertakes to exercise the highest standards of professional 
 This Agreement is governed by the laws of Imo State and the Federal Republic of Nigeria. In the event of any dispute, the parties agree to resolve differences through good-faith mutual consultation and amicable mediation.${data.customClauses ? `\n\nADDITIONAL AGREED TERMS & CLAUSES:\n${data.customClauses.trim()}` : ""}`;
 }
 
-function mapPartner(p: any, finRows: any[]): FarmPartner {
+function extractPartnerArchivesAndElection(p: any): {
+  archivedCycles: PartnerCycleArchive[];
+  payoutElection: PartnerPayoutElection | null;
+  visibleAuditLog: PartnerAuditEvent[];
+} {
+  const rawHistory: PartnerAuditEvent[] = Array.isArray(p.terms_history) ? p.terms_history : [];
+  let archivedCycles: PartnerCycleArchive[] = Array.isArray(p.archived_cycles) ? p.archived_cycles : [];
+  let payoutElection: PartnerPayoutElection | null = p.payout_election ?? null;
+
+  // Fallback extraction from terms_history if native columns aren't populated yet
+  const archiveEvents = rawHistory.filter((e) => e.kind === "cycle_archive_data" && e.meta);
+  if (archivedCycles.length === 0 && archiveEvents.length > 0) {
+    archivedCycles = archiveEvents.map((e) => e.meta as PartnerCycleArchive);
+  }
+
+  if (!payoutElection) {
+    const electionEvents = rawHistory.filter((e) => e.kind === "payout_election" && e.meta);
+    if (electionEvents.length > 0) {
+      payoutElection = electionEvents[electionEvents.length - 1].meta as PartnerPayoutElection;
+    }
+  }
+
+  const visibleAuditLog = rawHistory.filter((e) => e.kind !== "cycle_archive_data");
+  return { archivedCycles, payoutElection, visibleAuditLog };
+}
+
+function mapPartner(p: any, finRows: any[], actRows: any[] = []): FarmPartner {
   const initial = Number(p.initial_investment) || 0;
   const profitPct = Number(p.profit_share_percentage ?? 50);
   const lossPct = Number(p.loss_share_percentage ?? 100);
+
+  const mappedFins = finRows.map(mapFin).filter((f) => !isArchivedCycleRow(f.removalReason));
+  const mappedActs = actRows.map(mapAct).filter((a) => !isArchivedCycleRow(a.removalReason));
+
+  // Only approved entries affect live settlement calculations
+  const approvedFins = mappedFins.filter((f) => f.approvalStatus === "approved");
+  const pendingCount =
+    mappedFins.filter((f) => f.approvalStatus === "pending_approval" && !f.removedAt).length +
+    mappedActs.filter((a) => a.approvalStatus === "pending_approval" && !a.removedAt).length;
+
   const settlement = computeSettlement(
     { initialInvestment: initial, profitSharePercentage: profitPct, lossSharePercentage: lossPct },
-    finRows.map((r) => ({ type: r.type, amount: Number(r.amount) || 0, removedAt: r.removed_at ?? null })),
+    approvedFins.map((r) => ({ type: r.type, amount: Number(r.amount) || 0, removedAt: r.removedAt ?? null })),
   );
+
+  const { archivedCycles, payoutElection, visibleAuditLog } = extractPartnerArchivesAndElection(p);
+
   return {
     id: p.id,
     fullName: p.full_name,
@@ -306,7 +490,7 @@ function mapPartner(p: any, finRows: any[]): FarmPartner {
     cycleEndDate: p.cycle_end_date ?? null,
     cycleStatus: p.cycle_status === "closed" ? "closed" : "open",
     settledAt: p.settled_at ?? null,
-    auditLog: Array.isArray(p.terms_history) ? p.terms_history : [],
+    auditLog: visibleAuditLog,
     agreementTerms: p.agreement_terms ?? p.agreed_terms ?? null,
     agreementSigned: Boolean(p.agreement_signed),
     agreementSignedAt: p.agreement_signed_at ?? null,
@@ -317,6 +501,9 @@ function mapPartner(p: any, finRows: any[]): FarmPartner {
     agreementDocumentSize: p.agreement_document_size ?? null,
     agreementDocumentUploadedAt: p.agreement_document_uploaded_at ?? null,
     agreementDocumentUploadedBy: p.agreement_document_uploaded_by ?? null,
+    archivedCycles,
+    payoutElection,
+    pendingApprovalsCount: pendingCount,
     settlement,
   };
 }
@@ -345,33 +532,78 @@ async function loadPartnerBundle(supabaseAdmin: any, partnerId: string) {
     .order("created_at", { ascending: false });
   if (aErr) throw new Error(aErr.message);
 
-  const partner = mapPartner(p, finRows || []);
-  const financials = (finRows || []).map(mapFin);
-  const activities = (actRows || []).map(mapAct);
+  const partner = mapPartner(p, finRows || [], actRows || []);
+  const financials = (finRows || []).map(mapFin).filter((f) => !isArchivedCycleRow(f.removalReason));
+  const activities = (actRows || []).map(mapAct).filter((a) => !isArchivedCycleRow(a.removalReason));
   return { partner, financials, activities, raw: p };
 }
 
-function buildSummaryAndCharts(financials: PartnerFinancial[], activities: PartnerActivity[]) {
-  const live = activities.filter((a) => !a.removedAt);
-  const stocked = live.reduce((s, a) => s + a.stockHeadcount, 0);
-  const mortality = live.reduce((s, a) => s + a.mortalityCount, 0);
-  const feed = live.reduce((s, a) => s + a.feedConsumedKg, 0);
+function buildSummaryAndCharts(
+  financials: PartnerFinancial[],
+  activities: PartnerActivity[],
+  initialInvestment = 0,
+): { summary: PartnerDashboardSummary; charts: PartnerChartData } {
+  const approvedFins = financials.filter((f) => f.approvalStatus === "approved" && !f.removedAt);
+  const approvedActs = activities.filter((a) => a.approvalStatus === "approved" && !a.removedAt);
+
+  const pendingApprovalsCount =
+    financials.filter((f) => f.approvalStatus === "pending_approval" && !f.removedAt).length +
+    activities.filter((a) => a.approvalStatus === "pending_approval" && !a.removedAt).length;
+
+  const stocked = approvedActs.reduce((s, a) => s + a.stockHeadcount, 0);
+  const mortality = approvedActs.reduce((s, a) => s + a.mortalityCount, 0);
+  const feed = approvedActs.reduce((s, a) => s + a.feedConsumedKg, 0);
+  const currentStockCount = Math.max(0, stocked - mortality);
+
+  // Latest recorded average bird weight (sorted descending by activityDate/createdAt)
+  const weightRecord = approvedActs.find((a) => a.averageWeightKg > 0);
+  const latestAverageWeightKg = weightRecord ? Number(weightRecord.averageWeightKg) : 0;
+  const estimatedBiomassKg = Math.round(currentStockCount * latestAverageWeightKg * 10) / 10;
+
+  const fcr =
+    estimatedBiomassKg > 0 && feed > 0 ? Math.round((feed / estimatedBiomassKg) * 100) / 100 : null;
+
+  const totalExpenses = approvedFins
+    .filter((f) => f.type === "expense")
+    .reduce((sum, f) => sum + f.amount, 0);
+  const totalSales = approvedFins
+    .filter((f) => f.type === "income")
+    .reduce((sum, f) => sum + f.amount, 0);
+
+  const costPerLiveBird =
+    currentStockCount > 0 && totalExpenses > 0 ? Math.round(totalExpenses / currentStockCount) : null;
+
+  // Break-even selling price per remaining live bird to recover total capital/expenses
+  const targetRecoveryBase = Math.max(initialInvestment, totalExpenses);
+  const remainingToRecover = Math.max(0, targetRecoveryBase - totalSales);
+  const breakEvenPricePerBird =
+    currentStockCount > 0 && targetRecoveryBase > 0
+      ? Math.round(remainingToRecover / currentStockCount)
+      : null;
+
   return {
     summary: {
-      currentStockCount: Math.max(0, stocked - mortality),
+      initialStockCount: stocked,
+      currentStockCount,
       totalFeedConsumedKg: Math.round(feed * 10) / 10,
       totalMortalityCount: mortality,
       mortalityRatePercent: stocked > 0 ? Math.round((mortality / stocked) * 1000) / 10 : 0,
+      latestAverageWeightKg,
+      estimatedBiomassKg,
+      fcr,
+      costPerLiveBird,
+      breakEvenPricePerBird,
+      pendingApprovalsCount,
     },
     charts: buildChartData(
-      financials.map((f) => ({
+      approvedFins.map((f) => ({
         type: f.type,
         amount: f.amount,
         removedAt: f.removedAt,
         category: f.category,
         transactionDate: f.transactionDate,
       })),
-      live.map((a) => ({
+      approvedActs.map((a) => ({
         activityDate: a.activityDate,
         stockHeadcount: a.stockHeadcount,
         mortalityCount: a.mortalityCount,
@@ -392,12 +624,12 @@ async function assertCycleOpen(supabaseAdmin: any, partnerId: string) {
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)");
 const pct = z.number().min(0, "Percentage cannot be below 0").max(100, "Percentage cannot exceed 100");
 
-// ─── Owner Admin Server Functions ─────────────────────────────────────────────
+// ─── Owner & Manager Admin Server Functions ───────────────────────────────────
 
 export const adminListPartners = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1) }).parse(data))
   .handler(async ({ data }): Promise<FarmPartner[]> => {
-    await checkOwner(data.passcode);
+    await checkOwnerOrManager(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: partners, error: pErr } = await supabaseAdmin
@@ -408,17 +640,31 @@ export const adminListPartners = createServerFn({ method: "POST" })
 
     const { data: financials, error: fErr } = await supabaseAdmin
       .from("partner_financials")
-      .select("partner_id, type, amount, removed_at");
+      .select("*");
     if (fErr) throw new Error(fErr.message);
 
-    const byPartner = new Map<string, any[]>();
+    const { data: activities, error: aErr } = await supabaseAdmin
+      .from("partner_activities")
+      .select("*");
+    if (aErr) throw new Error(aErr.message);
+
+    const finByPartner = new Map<string, any[]>();
     for (const f of financials || []) {
-      const arr = byPartner.get(f.partner_id) || [];
+      const arr = finByPartner.get(f.partner_id) || [];
       arr.push(f);
-      byPartner.set(f.partner_id, arr);
+      finByPartner.set(f.partner_id, arr);
     }
 
-    return (partners || []).map((p: any) => mapPartner(p, byPartner.get(p.id) || []));
+    const actByPartner = new Map<string, any[]>();
+    for (const a of activities || []) {
+      const arr = actByPartner.get(a.partner_id) || [];
+      arr.push(a);
+      actByPartner.set(a.partner_id, arr);
+    }
+
+    return (partners || []).map((p: any) =>
+      mapPartner(p, finByPartner.get(p.id) || [], actByPartner.get(p.id) || []),
+    );
   });
 
 export const adminGetPartnerDetail = createServerFn({ method: "POST" })
@@ -431,12 +677,19 @@ export const adminGetPartnerDetail = createServerFn({ method: "POST" })
       financials: PartnerFinancial[];
       activities: PartnerActivity[];
       charts: PartnerChartData;
-      summary: PartnerDashboardData["summary"];
+      summary: PartnerDashboardSummary;
+      viewerRole: "owner" | "manager";
     }> => {
-      await checkOwner(data.passcode);
+      const { role } = await checkOwnerOrManager(data.passcode);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
-      return { partner, financials, activities, ...buildSummaryAndCharts(financials, activities) };
+      return {
+        partner,
+        financials,
+        activities,
+        ...buildSummaryAndCharts(financials, activities, partner.initialInvestment),
+        viewerRole: role,
+      };
     },
   );
 
@@ -554,7 +807,6 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
         cycleEndDate: dateStr.optional().nullable(),
         batchId: z.string().uuid().optional().nullable(),
         status: z.enum(["active", "matured", "completed", "paused"]),
-        /** Required when sharing terms or capital change after entries exist */
         amendReason: z.string().trim().max(500).optional().nullable(),
       })
       .parse(data),
@@ -707,6 +959,161 @@ export const adminReopenPartnerCycle = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ─── Multi-Cycle Rollover (Archive Current Cycle & Start New Cycle for Partner) ─
+
+export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        partnerId: z.string().uuid(),
+        newCycleName: z.string().trim().min(2, "New cycle name is required"),
+        newProjectName: z.string().trim().min(2, "Project name is required"),
+        newInitialInvestment: z.number().min(0, "Investment amount cannot be negative"),
+        newProfitSharePercentage: pct,
+        newLossSharePercentage: pct,
+        newCycleStartDate: dateStr,
+        newCycleEndDate: dateStr.optional().nullable(),
+        newBatchId: z.string().uuid().optional().nullable(),
+        rolloverNotes: z.string().trim().max(500).optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const cred = parseAdminCredential(data.passcode);
+
+    if (data.newCycleEndDate && data.newCycleEndDate < data.newCycleStartDate) {
+      throw new Error("Cycle end date cannot be before the start date.");
+    }
+
+    const { partner, financials, activities, raw } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+    const { summary } = buildSummaryAndCharts(financials, activities, partner.initialInvestment);
+    const now = new Date().toISOString();
+    const cycleId = `cycle_${Date.now()}`;
+
+    const archiveEntry: PartnerCycleArchive = {
+      cycleId,
+      cycleName: partner.cycleName,
+      projectName: partner.projectName,
+      batchId: partner.batchId,
+      batchName: partner.batchName ?? null,
+      initialInvestment: partner.initialInvestment,
+      profitSharePercentage: partner.profitSharePercentage,
+      lossSharePercentage: partner.lossSharePercentage,
+      cycleStartDate: partner.cycleStartDate,
+      cycleEndDate: partner.cycleEndDate,
+      settledAt: partner.settledAt || now,
+      settledBy: cred.username || "owner",
+      settlement: partner.settlement,
+      summary,
+      financials,
+      activities,
+      agreementSigned: partner.agreementSigned,
+      agreementSignedAt: partner.agreementSignedAt,
+      agreementSignedBy: partner.agreementSignedBy,
+    };
+
+    const existingArchives = [...partner.archivedCycles, archiveEntry];
+    const rawHistory: PartnerAuditEvent[] = Array.isArray(raw.terms_history) ? [...raw.terms_history] : [];
+
+    // Store archive both in terms_history fallback and in archived_cycles column
+    rawHistory.push({
+      at: now,
+      by: cred.username || "owner",
+      kind: "cycle_archive_data",
+      reason: `Archived ${partner.cycleName}`,
+      meta: archiveEntry,
+    });
+    rawHistory.push({
+      at: now,
+      by: cred.username || "owner",
+      kind: "cycle_rollover",
+      reason:
+        data.rolloverNotes ||
+        `Rolled over from ${partner.cycleName} to ${data.newCycleName} with capital ₦${Math.round(data.newInitialInvestment).toLocaleString("en-NG")}`,
+      from: { profit: partner.profitSharePercentage, loss: partner.lossSharePercentage },
+      to: { profit: data.newProfitSharePercentage, loss: data.newLossSharePercentage },
+    });
+
+    // Soft-archive current cycle's financials and activities so the new cycle starts with a clean ledger
+    const archiveTag = `${ARCHIVED_PREFIX}${cycleId}:${partner.cycleName}`;
+    await supabaseAdmin
+      .from("partner_financials")
+      .update({
+        removed_at: now,
+        removed_by: cred.username || "owner",
+        removal_reason: archiveTag,
+      })
+      .eq("partner_id", data.partnerId)
+      .is("removed_at", null);
+
+    await supabaseAdmin
+      .from("partner_activities")
+      .update({
+        removed_at: now,
+        removed_by: cred.username || "owner",
+        removal_reason: archiveTag,
+      })
+      .eq("partner_id", data.partnerId)
+      .is("removed_at", null);
+
+    const newTerms = generateDefaultAgreementTerms({
+      fullName: partner.fullName,
+      projectName: data.newProjectName,
+      cycleName: data.newCycleName,
+      initialInvestment: data.newInitialInvestment,
+      investmentDate: data.newCycleStartDate,
+      profitSharePercentage: data.newProfitSharePercentage,
+      lossSharePercentage: data.newLossSharePercentage,
+    });
+
+    const baseUpdate: Record<string, any> = {
+      cycle_name: data.newCycleName,
+      project_name: data.newProjectName,
+      initial_investment: data.newInitialInvestment,
+      investment_date: data.newCycleStartDate,
+      profit_share_percentage: data.newProfitSharePercentage,
+      loss_share_percentage: data.newLossSharePercentage,
+      cycle_start_date: data.newCycleStartDate,
+      cycle_end_date: data.newCycleEndDate || null,
+      batch_id: data.newBatchId || null,
+      cycle_status: "open",
+      status: "active",
+      settled_at: null,
+      settlement_snapshot: null,
+      agreed_terms: newTerms,
+      agreement_terms: newTerms,
+      agreement_signed: false,
+      agreement_signed_at: null,
+      agreement_signed_by: null,
+      agreement_signature_data: null,
+      terms_history: rawHistory,
+      updated_at: now,
+    };
+
+    const { error: fullErr } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        ...baseUpdate,
+        archived_cycles: existingArchives,
+        payout_election: null,
+      })
+      .eq("id", data.partnerId);
+
+    if (fullErr) {
+      // Fallback if archived_cycles / payout_election columns aren't migrated yet
+      const { error: fallbackErr } = await supabaseAdmin
+        .from("farm_partners")
+        .update(baseUpdate)
+        .eq("id", data.partnerId);
+      if (fallbackErr) throw new Error(fallbackErr.message);
+    }
+
+    return { ok: true, archivedCycleId: cycleId };
+  });
+
 export const adminResetPartnerPasscode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -757,6 +1164,8 @@ export const adminDeletePartner = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ─── Financial Entry Recording (Owner -> Approved, Manager -> Pending Approval) ─
+
 export const adminRecordPartnerFinancial = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -771,15 +1180,20 @@ export const adminRecordPartnerFinancial = createServerFn({ method: "POST" })
         paymentMethod: z.string().default("Bank Transfer"),
         transactionDate: dateStr,
         referenceNo: z.string().trim().optional().nullable(),
+        receiptUrl: z.string().trim().optional().nullable(),
+        attachmentName: z.string().trim().optional().nullable(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cred = parseAdminCredential(data.passcode);
+    const { role, username } = await checkOwnerOrManager(data.passcode);
+    if (data.type === "payout" && role !== "owner") {
+      throw new Error("Only the Farm Owner can record partner payouts.");
+    }
 
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { partner } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+
     if (partner.cycleStatus === "closed" && data.type !== "payout") {
       throw new Error("This cycle is closed and settled. Re-open the cycle to add expenses or income.");
     }
@@ -792,28 +1206,57 @@ export const adminRecordPartnerFinancial = createServerFn({ method: "POST" })
       }
     }
 
+    const now = new Date().toISOString();
+    const approvalStatus = role === "owner" ? "approved" : "pending_approval";
+    const packedDescription = packTextWithMeta(data.description, {
+      approvalStatus,
+      approvedBy: role === "owner" ? username : null,
+      approvedAt: role === "owner" ? now : null,
+      receiptUrl: data.receiptUrl || null,
+      attachmentName: data.attachmentName || null,
+      cycleName: partner.cycleName,
+    });
+
+    const baseRow = {
+      partner_id: data.partnerId,
+      batch_id: data.batchId || partner.batchId || null,
+      type: data.type,
+      category: data.category,
+      amount: data.amount,
+      description: packedDescription,
+      payment_method: data.paymentMethod,
+      transaction_date: data.transactionDate,
+      reference_no: data.referenceNo || null,
+      recorded_by: username,
+    };
+
     const { data: inserted, error } = await supabaseAdmin
       .from("partner_financials")
       .insert({
-        partner_id: data.partnerId,
-        batch_id: data.batchId || null,
-        type: data.type,
-        category: data.category,
-        amount: data.amount,
-        description: data.description,
-        payment_method: data.paymentMethod,
-        transaction_date: data.transactionDate,
-        reference_no: data.referenceNo || null,
-        recorded_by: cred.username || "owner",
+        ...baseRow,
+        approval_status: approvalStatus,
+        approved_by: role === "owner" ? username : null,
+        approved_at: role === "owner" ? now : null,
+        receipt_url: data.receiptUrl || null,
+        attachment_name: data.attachmentName || null,
+        cycle_name: partner.cycleName,
       })
       .select("id")
       .single();
 
-    if (error) throw new Error(error.message);
-    return { ok: true, id: inserted.id };
+    if (error) {
+      const { data: fallbackInserted, error: fallbackErr } = await supabaseAdmin
+        .from("partner_financials")
+        .insert(baseRow)
+        .select("id")
+        .single();
+      if (fallbackErr) throw new Error(fallbackErr.message);
+      return { ok: true, id: fallbackInserted.id, approvalStatus };
+    }
+
+    return { ok: true, id: inserted.id, approvalStatus };
   });
 
-/** Soft delete: the entry is retained and shown to the partner as "removed". */
 export const adminDeletePartnerFinancial = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -850,6 +1293,8 @@ export const adminDeletePartnerFinancial = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ─── Activity Recording (Owner -> Approved, Manager -> Pending Approval) ──────
+
 export const adminRecordPartnerActivity = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z
@@ -874,35 +1319,64 @@ export const adminRecordPartnerActivity = createServerFn({ method: "POST" })
         feedConsumedKg: z.number().default(0),
         averageWeightKg: z.number().default(0),
         notes: z.string().trim().optional().nullable(),
+        photoUrl: z.string().trim().optional().nullable(),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
-    await checkOwner(data.passcode);
+    const { role, username } = await checkOwnerOrManager(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const cred = parseAdminCredential(data.passcode);
     await assertCycleOpen(supabaseAdmin, data.partnerId);
+
+    const { partner } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+    const now = new Date().toISOString();
+    const approvalStatus = role === "owner" ? "approved" : "pending_approval";
+    const packedNotes = packTextWithMeta(data.notes || "", {
+      approvalStatus,
+      approvedBy: role === "owner" ? username : null,
+      approvedAt: role === "owner" ? now : null,
+      photoUrl: data.photoUrl || null,
+      cycleName: partner.cycleName,
+    });
+
+    const baseRow = {
+      partner_id: data.partnerId,
+      batch_id: data.batchId || partner.batchId || null,
+      activity_date: data.activityDate,
+      activity_type: data.activityType,
+      stock_headcount: data.stockHeadcount,
+      mortality_count: data.mortalityCount,
+      cause_of_mortality: data.causeOfMortality || null,
+      feed_consumed_kg: data.feedConsumedKg,
+      average_weight_kg: data.averageWeightKg,
+      notes: packedNotes || null,
+      recorded_by: username,
+    };
 
     const { data: inserted, error } = await supabaseAdmin
       .from("partner_activities")
       .insert({
-        partner_id: data.partnerId,
-        batch_id: data.batchId || null,
-        activity_date: data.activityDate,
-        activity_type: data.activityType,
-        stock_headcount: data.stockHeadcount,
-        mortality_count: data.mortalityCount,
-        cause_of_mortality: data.causeOfMortality || null,
-        feed_consumed_kg: data.feedConsumedKg,
-        average_weight_kg: data.averageWeightKg,
-        notes: data.notes || null,
-        recorded_by: cred.username || "owner",
+        ...baseRow,
+        approval_status: approvalStatus,
+        approved_by: role === "owner" ? username : null,
+        approved_at: role === "owner" ? now : null,
+        photo_url: data.photoUrl || null,
+        cycle_name: partner.cycleName,
       })
       .select("id")
       .single();
 
-    if (error) throw new Error(error.message);
-    return { ok: true, id: inserted.id };
+    if (error) {
+      const { data: fallbackInserted, error: fallbackErr } = await supabaseAdmin
+        .from("partner_activities")
+        .insert(baseRow)
+        .select("id")
+        .single();
+      if (fallbackErr) throw new Error(fallbackErr.message);
+      return { ok: true, id: fallbackInserted.id, approvalStatus };
+    }
+
+    return { ok: true, id: inserted.id, approvalStatus };
   });
 
 export const adminDeletePartnerActivity = createServerFn({ method: "POST" })
@@ -939,6 +1413,287 @@ export const adminDeletePartnerActivity = createServerFn({ method: "POST" })
       .eq("id", data.activityId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ─── Owner Approval Gate for Manager-Submitted Partner Records ────────────────
+
+export const adminDecidePartnerRecordApproval = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        recordType: z.enum(["financial", "activity"]),
+        recordId: z.string().uuid(),
+        decision: z.enum(["approved", "rejected"]),
+        rejectionReason: z.string().trim().max(300).optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const cred = parseAdminCredential(data.passcode);
+    const now = new Date().toISOString();
+    const approver = cred.username || "owner";
+
+    if (data.recordType === "financial") {
+      const { data: row } = await supabaseAdmin
+        .from("partner_financials")
+        .select("*")
+        .eq("id", data.recordId)
+        .single();
+      if (!row) throw new Error("Financial entry not found.");
+
+      const { cleanText, meta } = unpackTextAndMeta(row.description);
+      const updatedDesc = packTextWithMeta(cleanText || "", {
+        ...meta,
+        approvalStatus: data.decision,
+        approvedBy: approver,
+        approvedAt: now,
+      });
+
+      const baseUpdate: Record<string, any> = {
+        description: updatedDesc,
+        ...(data.decision === "rejected"
+          ? {
+              removed_at: now,
+              removed_by: approver,
+              removal_reason: data.rejectionReason || "Rejected by Owner during review",
+            }
+          : {}),
+      };
+
+      const { error } = await supabaseAdmin
+        .from("partner_financials")
+        .update({
+          ...baseUpdate,
+          approval_status: data.decision,
+          approved_by: approver,
+          approved_at: now,
+        })
+        .eq("id", data.recordId);
+
+      if (error) {
+        const { error: fErr } = await supabaseAdmin
+          .from("partner_financials")
+          .update(baseUpdate)
+          .eq("id", data.recordId);
+        if (fErr) throw new Error(fErr.message);
+      }
+    } else {
+      const { data: row } = await supabaseAdmin
+        .from("partner_activities")
+        .select("*")
+        .eq("id", data.recordId)
+        .single();
+      if (!row) throw new Error("Activity log not found.");
+
+      const { cleanText, meta } = unpackTextAndMeta(row.notes);
+      const updatedNotes = packTextWithMeta(cleanText || "", {
+        ...meta,
+        approvalStatus: data.decision,
+        approvedBy: approver,
+        approvedAt: now,
+      });
+
+      const baseUpdate: Record<string, any> = {
+        notes: updatedNotes,
+        ...(data.decision === "rejected"
+          ? {
+              removed_at: now,
+              removed_by: approver,
+              removal_reason: data.rejectionReason || "Rejected by Owner during review",
+            }
+          : {}),
+      };
+
+      const { error } = await supabaseAdmin
+        .from("partner_activities")
+        .update({
+          ...baseUpdate,
+          approval_status: data.decision,
+          approved_by: approver,
+          approved_at: now,
+        })
+        .eq("id", data.recordId);
+
+      if (error) {
+        const { error: fErr } = await supabaseAdmin
+          .from("partner_activities")
+          .update(baseUpdate)
+          .eq("id", data.recordId);
+        if (fErr) throw new Error(fErr.message);
+      }
+    }
+
+    return { ok: true };
+  });
+
+// ─── 1-Click Farm Batch -> Partner Log Synchronization ────────────────────────
+
+export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        partnerId: z.string().uuid(),
+        allocationPercentage: z.number().min(1).max(100).default(100),
+        syncFinancials: z.boolean().default(true),
+        syncActivities: z.boolean().default(true),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { role, username } = await checkOwnerOrManager(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+    if (!partner.batchId) {
+      throw new Error("This partner is not linked to a Farm Batch yet. Link a batch in Partner Settings first.");
+    }
+    if (partner.cycleStatus === "closed") {
+      throw new Error("Cannot sync into a closed cycle.");
+    }
+
+    const ratio = data.allocationPercentage / 100;
+    const approvalStatus = role === "owner" ? "approved" : "pending_approval";
+    const now = new Date().toISOString();
+
+    let importedFinancials = 0;
+    let importedActivities = 0;
+
+    if (data.syncFinancials) {
+      const { data: batchFins } = await supabaseAdmin
+        .from("farm_financials")
+        .select("*")
+        .eq("batch_id", partner.batchId)
+        .order("transaction_date", { ascending: true });
+
+      const existingRefs = new Set(
+        financials.map((f) => f.referenceNo).filter(Boolean),
+      );
+
+      for (const bf of batchFins || []) {
+        if (bf.approval_status && bf.approval_status !== "approved") continue;
+        const syncRef = `BATCH-SYNC-${String(bf.id).slice(0, 8)}`;
+        if (existingRefs.has(syncRef)) continue;
+        if (partner.cycleStartDate && bf.transaction_date < partner.cycleStartDate) continue;
+
+        const scaledAmount = Math.round(Number(bf.amount || 0) * ratio * 100) / 100;
+        if (scaledAmount <= 0) continue;
+
+        const descBase =
+          data.allocationPercentage < 100
+            ? `${bf.description} (${data.allocationPercentage}% batch share)`
+            : bf.description;
+
+        const packedDesc = packTextWithMeta(descBase, {
+          approvalStatus,
+          approvedBy: role === "owner" ? username : null,
+          approvedAt: role === "owner" ? now : null,
+          cycleName: partner.cycleName,
+        });
+
+        const baseRow = {
+          partner_id: partner.id,
+          batch_id: partner.batchId,
+          type: bf.type === "income" ? "income" : "expense",
+          category: bf.category || "Batch Operations",
+          amount: scaledAmount,
+          description: packedDesc,
+          payment_method: bf.payment_method || "Bank Transfer",
+          transaction_date: bf.transaction_date,
+          reference_no: syncRef,
+          recorded_by: username,
+        };
+
+        const { error } = await supabaseAdmin.from("partner_financials").insert({
+          ...baseRow,
+          approval_status: approvalStatus,
+          approved_by: role === "owner" ? username : null,
+          approved_at: role === "owner" ? now : null,
+          cycle_name: partner.cycleName,
+        });
+        if (error) {
+          await supabaseAdmin.from("partner_financials").insert(baseRow);
+        }
+        importedFinancials++;
+      }
+    }
+
+    if (data.syncActivities) {
+      const { data: batchActs } = await supabaseAdmin
+        .from("farm_activities")
+        .select("*")
+        .eq("batch_id", partner.batchId)
+        .order("activity_date", { ascending: true });
+
+      const existingSyncTags = new Set(
+        activities
+          .map((a) => {
+            const m = (a.notes || "").match(/\[SYNC:([a-z0-9-]+)\]/i);
+            return m ? m[1] : null;
+          })
+          .filter(Boolean),
+      );
+
+      for (const ba of batchActs || []) {
+        if (ba.approval_status && ba.approval_status !== "approved") continue;
+        const shortId = String(ba.id).slice(0, 8);
+        if (existingSyncTags.has(shortId)) continue;
+        if (partner.cycleStartDate && ba.activity_date < partner.cycleStartDate) continue;
+
+        const mappedType: PartnerActivity["activityType"] =
+          ba.activity_type === "Feeding" ||
+          ba.activity_type === "Mortality Record" ||
+          ba.activity_type === "Weight Check" ||
+          ba.activity_type === "Medication / Vaccination" ||
+          ba.activity_type === "Cleaning & Sanitation"
+            ? ba.activity_type
+            : "General Note";
+
+        const noteText = `${ba.notes || ba.activity_type}${ba.medication_given ? ` · Med: ${ba.medication_given}` : ""} [SYNC:${shortId}]`;
+        const packedNotes = packTextWithMeta(noteText, {
+          approvalStatus,
+          approvedBy: role === "owner" ? username : null,
+          approvedAt: role === "owner" ? now : null,
+          cycleName: partner.cycleName,
+        });
+
+        const baseRow = {
+          partner_id: partner.id,
+          batch_id: partner.batchId,
+          activity_date: ba.activity_date,
+          activity_type: mappedType,
+          stock_headcount: 0,
+          mortality_count: Math.round(Number(ba.mortality_count || 0) * ratio),
+          cause_of_mortality: ba.cause_of_mortality || null,
+          feed_consumed_kg: Math.round(Number(ba.feed_consumed_kg || 0) * ratio * 10) / 10,
+          average_weight_kg: 0,
+          notes: packedNotes,
+          recorded_by: username,
+        };
+
+        const { error } = await supabaseAdmin.from("partner_activities").insert({
+          ...baseRow,
+          approval_status: approvalStatus,
+          approved_by: role === "owner" ? username : null,
+          approved_at: role === "owner" ? now : null,
+          cycle_name: partner.cycleName,
+        });
+        if (error) {
+          await supabaseAdmin.from("partner_activities").insert(baseRow);
+        }
+        importedActivities++;
+      }
+    }
+
+    return {
+      ok: true,
+      importedFinancials,
+      importedActivities,
+      approvalStatus,
+    };
   });
 
 // ─── Partner Portal Server Functions (Strict Multi-Tenant Isolation) ──────────
@@ -988,36 +1743,120 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
     const session = await verifySession(data.token);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // The partner id comes ONLY from the signed token, so a partner can never
-    // request another partner's data.
     const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, session.pid);
     if (!partner.active) {
       throw new Error("Your partner account is inactive. Contact Dignity Agro Farms administration.");
     }
 
-    // Partners never see internal admin usernames, only "Farm Management".
+    // Partners ONLY see approved entries; pending_approval or rejected entries from managers never leak!
+    const approvedFinancials = financials.filter((f) => f.approvalStatus === "approved");
+    const approvedActivities = activities.filter((a) => a.approvalStatus === "approved");
+
     const MASK = "Farm Management";
     const maskedPartner: FarmPartner = {
       ...partner,
-      auditLog: partner.auditLog.map((e) => ({ ...e, by: MASK })),
+      auditLog: partner.auditLog.map((e) => ({
+        ...e,
+        by: e.kind === "agreement_signed" || e.kind === "payout_election" ? e.by : MASK,
+      })),
     };
-    const maskedFin = financials.map((f) => ({
+    const maskedFin = approvedFinancials.map((f) => ({
       ...f,
       recordedBy: f.recordedBy ? MASK : null,
       removedBy: f.removedBy ? MASK : null,
+      approvedBy: f.approvedBy ? MASK : null,
     }));
-    const maskedAct = activities.map((a) => ({
+    const maskedAct = approvedActivities.map((a) => ({
       ...a,
       recordedBy: a.recordedBy ? MASK : null,
       removedBy: a.removedBy ? MASK : null,
+      approvedBy: a.approvedBy ? MASK : null,
     }));
 
     return {
       partner: maskedPartner,
       financials: maskedFin,
       activities: maskedAct,
-      ...buildSummaryAndCharts(financials, activities),
+      ...buildSummaryAndCharts(approvedFinancials, approvedActivities, partner.initialInvestment),
     };
+  });
+
+export const partnerSubmitCycleElection = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        token: z.string().min(10),
+        choice: z.enum(["bank_payout", "rollover_principal", "rollover_all"]),
+        bankName: z.string().trim().max(120).optional().nullable(),
+        accountNumber: z.string().trim().max(30).optional().nullable(),
+        accountName: z.string().trim().max(120).optional().nullable(),
+        notes: z.string().trim().max(500).optional().nullable(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const session = await verifySession(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    if (data.choice === "bank_payout" && (!data.bankName || !data.accountNumber || !data.accountName)) {
+      throw new Error("Please provide your Bank Name, Account Number, and Account Name for payout disbursement.");
+    }
+
+    const { data: partner, error: pErr } = await supabaseAdmin
+      .from("farm_partners")
+      .select("id, full_name, terms_history")
+      .eq("id", session.pid)
+      .single();
+    if (pErr || !partner) throw new Error("Partner record not found.");
+
+    const now = new Date().toISOString();
+    const election: PartnerPayoutElection = {
+      choice: data.choice,
+      bankName: data.bankName || null,
+      accountNumber: data.accountNumber || null,
+      accountName: data.accountName || null,
+      notes: data.notes || null,
+      submittedAt: now,
+      status: "pending_review",
+    };
+
+    const choiceLabel =
+      data.choice === "bank_payout"
+        ? `Bank Payout Requested (${data.bankName} · ${data.accountNumber})`
+        : data.choice === "rollover_principal"
+          ? "Rollover Principal into Next Cycle (Payout Profit)"
+          : "Full Rollover (Principal + Profit) into Next Cycle";
+
+    const history: PartnerAuditEvent[] = Array.isArray(partner.terms_history) ? [...partner.terms_history] : [];
+    history.push({
+      at: now,
+      by: partner.full_name,
+      kind: "payout_election",
+      reason: choiceLabel,
+      meta: election,
+    });
+
+    const { error } = await supabaseAdmin
+      .from("farm_partners")
+      .update({
+        payout_election: election,
+        terms_history: history,
+        updated_at: now,
+      })
+      .eq("id", partner.id);
+
+    if (error) {
+      const { error: fErr } = await supabaseAdmin
+        .from("farm_partners")
+        .update({
+          terms_history: history,
+          updated_at: now,
+        })
+        .eq("id", partner.id);
+      if (fErr) throw new Error(fErr.message);
+    }
+
+    return { ok: true, election };
   });
 
 export const partnerSignAgreement = createServerFn({ method: "POST" })
