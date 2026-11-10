@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
   Handshake,
   Plus,
@@ -135,19 +135,25 @@ export function PartnersManagementPanel({
   const partnersQuery = useQuery({
     queryKey: ["admin-partners", passcode],
     queryFn: () => listPartnersFn({ data: { passcode } }),
-    staleTime: 10_000,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const batchesQuery = useQuery({
     queryKey: ["admin-batches", passcode],
     queryFn: () => listBatchesFn({ data: { passcode } }),
     staleTime: 60_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const partnerSettingsQuery = useQuery({
     queryKey: ["admin-partner-settings", passcode],
     queryFn: () => getPartnerSettingsFn({ data: { passcode } }),
-    staleTime: 10_000,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const isHiddenFromManager = partnerSettingsQuery.data?.hideFromManager ?? false;
@@ -323,7 +329,14 @@ export function PartnersManagementPanel({
         <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-6 shadow-sm space-y-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-base font-black text-[#0F3D24]">Registered Partners Directory</h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-black text-[#0F3D24]">Registered Partners Directory</h3>
+                {partnersQuery.isFetching && partnersQuery.data && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    <RefreshCw size={9} className="animate-spin text-emerald-600" /> Updating...
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-slate-500">
                 Select a partner to inspect unit economics, approve logs, sync batch records, or manage cycles.
               </p>
@@ -364,7 +377,7 @@ export function PartnersManagementPanel({
             </div>
           )}
 
-          {partnersQuery.isLoading ? (
+          {!partnersQuery.data && partnersQuery.isLoading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="animate-spin text-[#0F3D24]" size={28} />
             </div>
@@ -632,7 +645,9 @@ function PartnerDetailView({
   const detailQuery = useQuery({
     queryKey: ["admin-partner-detail", passcode, partnerId],
     queryFn: () => getPartnerDetailFn({ data: { passcode, partnerId } }),
-    staleTime: 5_000,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
 
   const refreshDetail = () => {
@@ -640,7 +655,7 @@ function PartnerDetailView({
     qc.invalidateQueries({ queryKey: ["admin-partners"] });
   };
 
-  if (detailQuery.isLoading) {
+  if (!detailQuery.data && detailQuery.isLoading) {
     return (
       <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-12 text-center shadow-sm">
         <Loader2 className="mx-auto animate-spin text-[#0F3D24]" size={32} />
@@ -787,6 +802,11 @@ function PartnerDetailView({
           <ArrowLeft size={16} /> &larr; Back to Partners Directory
         </button>
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+          {detailQuery.isFetching && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 animate-pulse">
+              <RefreshCw size={10} className="animate-spin text-emerald-600" /> Auto-syncing...
+            </span>
+          )}
           <span>Current Partner Workspace:</span>
           <strong className="rounded-lg bg-[#0F3D24]/10 px-2.5 py-1 font-black text-[#0F3D24]">
             {livePartner.fullName} (@{livePartner.username})
@@ -984,6 +1004,14 @@ function PartnerDetailView({
               <span className="rounded-md bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-extrabold text-emerald-800 tabular-nums">
                 {partner.profitSharePercentage}% Profit Share
               </span>
+              {summary.initialStockCount > 0 && partner.initialInvestment > 0 && (
+                <span
+                  className="rounded-md bg-[#0F3D24]/10 border border-[#0F3D24]/20 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0F3D24] tabular-nums"
+                  title="Agreed initial investment divided by initial stocked bird count"
+                >
+                  Agreed Placement: {naira(Math.round(partner.initialInvestment / summary.initialStockCount))} / bird ({summary.initialStockCount.toLocaleString()} birds)
+                </span>
+              )}
               {partner.batchName && (
                 <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-700">
                   Batch: {partner.batchName}

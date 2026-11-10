@@ -224,81 +224,115 @@ export function UnitEconomicsStrip({
       </div>
 
       {/* Bottom Row: 4 Unit-Economic Pillars */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Production Cost / Bird
-          </div>
-          <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
-            {summary.costPerLiveBird !== null ? naira(summary.costPerLiveBird) : "—"}
-          </div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
-            {summary.currentStockCount > 0
-              ? `Across ${summary.currentStockCount.toLocaleString()} live birds`
-              : "Awaiting stock headcount log"}
-          </div>
-        </div>
+      {(() => {
+        const agreedPricePerBird =
+          summary.initialStockCount > 0 && partner.initialInvestment > 0
+            ? Math.round(partner.initialInvestment / summary.initialStockCount)
+            : null;
 
-        <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Break-Even Price / Bird
-          </div>
-          <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
-            {summary.breakEvenPricePerBird !== null
-              ? summary.breakEvenPricePerBird === 0
-                ? "Recovered"
-                : naira(summary.breakEvenPricePerBird)
-              : "—"}
-          </div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
-            {summary.breakEvenPricePerBird === 0
-              ? "Sales have covered 100% of outlay"
-              : "Min. sale price per bird for ₦0 loss"}
-          </div>
-        </div>
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Production Cost / Bird
+                  </span>
+                  <span className="rounded bg-slate-200/60 px-1.5 py-0.2 text-[9px] font-bold text-slate-600" title="Calculated as: Total Verified Expenses ÷ Live Birds">
+                    Live Cost
+                  </span>
+                </div>
+                <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
+                  {summary.costPerLiveBird !== null ? naira(summary.costPerLiveBird) : "—"}
+                </div>
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 space-y-0.5 text-[11px] text-slate-500">
+                <div>
+                  {summary.currentStockCount > 0
+                    ? `Total spend ÷ ${summary.currentStockCount.toLocaleString()} live birds`
+                    : "Awaiting stock headcount log"}
+                </div>
+                {agreedPricePerBird && (
+                  <div className="text-[10px] font-semibold text-[#3F8F3F]">
+                    Agreed basis: {naira(agreedPricePerBird)} / bird
+                  </div>
+                )}
+              </div>
+            </div>
 
-        <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5">
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Feed Conversion (FCR)
-            </span>
-            {fcrStatus && (
-              <span className={`rounded border px-1.5 py-0.2 text-[9px] font-bold ${fcrStatus.tone}`}>
-                {fcrStatus.label}
-              </span>
-            )}
-          </div>
-          <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
-            {summary.fcr !== null ? `${summary.fcr.toFixed(2)} : 1` : "—"}
-          </div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
-            {summary.estimatedBiomassKg > 0
-              ? `${summary.totalFeedConsumedKg.toLocaleString()} kg feed / ${summary.estimatedBiomassKg.toLocaleString()} kg flock`
-              : "Requires feed + weight check logs"}
-          </div>
-        </div>
+            <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Break-Even Price / Bird
+                  </span>
+                  <span className="rounded bg-slate-200/60 px-1.5 py-0.2 text-[9px] font-bold text-slate-600" title="Calculated as: (Outlay - Sales) ÷ Live Birds">
+                    Auto-Calc
+                  </span>
+                </div>
+                <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
+                  {summary.breakEvenPricePerBird !== null
+                    ? summary.breakEvenPricePerBird === 0
+                      ? "Recovered"
+                      : naira(summary.breakEvenPricePerBird)
+                    : "—"}
+                </div>
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500">
+                {summary.breakEvenPricePerBird === 0
+                  ? "100% of capital & expenses covered"
+                  : "Min. sale price per bird for ₦0 loss"}
+              </div>
+            </div>
 
-        <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Flock Survival & Weight
+            <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Feed Conversion (FCR)
+                  </span>
+                  {fcrStatus && (
+                    <span className={`rounded border px-1.5 py-0.2 text-[9px] font-bold ${fcrStatus.tone}`}>
+                      {fcrStatus.label}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
+                  {summary.fcr !== null ? `${summary.fcr.toFixed(2)} : 1` : "—"}
+                </div>
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500">
+                {summary.estimatedBiomassKg > 0
+                  ? `${summary.totalFeedConsumedKg.toLocaleString()} kg feed ÷ ${summary.estimatedBiomassKg.toLocaleString()} kg flock`
+                  : "Requires feed + weight check logs"}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200/80 bg-[#FAF9F6] p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Flock Survival & Weight
+                </div>
+                <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
+                  {summary.initialStockCount > 0
+                    ? `${(100 - summary.mortalityRatePercent).toFixed(1)}%`
+                    : "—"}
+                  {summary.latestAverageWeightKg > 0 && (
+                    <span className="ml-2 text-xs font-bold text-[#3F8F3F]">
+                      · {summary.latestAverageWeightKg} kg avg
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500">
+                {summary.initialStockCount > 0
+                  ? `${summary.currentStockCount.toLocaleString()} live / ${summary.initialStockCount.toLocaleString()} stocked (${summary.totalMortalityCount} mortality)`
+                  : "No stock intake logged yet"}
+              </div>
+            </div>
           </div>
-          <div className="mt-1 text-lg font-black text-[#0F3D24] tabular-nums">
-            {summary.initialStockCount > 0
-              ? `${(100 - summary.mortalityRatePercent).toFixed(1)}%`
-              : "—"}
-            {summary.latestAverageWeightKg > 0 && (
-              <span className="ml-2 text-xs font-bold text-[#3F8F3F]">
-                · {summary.latestAverageWeightKg} kg avg
-              </span>
-            )}
-          </div>
-          <div className="mt-0.5 text-[11px] text-slate-500">
-            {summary.initialStockCount > 0
-              ? `${summary.currentStockCount.toLocaleString()} of ${summary.initialStockCount.toLocaleString()} stocked (${summary.totalMortalityCount} mortality)`
-              : "No stock intake logged yet"}
-          </div>
-        </div>
-      </div>
+        );
+      })()}
     </div>
   );
 }

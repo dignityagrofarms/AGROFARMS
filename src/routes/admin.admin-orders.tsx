@@ -300,7 +300,8 @@ function AdminOrders() {
     queryKey: ["admin-orders", passcode, applied],
     queryFn: () => listFn({ data: { passcode: passcode!, ...applied } }),
     enabled: !!passcode,
-    refetchInterval: 12000,
+    refetchInterval: activeTab === "orders" ? 12000 : false,
+    refetchOnWindowFocus: false,
     retry: 1,
     placeholderData: keepPreviousData,
   });
@@ -312,7 +313,9 @@ function AdminOrders() {
     queryKey: ["admin-partner-settings", passcode],
     queryFn: () => getPartnerSettingsFn({ data: { passcode: passcode! } }),
     enabled: !!passcode && (role === "owner" || role === "manager"),
-    staleTime: 10_000,
+    staleTime: 15_000,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
   });
   const hidePartnersFromManager = partnerSettingsQuery.data?.hideFromManager ?? false;
 

@@ -984,6 +984,17 @@ ${portalUrl}`;
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleOpenWhatsApp = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      navigator.clipboard.writeText(digestText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {}
+    window.open(waHref, "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-[#0F3D24]/10 space-y-4">
@@ -1016,14 +1027,13 @@ ${portalUrl}`;
             {copied ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
             {copied ? "Copied to Clipboard" : "Copy Digest Text"}
           </button>
-          <a
-            href={waHref}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
+          <button
+            type="button"
+            onClick={handleOpenWhatsApp}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white hover:bg-[#165232] transition cursor-pointer shadow-sm"
           >
             <MessageCircle size={14} /> Send on WhatsApp &rarr;
-          </a>
+          </button>
         </div>
       </div>
     </div>
