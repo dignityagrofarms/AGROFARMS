@@ -1406,11 +1406,11 @@ export function BatchFinancialsPanel({
         </>
       )}
       {/* Top Header & Quick Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
-        <div>
-          <div className="flex items-center gap-2 text-[#0F3D24]">
-            <TrendingUp className="text-[#3F8F3F]" size={24} />
-            <h2 className="text-xl font-bold">Batches & Financial Management</h2>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
+        <div className="min-w-0">
+          <div className="flex items-start gap-2 text-[#0F3D24]">
+            <TrendingUp className="mt-1 shrink-0 text-[#3F8F3F]" size={24} />
+            <h2 className="text-lg font-bold sm:text-xl">Batches & Financial Management</h2>
           </div>
           <p className="mt-1 text-sm text-[#0F3D24]/70">
             Register income, expenses, track production costs, and generate profit/loss reports per
@@ -1418,10 +1418,10 @@ export function BatchFinancialsPanel({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-3 [&>button]:min-h-11 [&>button]:min-w-0 [&>button]:justify-center [&>button]:px-2 sm:[&>button]:px-4">
           {role === "owner" && (
             <button
-              className="min-h-11 rounded-full border px-4 text-sm font-semibold"
+              className="min-h-11 rounded-full border px-4 text-xs font-semibold sm:text-sm"
               onClick={() => setShowAllocation(true)}
             >
               Allocate Partners
@@ -1445,7 +1445,7 @@ export function BatchFinancialsPanel({
               setFinForm((prev) => ({ ...prev, batchId: preferred }));
               setShowFinancialModal(true);
             }}
-            className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
+            className="col-span-2 flex items-center gap-2 rounded-full bg-[#0F3D24] sm:col-span-1 px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
           >
             <PlusCircle size={16} />
             Register Income / Expense
@@ -1456,7 +1456,7 @@ export function BatchFinancialsPanel({
             title="Import expenses & sales from CSV / Excel sheet with automatic order matching"
           >
             <FileSpreadsheet size={16} className="text-[#0F3D24]" />
-            Import Financials (CSV)
+            Import CSV
           </button>
           <button
             onClick={() => setShowExportModal(true)}
@@ -1464,7 +1464,7 @@ export function BatchFinancialsPanel({
             title="Export custom farm report in PDF, Excel, or CSV format"
           >
             <Download size={16} className="text-[#3F8F3F]" />
-            Export Custom Report
+            Export Report
           </button>
         </div>
       </div>
@@ -1667,16 +1667,17 @@ export function BatchFinancialsPanel({
       ) : (
         <>
           {/* Batch Selector Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#F7F5F0] p-4">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#F7F5F0] p-4">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-3">
               <Filter size={18} className="text-[#0F3D24]/70" />
               <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">
                 Select Batch:
               </span>
               <select
+                aria-label="Select financial batch"
                 value={selectedBatchId}
                 onChange={(e) => setSelectedBatchId(e.target.value)}
-                className="rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2 text-sm font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
+                className="min-h-11 w-full min-w-0 max-w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-semibold sm:w-auto text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
               >
                 <option value="all">All Batches (Farm Overview)</option>
                 <option value="__general__">Unassigned / Storefront (General)</option>
@@ -1852,20 +1853,20 @@ export function BatchFinancialsPanel({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 border-t sm:border-t-0 sm:border-l border-[#0F3D24]/10 pt-3 sm:pt-0 sm:pl-5">
+                  <div className="grid grid-cols-3 gap-3 border-t sm:border-t-0 sm:border-l border-[#0F3D24]/10 pt-3 sm:pt-0 sm:pl-5">
                     <div className="text-center sm:text-left">
                       <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">
                         Initial Headcount
                       </span>
                       <p className="text-base font-black text-[#0F3D24]">{b.initialHeadcount}</p>
                     </div>
-                    <div className="text-center sm:text-left pl-4">
+                    <div className="text-center sm:text-left">
                       <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">
                         Mortality Count
                       </span>
                       <p className="text-base font-black text-rose-600">{b.totalMortality ?? 0}</p>
                     </div>
-                    <div className="text-center sm:text-left pl-4">
+                    <div className="text-center sm:text-left">
                       <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">
                         Birds Sold
                       </span>
@@ -2411,19 +2412,19 @@ export function BatchFinancialsPanel({
           )}
 
           {/* Transaction Records Table */}
-          <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
+          <div className="min-w-0 rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
             <div className="flex flex-wrap items-center justify-between gap-4 pb-4">
               <h3 className="text-lg font-bold text-[#0F3D24]">Financial Transaction Ledger</h3>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative">
+              <div className="flex w-full min-w-0 flex-wrap items-center gap-3 sm:w-auto">
+                <div className="relative w-full min-w-0 sm:w-auto">
                   <Search size={16} className="absolute left-3.5 top-3 text-[#0F3D24]/40" />
                   <input
                     type="text"
                     placeholder="Search ledger..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="rounded-full border border-[#0F3D24]/15 pl-10 pr-4 py-2 text-xs outline-none focus:border-[#3F8F3F]"
+                    className="min-h-11 w-full min-w-0 rounded-full border border-[#0F3D24]/15 pl-10 pr-4 py-2 text-xs outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
 

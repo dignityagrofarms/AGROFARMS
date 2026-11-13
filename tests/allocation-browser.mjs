@@ -169,6 +169,28 @@ try {
   await page.locator('button[type="submit"]').click();
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
   await page.getByRole("button", { name: "Batches & Finances", exact: true }).first().click();
+  for (const width of [320, 390, 768, 1280]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page
+      .getByRole("heading", { name: "Batches & Financial Management", exact: true })
+      .waitFor();
+    const panel = page
+      .locator("div.overflow-y-auto")
+      .filter({
+        has: page.getByRole("heading", { name: "Batches & Financial Management", exact: true }),
+      })
+      .first();
+    assert(
+      await panel.evaluate((e) => e.scrollWidth <= e.clientWidth + 1),
+      `Dashboard overflow at ${width}px`,
+    );
+    const select = await page.getByLabel("Select financial batch").boundingBox();
+    assert(
+      select.x >= 0 && select.x + select.width <= width + 1,
+      `Batch selector clipped at ${width}px`,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Allocate Partners", exact: true }).first().click();
   const dialog = page.getByRole("dialog", { name: "Allocate partners to a batch" });
   await dialog.waitFor();

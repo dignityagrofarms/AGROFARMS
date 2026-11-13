@@ -347,13 +347,13 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
   };
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 space-y-6">
+    <div className="min-w-0 rounded-3xl bg-white p-4 sm:p-6 shadow-sm ring-1 ring-[#0F3D24]/5 space-y-6">
       {/* Header & Timeframe Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-[#0F3D24]">
-            <TrendingUp className="text-[#3F8F3F]" size={22} />
-            <h3 className="text-lg font-bold">Sales & Revenue Line Chart</h3>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-start gap-2 text-[#0F3D24]">
+            <TrendingUp className="mt-1 shrink-0 text-[#3F8F3F]" size={22} />
+            <h3 className="min-w-0 flex-1 text-base font-bold sm:text-lg">Sales & Revenue Line Chart</h3>
             <span className="rounded-full bg-[#3F8F3F]/10 px-2.5 py-0.5 text-xs font-semibold text-[#0F3D24]">
               Real-time
             </span>
@@ -364,8 +364,8 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
         </div>
 
         {/* Timeframe Selector & Dynamic Year Selector */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 rounded-2xl bg-[#F7F5F0] p-1.5 text-xs font-medium border border-[#0F3D24]/10">
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
+          <div className="grid w-full min-w-0 grid-cols-2 items-center gap-1 rounded-2xl sm:flex sm:w-auto sm:flex-wrap bg-[#F7F5F0] p-1.5 text-xs font-medium border border-[#0F3D24]/10">
             {(
               [
                 { key: "24h", label: "24 Hours" },
@@ -381,7 +381,7 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
                   setTimeframe(item.key);
                   setSelectedYear("current");
                 }}
-                className={`rounded-xl px-3 py-1.5 transition ${
+                className={`min-h-11 rounded-xl px-3 py-1.5 transition ${
                   timeframe === item.key && selectedYear === "current"
                     ? "bg-[#0F3D24] font-semibold text-white shadow-sm"
                     : "text-[#0F3D24]/70 hover:bg-white hover:text-[#0F3D24]"
@@ -420,7 +420,7 @@ export function FinanceSalesChart({ passcode, financials }: FinanceSalesChartPro
       </div>
 
       {/* Summary KPI Badges */}
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 min-[380px]:grid-cols-2 sm:grid-cols-4 [&>div]:min-w-0 [&>div]:[overflow-wrap:anywhere]">
         <div className="rounded-2xl border border-[#0F3D24]/10 bg-[#F7F5F0]/60 p-3.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-[#0F3D24]/60">Total Revenue</span>
           <div className="mt-1 flex items-baseline gap-1">

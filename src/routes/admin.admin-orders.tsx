@@ -959,7 +959,7 @@ function AdminOrders() {
   ).length;
 
   return (
-    <div className="flex h-screen bg-[#f4f7f5] overflow-hidden text-[#0F3D24]">
+    <div className="flex h-dvh w-full min-w-0 bg-[#f4f7f5] overflow-hidden text-[#0F3D24]">
       <PwaInstallPrompt />
 
       {/* Mobile Overlay */}
@@ -972,7 +972,7 @@ function AdminOrders() {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 transform bg-[#0F3D24] text-white transition-all duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-xl ${
+        className={`fixed inset-y-0 left-0 z-50 transform bg-[#0F3D24] text-white transition-all duration-300 ease-in-out md:relative md:translate-x-0 flex shrink-0 flex-col shadow-xl ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         } ${isSidebarCollapsed ? "w-20" : "w-64"}`}
       >
@@ -1301,10 +1301,10 @@ function AdminOrders() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
         {/* Top Header */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-4 shadow-sm backdrop-blur-md md:px-8 sticky top-0 z-30">
-          <div className="flex items-center gap-3">
+        <header className="flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 py-2 border-b border-gray-200 bg-white/80 px-4 shadow-sm backdrop-blur-md md:px-8 sticky top-0 z-30">
+          <div className="flex shrink-0 items-center gap-3">
             <button
               aria-label="Open navigation"
               onClick={() => setIsMobileMenuOpen(true)}
@@ -1312,14 +1312,14 @@ function AdminOrders() {
             >
               <Menu size={24} />
             </button>
-            <h2 className="text-lg font-bold text-gray-800 capitalize hidden sm:block">
+            <h2 className="text-lg font-bold text-gray-800 capitalize hidden lg:block">
               {activeTab === "partners"
                 ? "For Partners"
                 : `${activeTab.replace("-", " ")} Dashboard`}
             </h2>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
             {/* Top Plus (+) Button to Place Order for Owner, Manager & Staff */}
             <button
               type="button"
@@ -1646,7 +1646,7 @@ function AdminOrders() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3F8F3F] font-bold text-white shadow-sm">
                 {currentUsername.charAt(0).toUpperCase()}
               </div>
-              <div className="hidden flex-col md:flex">
+              <div className="hidden flex-col xl:flex">
                 <span className="text-xs font-bold leading-tight text-gray-800">
                   {currentUsername}
                 </span>
@@ -1659,7 +1659,7 @@ function AdminOrders() {
         </header>
 
         {/* Content Body */}
-        <div className="flex-1 p-4 md:p-8">
+        <div className="min-w-0 w-full flex-1 p-4 md:p-8">
           {(() => {
             const unprocessedOrders = (query.data?.orders || []).filter(
               (o) =>
