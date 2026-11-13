@@ -43,6 +43,7 @@ import { ExportReportModal } from "./ExportReportModal";
 import { LeadImportModal } from "./LeadImportModal";
 import { FinancialImportModal } from "./FinancialImportModal";
 import { ActivityImportModal } from "./ActivityImportModal";
+import { DailyLogModal } from "./DailyLogModal";
 import { ReminderModal } from "./ReminderModal";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
@@ -2599,6 +2600,7 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
   const queryClient = useQueryClient();
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showDailyLogModal, setShowDailyLogModal] = useState(false);
   const [showActivityImportModal, setShowActivityImportModal] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -2709,7 +2711,7 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
             <h2 className="text-xl font-bold">Daily Farm Activities & Mortality Logging</h2>
           </div>
           <p className="mt-1 text-sm text-[#0F3D24]/70">
-            Log mortality, daily feed consumption, vaccinations, egg collection, and pen maintenance.
+            Log one Daily Report per batch each day (sick, dead, feed, water, temperature, medication), or a quick single entry.
           </p>
         </div>
 
@@ -2724,10 +2726,18 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
           </button>
           <button
             onClick={() => setShowActivityModal(true)}
+            className="flex items-center gap-2 rounded-full border border-[#0F3D24]/20 bg-white px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#0F3D24]/5 transition"
+            title="Log a single activity such as weight check, pen maintenance or egg collection"
+          >
+            <PlusCircle size={16} />
+            Quick Single Entry
+          </button>
+          <button
+            onClick={() => setShowDailyLogModal(true)}
             className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
           >
             <PlusCircle size={16} />
-            Log Daily Activity
+            Log Daily Report
           </button>
         </div>
       </div>
@@ -2792,6 +2802,7 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
             className="rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none"
           >
             <option value="all">All Activity Types</option>
+            <option value="Daily Log">Daily Report</option>
             <option value="Mortality Record">Mortality Record</option>
             <option value="Feeding">Feeding</option>
             <option value="Medication / Vaccination">Medication / Vaccination</option>
@@ -2844,13 +2855,38 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
                     </div>
 
                     <div className="mt-2 space-y-1 text-xs text-[#0F3D24]/80">
-                      {act.mortalityCount > 0 && (
+                      {act.activityType === "Daily Log" && (
+                        <div className="flex flex-wrap gap-1.5 pb-1">
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 font-semibold text-orange-800">
+                            Sick: {act.sickCount ? act.sickCount : "Nil"}
+                          </span>
+                          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">
+                            Dead: {act.mortalityCount ? act.mortalityCount : "Nil"}
+                          </span>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">
+                            Feed: {act.feedGiven === false ? "Not given" : act.feedBrand || "Given"}
+                            {act.feedConsumedKg > 0 ? ` · ${act.feedConsumedKg} kg` : ""}
+                          </span>
+                          <span className="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-800">
+                            Water: {act.waterGiven ? "✓" : "—"}
+                          </span>
+                          {act.temperature && (
+                            <span className="rounded-full bg-cyan-100 px-2 py-0.5 font-semibold text-cyan-800">
+                              Temp: {act.temperature}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      {act.activityType !== "Daily Log" && act.mortalityCount > 0 && (
                         <p className="font-bold text-rose-700">
                           ⚠️ Mortality: {act.mortalityCount} bird(s) lost
                           {act.causeOfMortality ? ` (${act.causeOfMortality})` : ""}
                         </p>
                       )}
-                      {act.feedConsumedKg > 0 && <p>🌾 Feed Consumed: {act.feedConsumedKg} kg</p>}
+                      {act.activityType === "Daily Log" && act.mortalityCount > 0 && act.causeOfMortality && (
+                        <p className="font-bold text-rose-700">Cause: {act.causeOfMortality}</p>
+                      )}
+                      {act.activityType !== "Daily Log" && act.feedConsumedKg > 0 && <p>🌾 Feed Consumed: {act.feedConsumedKg} kg</p>}
                       {act.eggsCollected > 0 && <p>🥚 Eggs Collected: {act.eggsCollected} pieces</p>}
                       {act.medicationGiven && <p>💉 Medication: {act.medicationGiven}</p>}
                       {act.notes && <p className="italic text-[#0F3D24]/70">"{act.notes}"</p>}
@@ -3028,6 +3064,20 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
             </div>
           </div>
         </div>
+      )}
+
+      {showDailyLogModal && (
+        <DailyLogModal
+          passcode={passcode}
+          role={role}
+          batches={batches}
+          defaultBatchId={selectedBatchId === "all" ? null : selectedBatchId}
+          onClose={() => setShowDailyLogModal(false)}
+          onSaved={(message) => {
+            setShowDailyLogModal(false);
+            setFeedback(message);
+          }}
+        />
       )}
 
       {showActivityImportModal && (

@@ -1693,16 +1693,30 @@ export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
         if (existingSyncTags.has(shortId)) continue;
         if (partner.cycleStartDate && ba.activity_date < partner.cycleStartDate) continue;
 
-        const mappedType: PartnerActivity["activityType"] =
-          ba.activity_type === "Feeding" ||
-          ba.activity_type === "Mortality Record" ||
-          ba.activity_type === "Weight Check" ||
-          ba.activity_type === "Medication / Vaccination" ||
-          ba.activity_type === "Cleaning & Sanitation"
+        const isDailyLog = ba.activity_type === "Daily Log";
+        const mappedType: PartnerActivity["activityType"] = isDailyLog
+          ? Number(ba.feed_consumed_kg || 0) > 0
+            ? "Feeding"
+            : Number(ba.mortality_count || 0) > 0
+              ? "Mortality Record"
+              : "General Note"
+          : ba.activity_type === "Feeding" ||
+              ba.activity_type === "Mortality Record" ||
+              ba.activity_type === "Weight Check" ||
+              ba.activity_type === "Medication / Vaccination" ||
+              ba.activity_type === "Cleaning & Sanitation"
             ? ba.activity_type
             : "General Note";
 
-        const noteText = `${ba.notes || ba.activity_type}${ba.medication_given ? ` · Med: ${ba.medication_given}` : ""} [SYNC:${shortId}]`;
+        const dailyBits: string[] = [];
+        if (isDailyLog) {
+          if (Number(ba.sick_count || 0) > 0) dailyBits.push(`Sick: ${ba.sick_count}`);
+          if (ba.feed_brand) dailyBits.push(`Feed: ${ba.feed_brand}`);
+          if (ba.water_given) dailyBits.push("Water ✓");
+          if (ba.temperature) dailyBits.push(`Temp: ${ba.temperature}`);
+        }
+        const baseNote = ba.notes || (isDailyLog ? "Daily log" : ba.activity_type);
+        const noteText = `${baseNote}${dailyBits.length ? ` · ${dailyBits.join(" · ")}` : ""}${ba.medication_given ? ` · Med: ${ba.medication_given}` : ""} [SYNC:${shortId}]`;
         const packedNotes = packTextWithMeta(noteText, {
           approvalStatus,
           approvedBy: role === "owner" ? username : null,

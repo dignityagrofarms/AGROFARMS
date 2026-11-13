@@ -185,6 +185,15 @@ export function PendingApprovalsPanel({ passcode, role }: PendingApprovalsPanelP
                       <tr key={a.id} className="hover:bg-amber-50/40">
                         <td className="p-3 font-semibold text-[#0F3D24]">{a.activityType}</td>
                         <td className="p-3">
+                          {a.activityType === "Daily Log" && (
+                            <span className="mr-2">
+                              Sick: {a.sickCount ? a.sickCount : "Nil"} ·{" "}
+                              Feed: {a.feedGiven === false ? "Not given" : a.feedBrand || "Given"} ·{" "}
+                              Water: {a.waterGiven ? "✓" : "—"}
+                              {a.temperature ? ` · Temp: ${a.temperature}` : ""}
+                              {a.medicationGiven ? ` · Med: ${a.medicationGiven}` : ""}{" "}
+                            </span>
+                          )}
                           {a.mortalityCount > 0 && (
                             <span className="font-bold text-rose-700">Mortality: {a.mortalityCount} birds </span>
                           )}

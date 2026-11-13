@@ -76,7 +76,8 @@ export type FarmActivity = {
     | "Egg Collection"
     | "Cleaning & Sanitation"
     | "Pen Maintenance"
-    | "General Activity";
+    | "General Activity"
+    | "Daily Log";
   mortalityCount: number;
   causeOfMortality: string | null;
   feedConsumedKg: number;
@@ -86,6 +87,12 @@ export type FarmActivity = {
   recordedBy: string | null;
   approvalStatus?: "approved" | "pending_approval" | "rejected";
   createdAt: string;
+  // Daily Log fields
+  sickCount?: number;
+  feedGiven?: boolean | null;
+  feedBrand?: string | null;
+  waterGiven?: boolean | null;
+  temperature?: string | null;
 };
 
 export type BatchReport = {
@@ -173,6 +180,7 @@ const createActivitySchema = baseAuthSchema.extend({
     "Cleaning & Sanitation",
     "Pen Maintenance",
     "General Activity",
+    "Daily Log",
   ]),
   mortalityCount: z.number().int().min(0).default(0),
   causeOfMortality: z.string().trim().max(200).optional().nullable(),
@@ -886,6 +894,11 @@ export const adminListActivities = createServerFn({ method: "POST" })
       recordedBy: r.recorded_by ?? null,
       approvalStatus: r.approval_status ?? "approved",
       createdAt: r.created_at,
+      sickCount: Number(r.sick_count || 0),
+      feedGiven: r.feed_given ?? null,
+      feedBrand: r.feed_brand ?? null,
+      waterGiven: r.water_given ?? null,
+      temperature: r.temperature ?? null,
     }));
   });
 
@@ -937,6 +950,175 @@ export const adminCreateActivity = createServerFn({ method: "POST" })
     }
 
     return { id: row.id };
+  });
+
+// ─── Unified Daily Log (one record per batch per day) ────────────────────────
+
+const dailyLogSchema = baseAuthSchema.extend({
+  batchId: z.string().uuid(),
+  activityDate: z.string().trim().min(1),
+  sickCount: z.number().int().min(0).default(0),
+  mortalityCount: z.number().int().min(0).default(0),
+  causeOfMortality: z.string().trim().max(200).optional().nullable(),
+  feedGiven: z.boolean().default(false),
+  feedConsumedKg: z.number().min(0).default(0),
+  feedBrand: z.string().trim().max(120).optional().nullable(),
+  waterGiven: z.boolean().default(false),
+  temperature: z.string().trim().max(60).optional().nullable(),
+  medicationGiven: z.string().trim().max(300).optional().nullable(),
+  eggsCollected: z.number().int().min(0).default(0),
+  notes: z.string().trim().max(1000).optional().nullable(),
+});
+
+async function adjustBatchHeadcount(supabaseAdmin: any, batchId: string, delta: number) {
+  if (!delta) return;
+  const { data: b } = await supabaseAdmin
+    .from("farm_batches")
+    .select("current_headcount")
+    .eq("id", batchId)
+    .single();
+  if (!b) return;
+  const nextCount = Math.max(0, Number(b.current_headcount || 0) - delta);
+  await supabaseAdmin
+    .from("farm_batches")
+    .update({ current_headcount: nextCount, updated_at: new Date().toISOString() })
+    .eq("id", batchId);
+}
+
+function dailyLogRow(data: z.infer<typeof dailyLogSchema>) {
+  return {
+    batch_id: data.batchId,
+    activity_date: data.activityDate,
+    activity_type: "Daily Log",
+    sick_count: data.sickCount,
+    mortality_count: data.mortalityCount,
+    cause_of_mortality: data.mortalityCount > 0 ? data.causeOfMortality || null : null,
+    feed_given: data.feedGiven,
+    feed_consumed_kg: data.feedGiven ? data.feedConsumedKg : 0,
+    feed_brand: data.feedBrand || null,
+    water_given: data.waterGiven,
+    temperature: data.temperature || null,
+    medication_given: data.medicationGiven || null,
+    eggs_collected: data.eggsCollected,
+    notes: data.notes || null,
+  };
+}
+
+export const adminGetDailyLogDates = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    baseAuthSchema.extend({ batchId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<FarmActivity[]> => {
+    await checkPasscode(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows, error } = await supabaseAdmin
+      .from("farm_activities")
+      .select("*")
+      .eq("batch_id", data.batchId)
+      .eq("activity_type", "Daily Log")
+      .order("activity_date", { ascending: false })
+      .limit(60);
+    if (error) {
+      console.warn("daily log query warning:", error.message);
+      return [];
+    }
+    return (rows || []).map((r: any) => ({
+      id: r.id,
+      batchId: r.batch_id ?? null,
+      activityDate: r.activity_date,
+      activityType: "Daily Log",
+      mortalityCount: Number(r.mortality_count || 0),
+      causeOfMortality: r.cause_of_mortality ?? null,
+      feedConsumedKg: Number(r.feed_consumed_kg || 0),
+      eggsCollected: Number(r.eggs_collected || 0),
+      medicationGiven: r.medication_given ?? null,
+      notes: r.notes ?? null,
+      recordedBy: r.recorded_by ?? null,
+      approvalStatus: r.approval_status ?? "approved",
+      createdAt: r.created_at,
+      sickCount: Number(r.sick_count || 0),
+      feedGiven: r.feed_given ?? null,
+      feedBrand: r.feed_brand ?? null,
+      waterGiven: r.water_given ?? null,
+      temperature: r.temperature ?? null,
+    }));
+  });
+
+export const adminCreateDailyLog = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => dailyLogSchema.parse(data))
+  .handler(async ({ data }): Promise<{ id: string; approvalStatus: string }> => {
+    const role = await checkPasscode(data.passcode);
+    const credential = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
+    const approvalStatus = isOwner ? "approved" : "pending_approval";
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: existing } = await supabaseAdmin
+      .from("farm_activities")
+      .select("id")
+      .eq("batch_id", data.batchId)
+      .eq("activity_date", data.activityDate)
+      .eq("activity_type", "Daily Log")
+      .maybeSingle();
+    if (existing) {
+      throw new Error(
+        "A Daily Log already exists for this batch and date. Ask the Farm Owner to edit it.",
+      );
+    }
+
+    const { data: row, error } = await supabaseAdmin
+      .from("farm_activities")
+      .insert({
+        ...dailyLogRow(data),
+        approval_status: approvalStatus,
+        recorded_by: credential.username,
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      if (/sick_count|feed_given|feed_brand|water_given|temperature/i.test(error.message)) {
+        throw new Error(
+          "Database update required: please run the latest Supabase migration (daily_log_fields).",
+        );
+      }
+      throw new Error(error.message);
+    }
+
+    if (isOwner && data.mortalityCount > 0) {
+      await adjustBatchHeadcount(supabaseAdmin, data.batchId, data.mortalityCount);
+    }
+    return { id: row.id, approvalStatus };
+  });
+
+export const adminUpdateDailyLog = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => dailyLogSchema.extend({ id: z.string().uuid() }).parse(data))
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: prev, error: prevErr } = await supabaseAdmin
+      .from("farm_activities")
+      .select("mortality_count, approval_status")
+      .eq("id", data.id)
+      .single();
+    if (prevErr || !prev) throw new Error("Daily Log not found.");
+
+    const { error } = await supabaseAdmin
+      .from("farm_activities")
+      .update(dailyLogRow(data))
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    // Headcount was only deducted once the log was approved; adjust by the difference.
+    if ((prev.approval_status ?? "approved") === "approved") {
+      await adjustBatchHeadcount(
+        supabaseAdmin,
+        data.batchId,
+        data.mortalityCount - Number(prev.mortality_count || 0),
+      );
+    }
+    return { ok: true };
   });
 
 export const adminDeleteActivity = createServerFn({ method: "POST" })
@@ -1149,6 +1331,11 @@ export const adminListPendingApprovals = createServerFn({ method: "POST" })
       recordedBy: r.recorded_by ?? null,
       approvalStatus: r.approval_status,
       createdAt: r.created_at,
+      sickCount: Number(r.sick_count || 0),
+      feedGiven: r.feed_given ?? null,
+      feedBrand: r.feed_brand ?? null,
+      waterGiven: r.water_given ?? null,
+      temperature: r.temperature ?? null,
     }));
 
     return { financials, activities };
