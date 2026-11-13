@@ -34,3 +34,13 @@ CREATE INDEX IF NOT EXISTS idx_farm_financial_payments_financial_id
 
 CREATE INDEX IF NOT EXISTS idx_farm_financial_payments_approval_status
   ON public.farm_financial_payments (approval_status);
+
+ALTER TABLE public.farm_financial_payments ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Server access to farm financial payments" ON public.farm_financial_payments;
+CREATE POLICY "Server access to farm financial payments"
+  ON public.farm_financial_payments
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
