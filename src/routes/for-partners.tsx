@@ -1,3 +1,4 @@
+import { OfficialAgreementPanel } from "@/components/agreements/OfficialAgreementPanel";
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -39,7 +40,6 @@ import {
   CycleElectionCard,
   PartnershipCertificateModal,
   EvidenceLightboxModal,
-  TermsBanner,
   ResultHero,
   SettlementBreakdown,
   PayoutTracker,
@@ -600,15 +600,24 @@ function PartnersAccountPortal({
       {/* 1b. Biological & Unit Economics Strip (Cost per bird, FCR, Break-even price) */}
       <UnitEconomicsStrip partner={displayPartner} summary={summary} />
 
-      {/* 2. Terms Banner */}
-      <TermsBanner partner={displayPartner} onOpenAgreement={() => setShowSignModal(true)} />
-
-      {/* 2b. Terms & Conditions Agreement Card */}
-      <AgreementCard
-        partner={displayPartner}
-        onOpenSignModal={() => setShowSignModal(true)}
-        onOpenUploadModal={() => setShowUploadModal(true)}
-      />
+      <OfficialAgreementPanel partner={displayPartner} token={session.token} />
+      {(displayPartner.agreementSigned || displayPartner.agreementDocumentUrl) && (
+        <details className="rounded-xl border bg-white p-4">
+          <summary className="cursor-pointer font-semibold">
+            Earlier signed agreement and uploaded attachments
+          </summary>
+          <p className="my-2 text-sm text-slate-600">
+            Historical documents remain available. They are separate from newly issued official
+            agreement versions.
+          </p>
+          <AgreementCard
+            historical
+            partner={displayPartner}
+            onOpenSignModal={() => setShowSignModal(true)}
+            onOpenUploadModal={() => setShowUploadModal(true)}
+          />
+        </details>
+      )}
 
       {/* 3. Settlement Breakdown & Payout Tracker */}
       <div className="grid gap-6 lg:grid-cols-2">

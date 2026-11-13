@@ -197,7 +197,7 @@ export interface PartnerDashboardData {
 
 // ─── Role Guard: Owner or Manager Only (Staff Strictly Blocked) ───────────────
 
-async function checkOwnerOrManager(
+export async function checkOwnerOrManager(
   value: string,
 ): Promise<{ role: "owner" | "manager"; username: string }> {
   const role = await checkPasscode(value);
@@ -316,7 +316,7 @@ async function signSession(
   return { token: `${payload}.${b64url(sig)}`, expiresAt };
 }
 
-async function verifySession(token: string): Promise<{ pid: string; u: string }> {
+export async function verifySession(token: string): Promise<{ pid: string; u: string }> {
   const [payload, sig] = String(token || "").split(".");
   if (!payload || !sig) throw new Error("Your session is invalid. Please sign in again.");
   const ok = await crypto.subtle.verify(
@@ -1460,6 +1460,19 @@ export const adminDeletePartner = createServerFn({ method: "POST" })
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    // Retained agreements must prevent deletion before any related records are removed.
+    const { agreementDb } = await import("./agreements/service.server");
+    const { data: agreements, error: agreementError } = await agreementDb
+      .from("official_agreements")
+      .select("id")
+      .eq("partner_id", data.partnerId)
+      .limit(1);
+    if (agreementError) throw new Error("Could not check retained agreements. Please retry.");
+    if (agreements?.length)
+      throw new Error(
+        "This partner has a retained official agreement. Deactivate the account instead of deleting its records.",
+      );
+
     // Clean up all related financial entries and activity logs first
     await supabaseAdmin.from("partner_financials").delete().eq("partner_id", data.partnerId);
     await supabaseAdmin.from("partner_activities").delete().eq("partner_id", data.partnerId);
@@ -2288,7 +2301,7 @@ export const partnerSignAgreement = createServerFn({ method: "POST" })
       })
       .parse(data),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<{ ok: boolean; signedBy: string; signedAt: string }> => {
     const session = await verifySession(data.token);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -2300,28 +2313,9 @@ export const partnerSignAgreement = createServerFn({ method: "POST" })
 
     if (pErr || !partner) throw new Error("Partner record not found.");
 
-    const now = new Date().toISOString();
-    const history = Array.isArray(partner.terms_history) ? partner.terms_history : [];
-    const event: PartnerAuditEvent = {
-      at: now,
-      by: data.legalName,
-      kind: "agreement_signed",
-      reason: "Partner digitally reviewed and signed Terms & Conditions on the portal",
-    };
-
-    const { error: uErr } = await supabaseAdmin
-      .from("farm_partners")
-      .update({
-        agreement_signed: true,
-        agreement_signed_at: now,
-        agreement_signed_by: data.legalName,
-        agreement_signature_data: data.signatureData || null,
-        terms_history: [...history, event],
-      })
-      .eq("id", partner.id);
-
-    if (uErr) throw new Error(uErr.message);
-    return { ok: true, signedAt: now, signedBy: data.legalName };
+    throw new Error(
+      "New signatures must use the Official partner agreement section. Earlier signed agreements remain unchanged.",
+    );
   });
 
 export const partnerUploadWrittenAgreement = createServerFn({ method: "POST" })

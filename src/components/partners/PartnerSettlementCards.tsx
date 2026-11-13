@@ -1027,11 +1027,13 @@ export function AuditTimeline({ partner }: { partner: FarmPartner }) {
 
 export function AgreementCard({
   partner,
+  historical = false,
   onOpenSignModal,
   onOpenUploadModal,
   onOpenCertificate,
 }: {
   partner: FarmPartner;
+  historical?: boolean;
   onOpenSignModal: () => void;
   onOpenUploadModal: () => void;
   onOpenCertificate?: () => void;
@@ -1044,7 +1046,9 @@ export function AgreementCard({
             <FileText size={20} />
           </div>
           <div>
-            <h3 className="text-base font-black text-[#0F3D24]">Partnership Contract & Documentation</h3>
+            <h3 className="text-base font-black text-[#0F3D24]">
+              {historical ? "Earlier partnership documents" : "Partnership Contract & Documentation"}
+            </h3>
             <p className="text-xs text-slate-500">
               Executed legal agreement governing capital commitment, profit/loss split, and cycle terms.
             </p>
@@ -1061,11 +1065,13 @@ export function AgreementCard({
           >
             {partner.agreementSigned ? (
               <>
-                <FileCheck2 size={13} /> Digitally Signed & Certified
+                <FileCheck2 size={13} />{" "}
+                {historical ? "Earlier signature recorded" : "Digitally Signed & Certified"}
               </>
             ) : (
               <>
-                <AlertCircle size={13} /> Signature Required
+                <AlertCircle size={13} />{" "}
+                {historical ? "Earlier attachment — no recorded signature" : "Signature Required"}
               </>
             )}
           </span>
@@ -1105,6 +1111,11 @@ export function AgreementCard({
             </button>
           )}
         </div>
+      ) : historical ? (
+        <p className="rounded-xl bg-slate-50 p-4 text-sm">
+          This earlier attachment is retained for reference. Review and sign new agreements in the
+          Official partner agreement section above.
+        </p>
       ) : (
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

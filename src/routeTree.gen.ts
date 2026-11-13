@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as AgreementVerifyRouteImport } from './routes/agreement-verify'
+import { Route as AgreementWitnessRouteImport } from './routes/agreement-witness'
 import { Route as BlogRouteImport } from './routes/blog'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DecemberPreorderRouteImport } from './routes/december-preorder'
@@ -34,6 +36,16 @@ const IndexRoute = IndexRouteImport.update({
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
   path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgreementVerifyRoute = AgreementVerifyRouteImport.update({
+  id: '/agreement-verify',
+  path: '/agreement-verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgreementWitnessRoute = AgreementWitnessRouteImport.update({
+  id: '/agreement-witness',
+  path: '/agreement-witness',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BlogRoute = BlogRouteImport.update({
@@ -110,6 +122,8 @@ const ReceiptOrderCodeRoute = ReceiptOrderCodeRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/agreement-verify': typeof AgreementVerifyRoute
+  '/agreement-witness': typeof AgreementWitnessRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/december-preorder': typeof DecemberPreorderRoute
@@ -128,6 +142,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/agreement-verify': typeof AgreementVerifyRoute
+  '/agreement-witness': typeof AgreementWitnessRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/december-preorder': typeof DecemberPreorderRoute
@@ -147,6 +163,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/agreement-verify': typeof AgreementVerifyRoute
+  '/agreement-witness': typeof AgreementWitnessRoute
   '/blog': typeof BlogRoute
   '/contact': typeof ContactRoute
   '/december-preorder': typeof DecemberPreorderRoute
@@ -167,6 +185,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/agreement-verify'
+    | '/agreement-witness'
     | '/blog'
     | '/contact'
     | '/december-preorder'
@@ -185,6 +205,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/agreement-verify'
+    | '/agreement-witness'
     | '/blog'
     | '/contact'
     | '/december-preorder'
@@ -203,6 +225,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/agreement-verify'
+    | '/agreement-witness'
     | '/blog'
     | '/contact'
     | '/december-preorder'
@@ -222,6 +246,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AgreementVerifyRoute: typeof AgreementVerifyRoute
+  AgreementWitnessRoute: typeof AgreementWitnessRoute
   BlogRoute: typeof BlogRoute
   ContactRoute: typeof ContactRoute
   DecemberPreorderRoute: typeof DecemberPreorderRoute
@@ -252,6 +278,20 @@ declare module '@tanstack/react-router' {
       path: '/about'
       fullPath: '/about'
       preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agreement-verify': {
+      id: '/agreement-verify'
+      path: '/agreement-verify'
+      fullPath: '/agreement-verify'
+      preLoaderRoute: typeof AgreementVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agreement-witness': {
+      id: '/agreement-witness'
+      path: '/agreement-witness'
+      fullPath: '/agreement-witness'
+      preLoaderRoute: typeof AgreementWitnessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/blog': {
@@ -358,6 +398,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AgreementVerifyRoute: AgreementVerifyRoute,
+  AgreementWitnessRoute: AgreementWitnessRoute,
   BlogRoute: BlogRoute,
   ContactRoute: ContactRoute,
   DecemberPreorderRoute: DecemberPreorderRoute,

@@ -1,3 +1,4 @@
+import { OfficialAgreementPanel } from "@/components/agreements/OfficialAgreementPanel";
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
@@ -76,7 +77,6 @@ import type { AdminRole } from "@/lib/orders.functions";
 import { NumberField } from "@/components/ui/number-field";
 import { PartnerCharts } from "@/components/partners/PartnerCharts";
 import {
-  TermsBanner,
   ResultHero,
   SettlementBreakdown,
   PayoutTracker,
@@ -1160,10 +1160,10 @@ function PartnerDetailView({
         <div className="space-y-5">
           <ResultHero partner={partner} />
           <UnitEconomicsStrip partner={partner} summary={summary} />
-          <TermsBanner
+          <OfficialAgreementPanel
             partner={partner}
-            onOpenAgreement={() => setShowSignModal(true)}
-            onOpenCertificate={() => setShowCertificateModal(true)}
+            passcode={passcode}
+            owner={viewerRole === "owner" && !isViewingArchive}
           />
           <div className="grid gap-5 lg:grid-cols-2">
             <SettlementBreakdown partner={partner} />
@@ -1178,12 +1178,20 @@ function PartnerDetailView({
                 : undefined
             }
           />
-          <AgreementCard
-            partner={partner}
-            onOpenSignModal={() => setShowSignModal(true)}
-            onOpenUploadModal={() => setShowUploadModal(true)}
-            onOpenCertificate={() => setShowCertificateModal(true)}
-          />
+          {(partner.agreementSigned || partner.agreementDocumentUrl) && (
+            <details className="rounded-xl border bg-white p-4">
+              <summary className="cursor-pointer font-semibold">
+                Earlier signed agreement and uploaded attachments
+              </summary>
+              <AgreementCard
+                historical
+                partner={partner}
+                onOpenSignModal={() => setShowSignModal(true)}
+                onOpenUploadModal={() => setShowUploadModal(true)}
+                onOpenCertificate={() => setShowCertificateModal(true)}
+              />
+            </details>
+          )}
           <PartnerCharts charts={charts} settlement={s} partnerLabel={partner.fullName} />
           <HowCalculated partner={partner} />
           <AuditTimeline partner={partner} />
