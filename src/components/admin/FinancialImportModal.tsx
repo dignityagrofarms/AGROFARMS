@@ -40,7 +40,10 @@ export function FinancialImportModal({
   onSuccess,
 }: FinancialImportModalProps) {
   const importFn = useServerFn(adminImportFinancialsWithAutoMatch);
-  const [selectedBatchId, setSelectedBatchId] = useState<string>(defaultBatchId || "none");
+  const activeBatches = batches.filter((b) => b.status === "active");
+  const initialBatchId =
+    (defaultBatchId && activeBatches.some((b) => b.id === defaultBatchId) ? defaultBatchId : activeBatches[0]?.id) || "";
+  const [selectedBatchId, setSelectedBatchId] = useState<string>(initialBatchId);
   const [rawText, setRawText] = useState<string>("");
   const [parsedRows, setParsedRows] = useState<ParsedFinancialRow[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -220,6 +223,10 @@ export function FinancialImportModal({
 
   const handleExecuteImport = async () => {
     if (parsedRows.length === 0) return;
+    if (!selectedBatchId) {
+      setErrorMsg("Please select an active batch before importing financial records.");
+      return;
+    }
     setIsProcessing(true);
     setErrorMsg(null);
 
@@ -227,7 +234,7 @@ export function FinancialImportModal({
       const res = await importFn({
         data: {
           passcode,
-          batchId: selectedBatchId === "none" ? null : selectedBatchId,
+          batchId: selectedBatchId,
           records: parsedRows.map((r) => ({
             type: r.type,
             category: r.category,
@@ -323,7 +330,7 @@ export function FinancialImportModal({
             {/* Target Batch Selector */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-2xl bg-[#F7F5F0] p-4">
               <div>
-                <label className="block text-xs font-bold text-[#0F3D24]">Assign Import to Farm Batch</label>
+                <label className="block text-xs font-bold text-[#0F3D24]">Assign Import to Active Farm Batch *</label>
                 <p className="text-[11px] text-[#0F3D24]/70">Sales matched to orders will link their website batch accordingly</p>
               </div>
               <select
@@ -331,8 +338,8 @@ export function FinancialImportModal({
                 onChange={(e) => setSelectedBatchId(e.target.value)}
                 className="w-full sm:w-64 rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none"
               >
-                <option value="none">General Farm (No Specific Batch)</option>
-                {batches.map((b) => (
+                <option value="">Select active batch...</option>
+                {activeBatches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.batchName} ({b.batchType})
                   </option>

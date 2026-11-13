@@ -44,6 +44,7 @@ import {
   type AdminRole,
   type UserAccountItem,
 } from "@/lib/orders.functions";
+import { NumberField } from "@/components/ui/number-field";
 
 interface HrManagementPanelProps {
   passcode: string;
@@ -1370,11 +1371,11 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
 
               <div>
                 <label className="block font-bold text-[#0F3D24] mb-1">Salary Amount (₦)</label>
-                <input
-                  type="number"
+                <NumberField
+                  allowDecimal
                   placeholder="150000"
                   value={payrollForm.amount}
-                  onChange={(e) => setPayrollForm({ ...payrollForm, amount: Number(e.target.value) })}
+                  onValueChange={(n) => setPayrollForm({ ...payrollForm, amount: n ?? 0 })}
                   className="w-full rounded-xl bg-[#F7F5F0] p-2.5 font-mono font-bold text-[#3F8F3F]"
                 />
               </div>

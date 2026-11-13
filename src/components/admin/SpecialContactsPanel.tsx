@@ -49,6 +49,7 @@ import {
 } from "@/lib/contacts.functions";
 import type { FarmBatch } from "@/lib/farm.functions";
 import type { AdminRole } from "@/lib/orders.functions";
+import { NumberField } from "@/components/ui/number-field";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
 
@@ -936,8 +937,9 @@ function AddSpecialContactModal({
   const [notes, setNotes] = useState("");
 
   // Optional initial transaction
+  const activeBatches = batches.filter((b) => b.status === "active");
   const [hasInitialTx, setHasInitialTx] = useState(false);
-  const [batchId, setBatchId] = useState("");
+  const [batchId, setBatchId] = useState(activeBatches[0]?.id || "");
   const [itemDescription, setItemDescription] = useState("");
   const [quantity, setQuantity] = useState(100);
   const [unit, setUnit] = useState("birds");
@@ -957,6 +959,10 @@ function AddSpecialContactModal({
     }
     if (!phone.trim()) {
       setErrorMsg("Please provide a primary phone number.");
+      return;
+    }
+    if (hasInitialTx && !batchId) {
+      setErrorMsg("Please select an active batch for the opening transaction.");
       return;
     }
 
@@ -1159,14 +1165,14 @@ function AddSpecialContactModal({
               <div className="space-y-3 pt-2 border-t border-slate-200">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Linked Farm Batch</label>
+                    <label className="block font-bold text-slate-700 mb-1">Active Farm Batch *</label>
                     <select
                       value={batchId}
                       onChange={(e) => setBatchId(e.target.value)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24]"
                     >
-                      <option value="">No Batch (General)</option>
-                      {batches.map((b) => (
+                      <option value="">Select active batch...</option>
+                      {activeBatches.map((b) => (
                         <option key={b.id} value={b.id}>
                           {b.batchName} ({b.batchType})
                         </option>
@@ -1188,21 +1194,20 @@ function AddSpecialContactModal({
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Quantity</label>
-                    <input
-                      type="number"
+                    <NumberField
                       min={1}
                       value={quantity}
-                      onChange={(e) => setQuantity(Number(e.target.value) || 0)}
+                      onValueChange={(n) => setQuantity(n ?? 0)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24]"
                     />
                   </div>
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Unit Price (₦)</label>
-                    <input
-                      type="number"
+                    <NumberField
+                      allowDecimal
                       min={0}
                       value={unitPrice}
-                      onChange={(e) => setUnitPrice(Number(e.target.value) || 0)}
+                      onValueChange={(n) => setUnitPrice(n ?? 0)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24]"
                     />
                   </div>
@@ -1217,11 +1222,11 @@ function AddSpecialContactModal({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block font-bold text-slate-700 mb-1">Amount Paid Now (₦)</label>
-                    <input
-                      type="number"
+                    <NumberField
+                      allowDecimal
                       min={0}
                       value={amountPaid}
-                      onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
+                      onValueChange={(n) => setAmountPaid(n ?? 0)}
                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24]"
                     />
                   </div>
@@ -1284,8 +1289,9 @@ function RecordTransactionModal({
   const isBuyer = contact.contactType === "bulk_buyer" || contact.contactType === "offloader";
   const defaultTxType: TransactionType = isBuyer ? "sale_to_contact" : "purchase_from_supplier";
 
+  const activeBatches = batches.filter((b) => b.status === "active");
   const [transactionType, setTransactionType] = useState<TransactionType>(defaultTxType);
-  const [batchId, setBatchId] = useState("");
+  const [batchId, setBatchId] = useState(activeBatches[0]?.id || "");
   const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
   const [itemDescription, setItemDescription] = useState(
     isBuyer ? "Live Broiler Chickens (Offload)" : "Starter / Finisher Feed Supply"
@@ -1316,6 +1322,10 @@ function RecordTransactionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!batchId) {
+      setErrorMsg("Please select an active farm batch.");
+      return;
+    }
     if (!itemDescription.trim()) {
       setErrorMsg("Please provide an item description.");
       return;
@@ -1334,7 +1344,7 @@ function RecordTransactionModal({
           passcode,
           contactId: contact.id,
           transactionType,
-          batchId: batchId || null,
+          batchId,
           transactionDate,
           itemDescription: itemDescription.trim(),
           quantity,
@@ -1427,14 +1437,15 @@ function RecordTransactionModal({
               />
             </div>
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Linked Farm Batch</label>
+              <label className="block font-bold text-[#0F3D24] mb-1">Active Farm Batch *</label>
               <select
+                required
                 value={batchId}
                 onChange={(e) => setBatchId(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
               >
-                <option value="">No Batch (General Farm Account)</option>
-                {batches.map((b) => (
+                <option value="">Select active batch...</option>
+                {activeBatches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.batchName} ({b.batchType} - {b.currentHeadcount} live)
                   </option>
@@ -1460,11 +1471,10 @@ function RecordTransactionModal({
           <div className="grid grid-cols-3 gap-2">
             <div>
               <label className="block font-bold text-[#0F3D24] mb-1">Quantity</label>
-              <input
-                type="number"
+              <NumberField
                 min={1}
                 value={quantity}
-                onChange={(e) => handleQtyPriceChange(Number(e.target.value) || 0, unitPrice)}
+                onValueChange={(n) => handleQtyPriceChange(n ?? 0, unitPrice)}
                 className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
               />
             </div>
@@ -1484,11 +1494,11 @@ function RecordTransactionModal({
             </div>
             <div>
               <label className="block font-bold text-[#0F3D24] mb-1">Unit Price (₦)</label>
-              <input
-                type="number"
+              <NumberField
+                allowDecimal
                 min={0}
                 value={unitPrice}
-                onChange={(e) => handleQtyPriceChange(quantity, Number(e.target.value) || 0)}
+                onValueChange={(n) => handleQtyPriceChange(quantity, n ?? 0)}
                 className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
               />
             </div>
@@ -1503,11 +1513,11 @@ function RecordTransactionModal({
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase text-slate-500">Amount Paid</div>
-                <input
-                  type="number"
+                <NumberField
+                  allowDecimal
                   min={0}
                   value={amountPaid}
-                  onChange={(e) => setAmountPaid(Number(e.target.value) || 0)}
+                  onValueChange={(n) => setAmountPaid(n ?? 0)}
                   className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-center font-bold text-emerald-700"
                 />
               </div>

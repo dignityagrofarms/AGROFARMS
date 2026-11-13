@@ -1138,6 +1138,10 @@ export const adminAssignOrderBatch = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.batchId) {
+      const { assertBatchOpen } = await import("./farm.functions");
+      await assertBatchOpen(supabaseAdmin, data.batchId);
+    }
     const { error } = await (supabaseAdmin as any)
       .from("orders")
       .update({ batch_id: data.batchId || null, updated_at: new Date().toISOString() })

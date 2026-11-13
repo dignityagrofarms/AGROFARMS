@@ -460,6 +460,10 @@ export const adminAssignPreorderBatch = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.batchId) {
+      const { assertBatchOpen } = await import("./farm.functions");
+      await assertBatchOpen(supabaseAdmin, data.batchId);
+    }
     const { error } = await supabaseAdmin
       .from("preorders")
       .update({ batch_id: data.batchId || null, updated_at: new Date().toISOString() })

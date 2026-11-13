@@ -71,6 +71,13 @@ export interface PartnerDashboardSummary {
   costPerLiveBird: number | null;
   breakEvenPricePerBird: number | null;
   pendingApprovalsCount: number;
+  feedBagStats?: {
+    bagsBought: number;
+    bagsFinished: number;
+    currentOpenBagNo: number | null;
+    bagsInStock: number;
+    avgCostPerBag: number;
+  } | null;
 }
 
 export interface FarmPartner {
@@ -678,6 +685,85 @@ export const adminListPartners = createServerFn({ method: "POST" })
     );
   });
 
+async function computePartnerBatchFeedStats(
+  supabaseAdmin: any,
+  partner: FarmPartner,
+  syncedFinancials: PartnerFinancial[] = [],
+) {
+  if (!partner.batchId) return null;
+  let pct = 100;
+  for (const f of syncedFinancials) {
+    if (f.referenceNo?.startsWith("BATCH-SYNC-")) {
+      const m = (f.description || "").match(/\((\d+(?:\.\d+)?)%\s*batch share\)/i);
+      if (m) {
+        pct = Number(m[1]);
+        break;
+      }
+    }
+  }
+  const ratio = Math.max(0.01, Math.min(1, pct / 100));
+
+  const [{ data: finRows }, { data: actRows }] = await Promise.all([
+    supabaseAdmin
+      .from("farm_financials")
+      .select("amount, feed_bags, transaction_date, approval_status")
+      .eq("batch_id", partner.batchId)
+      .eq("type", "expense")
+      .ilike("category", "%feed%"),
+    supabaseAdmin
+      .from("farm_activities")
+      .select("activity_date, feed_bag_no, feed_bag_status, feed_bags_used, approval_status")
+      .eq("batch_id", partner.batchId)
+      .order("activity_date", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ]);
+
+  let rawBagsBought = 0;
+  let totalFeedSpend = 0;
+  for (const r of finRows || []) {
+    if (r.approval_status && r.approval_status !== "approved") continue;
+    if (partner.cycleStartDate && r.transaction_date < partner.cycleStartDate) continue;
+    totalFeedSpend += Number(r.amount || 0);
+    rawBagsBought += Number(r.feed_bags || 0);
+  }
+
+  let rawBagsFinished = 0;
+  let currentOpenBagNo: number | null = null;
+  let foundLatest = false;
+  for (const a of actRows || []) {
+    if (a.approval_status && a.approval_status !== "approved") continue;
+    if (partner.cycleStartDate && a.activity_date < partner.cycleStartDate) continue;
+    if (a.feed_bag_no && a.feed_bag_status) {
+      const cumUsed =
+        a.feed_bags_used !== null && a.feed_bags_used !== undefined
+          ? Number(a.feed_bags_used)
+          : a.feed_bag_status === "finished"
+            ? Number(a.feed_bag_no)
+            : Math.max(0, Number(a.feed_bag_no) - 1);
+      if (cumUsed > rawBagsFinished) rawBagsFinished = cumUsed;
+      if (!foundLatest) {
+        foundLatest = true;
+        if (a.feed_bag_status === "opened") currentOpenBagNo = Number(a.feed_bag_no);
+      }
+    }
+  }
+
+  if (rawBagsBought <= 0 && rawBagsFinished <= 0 && !currentOpenBagNo) return null;
+
+  const bagsBought = Math.round(rawBagsBought * ratio * 10) / 10;
+  const bagsFinished = Math.round(rawBagsFinished * ratio * 10) / 10;
+  const bagsInStock = Math.max(0, Math.round((bagsBought - bagsFinished) * 10) / 10);
+  const avgCostPerBag = rawBagsBought > 0 ? Math.round((totalFeedSpend / rawBagsBought) * 100) / 100 : 0;
+
+  return {
+    bagsBought,
+    bagsFinished,
+    currentOpenBagNo,
+    bagsInStock,
+    avgCostPerBag,
+  };
+}
+
 export const adminGetPartnerDetail = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data))
   .handler(
@@ -694,11 +780,14 @@ export const adminGetPartnerDetail = createServerFn({ method: "POST" })
       const { role } = await checkOwnerOrManager(data.passcode);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+      const computed = buildSummaryAndCharts(financials, activities, partner.initialInvestment);
+      const feedBagStats = await computePartnerBatchFeedStats(supabaseAdmin, partner, financials).catch(() => null);
       return {
         partner,
         financials,
         activities,
-        ...buildSummaryAndCharts(financials, activities, partner.initialInvestment),
+        summary: { ...computed.summary, feedBagStats },
+        charts: computed.charts,
         viewerRole: role,
       };
     },
@@ -1629,13 +1718,21 @@ export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
         if (existingRefs.has(syncRef)) continue;
         if (partner.cycleStartDate && bf.transaction_date < partner.cycleStartDate) continue;
 
-        const scaledAmount = Math.round(Number(bf.amount || 0) * ratio * 100) / 100;
+        const effectiveAmount =
+          bf.type === "income" && bf.amount_paid !== null && bf.amount_paid !== undefined
+            ? Number(bf.amount_paid)
+            : Number(bf.amount || 0);
+        const scaledAmount = Math.round(effectiveAmount * ratio * 100) / 100;
         if (scaledAmount <= 0) continue;
 
+        const bagCountLabel =
+          Number(bf.feed_bags || 0) > 0
+            ? ` · ${Math.round(Number(bf.feed_bags) * ratio * 10) / 10} bags${bf.feed_brand ? ` (${bf.feed_brand})` : ""}`
+            : "";
         const descBase =
           data.allocationPercentage < 100
-            ? `${bf.description} (${data.allocationPercentage}% batch share)`
-            : bf.description;
+            ? `${bf.description}${bagCountLabel} (${data.allocationPercentage}% batch share)`
+            : `${bf.description}${bagCountLabel}`;
 
         const packedDesc = packTextWithMeta(descBase, {
           approvalStatus,
@@ -1709,6 +1806,9 @@ export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
             : "General Note";
 
         const dailyBits: string[] = [];
+        if (ba.feed_bag_no && ba.feed_bag_status) {
+          dailyBits.push(`Bag #${ba.feed_bag_no} ${ba.feed_bag_status === "finished" ? "Finished" : "Opened"}`);
+        }
         if (isDailyLog) {
           if (Number(ba.sick_count || 0) > 0) dailyBits.push(`Sick: ${ba.sick_count}`);
           if (ba.feed_brand) dailyBits.push(`Feed: ${ba.feed_brand}`);
@@ -1837,11 +1937,15 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
       approvedBy: a.approvedBy ? MASK : null,
     }));
 
+    const computed = buildSummaryAndCharts(approvedFinancials, approvedActivities, partner.initialInvestment);
+    const feedBagStats = await computePartnerBatchFeedStats(supabaseAdmin, partner, approvedFinancials).catch(() => null);
+
     return {
       partner: maskedPartner,
       financials: maskedFin,
       activities: maskedAct,
-      ...buildSummaryAndCharts(approvedFinancials, approvedActivities, partner.initialInvestment),
+      summary: { ...computed.summary, feedBagStats },
+      charts: computed.charts,
     };
   });
 

@@ -897,6 +897,15 @@ function PartnersAccountPortal({
                   <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 font-bold text-amber-800">
                     Feed Intake: {summary.totalFeedConsumedKg} kg
                   </span>
+                  {summary.feedBagStats && (
+                    <span className="rounded-full bg-amber-100 border border-amber-300 px-3 py-1 font-bold text-amber-950">
+                      Feed Bags: {summary.feedBagStats.bagsFinished} used / {summary.feedBagStats.bagsBought} bought ·{" "}
+                      {summary.feedBagStats.bagsInStock} left
+                      {summary.feedBagStats.currentOpenBagNo
+                        ? ` (Bag #${summary.feedBagStats.currentOpenBagNo} open)`
+                        : ""}
+                    </span>
+                  )}
                 </div>
               </div>
 

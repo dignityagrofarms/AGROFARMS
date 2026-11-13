@@ -39,7 +39,10 @@ export function ActivityImportModal({
   onSuccess,
 }: ActivityImportModalProps) {
   const importFn = useServerFn(adminImportActivities);
-  const [selectedBatchId, setSelectedBatchId] = useState<string>(defaultBatchId || "none");
+  const activeBatches = batches.filter((b) => b.status === "active");
+  const initialBatchId =
+    (defaultBatchId && activeBatches.some((b) => b.id === defaultBatchId) ? defaultBatchId : activeBatches[0]?.id) || "none";
+  const [selectedBatchId, setSelectedBatchId] = useState<string>(initialBatchId);
   const [rawText, setRawText] = useState<string>("");
   const [parsedRows, setParsedRows] = useState<ParsedActivityRow[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -329,8 +332,8 @@ function normalizeActivityType(rawType: string): string {
                     onChange={(e) => setSelectedBatchId(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-700 text-slate-100 rounded-lg p-2.5 text-sm focus:border-amber-500 focus:outline-none"
                   >
-                    <option value="none">Auto-detect batch from CSV or Default</option>
-                    {batches.map((b) => (
+                    <option value="none">Require matching active batch per CSV row</option>
+                    {activeBatches.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.batchName} ({b.batchType})
                       </option>

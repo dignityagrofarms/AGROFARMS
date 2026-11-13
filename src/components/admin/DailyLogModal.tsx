@@ -6,10 +6,12 @@ import {
   adminGetDailyLogDates,
   adminCreateDailyLog,
   adminUpdateDailyLog,
+  adminGetBatchFeedLedger,
   type FarmBatch,
   type FarmActivity,
 } from "@/lib/farm.functions";
 import type { AdminRole } from "@/lib/orders.functions";
+import { NumberField } from "@/components/ui/number-field";
 
 const todayStr = () => new Date().toISOString().split("T")[0];
 
@@ -22,6 +24,8 @@ type FormState = {
   feedGiven: boolean;
   feedConsumedKg: string;
   feedBrand: string;
+  feedBagNo: string;
+  feedBagStatus: "opened" | "finished" | "";
   waterGiven: boolean;
   temperature: string;
   medicationGiven: string;
@@ -36,6 +40,8 @@ const emptyForm = (): FormState => ({
   feedGiven: true,
   feedConsumedKg: "",
   feedBrand: "",
+  feedBagNo: "",
+  feedBagStatus: "",
   waterGiven: true,
   temperature: "",
   medicationGiven: "",
@@ -50,6 +56,8 @@ const fromLog = (l: FarmActivity): FormState => ({
   feedGiven: l.feedGiven ?? l.feedConsumedKg > 0,
   feedConsumedKg: l.feedConsumedKg ? String(l.feedConsumedKg) : "",
   feedBrand: l.feedBrand || "",
+  feedBagNo: l.feedBagNo ? String(l.feedBagNo) : "",
+  feedBagStatus: l.feedBagStatus || "",
   waterGiven: l.waterGiven ?? false,
   temperature: l.temperature || "",
   medicationGiven: l.medicationGiven || "",
@@ -86,10 +94,13 @@ export function DailyLogModal({
   const getLogsFn = useServerFn(adminGetDailyLogDates);
   const createFn = useServerFn(adminCreateDailyLog);
   const updateFn = useServerFn(adminUpdateDailyLog);
+  const getFeedLedgerFn = useServerFn(adminGetBatchFeedLedger);
 
   const activeBatches = batches.filter((b) => b.status === "active");
-  const selectable = activeBatches.length > 0 ? activeBatches : batches;
-  const [batchId, setBatchId] = useState<string>(defaultBatchId || selectable[0]?.id || "");
+  const selectable = activeBatches;
+  const initialBatch =
+    defaultBatchId && selectable.some((b) => b.id === defaultBatchId) ? defaultBatchId : selectable[0]?.id || "";
+  const [batchId, setBatchId] = useState<string>(initialBatch);
   const [date, setDate] = useState<string>(todayStr());
   const [form, setForm] = useState<FormState>(emptyForm());
   const [error, setError] = useState<string | null>(null);
@@ -106,19 +117,73 @@ export function DailyLogModal({
     refetchOnWindowFocus: false,
   });
 
+  const feedLedgerQuery = useQuery({
+    queryKey: ["batch-feed-ledger", passcode, batchId],
+    queryFn: () => getFeedLedgerFn({ data: { passcode, batchId } }),
+    enabled: Boolean(batchId),
+    placeholderData: (prev) => prev,
+    refetchOnWindowFocus: false,
+  });
+
   const logs = logsQuery.data || [];
+  const feedLedger = feedLedgerQuery.data;
   const existing = useMemo(() => logs.find((l) => l.activityDate === date) || null, [logs, date]);
   const loggedDates = useMemo(() => new Set(logs.map((l) => l.activityDate)), [logs]);
+
+  const prevLogWithBag = useMemo(
+    () => logs.find((l) => l.activityDate < date && l.feedBagNo && l.feedBagStatus) || null,
+    [logs, date],
+  );
+  const prevBagsUsed = prevLogWithBag
+    ? prevLogWithBag.feedBagsUsed ??
+      (prevLogWithBag.feedBagStatus === "finished"
+        ? prevLogWithBag.feedBagNo || 0
+        : Math.max(0, (prevLogWithBag.feedBagNo || 1) - 1))
+    : 0;
+  const suggestedNextBagNo = prevLogWithBag
+    ? prevLogWithBag.feedBagStatus === "finished"
+      ? (prevLogWithBag.feedBagNo || 0) + 1
+      : prevLogWithBag.feedBagNo || 1
+    : 1;
+  const hasNewerBagLogs = useMemo(
+    () => Boolean(existing && logs.some((l) => l.activityDate > date && l.feedBagNo)),
+    [existing, logs, date],
+  );
 
   // Load the existing log into the form when batch/date changes; otherwise start blank.
   useEffect(() => {
     setError(null);
-    setForm(existing ? fromLog(existing) : emptyForm());
+    if (existing) {
+      setForm(fromLog(existing));
+    } else {
+      const blank = emptyForm();
+      if (prevLogWithBag?.feedBrand) {
+        blank.feedBrand = prevLogWithBag.feedBrand;
+      }
+      setForm(blank);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existing?.id, date, batchId]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
+
+  const applyBagSequence = (nextBagNoRaw: string, nextStatus: "opened" | "finished" | "") => {
+    const bagNum = nextBagNoRaw.trim() === "" ? 0 : Math.max(1, Math.round(Number(nextBagNoRaw) || 0));
+    const kgPerBag = feedLedger?.defaultKgPerBag || 25;
+    let nextKg = form.feedConsumedKg;
+    if (bagNum >= 1 && (nextStatus === "opened" || nextStatus === "finished")) {
+      const cumUsed = nextStatus === "finished" ? bagNum : Math.max(0, bagNum - 1);
+      const deltaBags = Math.max(0, cumUsed - prevBagsUsed);
+      nextKg = String(Math.round(deltaBags * kgPerBag * 10) / 10);
+    }
+    setForm((f) => ({
+      ...f,
+      feedBagNo: nextBagNoRaw,
+      feedBagStatus: nextStatus,
+      feedConsumedKg: nextKg,
+    }));
+  };
 
   const saveMut = useMutation({
     mutationFn: async () => {
@@ -126,6 +191,10 @@ export function DailyLogModal({
       const sick = Number(form.sickCount || 0);
       if (!batchId) throw new Error("Please select a batch.");
       if (dead < 0 || sick < 0) throw new Error("Counts cannot be negative.");
+      const bagNo = form.feedGiven && form.feedBagNo.trim() !== "" ? Math.max(1, Math.round(Number(form.feedBagNo))) : null;
+      const bagStatus = bagNo && (form.feedBagStatus === "opened" || form.feedBagStatus === "finished") ? form.feedBagStatus : bagNo ? "opened" : null;
+      const bagsUsed = bagNo && bagStatus ? (bagStatus === "finished" ? bagNo : Math.max(0, bagNo - 1)) : null;
+
       const payload = {
         passcode,
         batchId,
@@ -136,6 +205,9 @@ export function DailyLogModal({
         feedGiven: form.feedGiven,
         feedConsumedKg: Number(form.feedConsumedKg || 0),
         feedBrand: form.feedBrand || null,
+        feedBagNo: bagNo,
+        feedBagStatus: bagStatus as "opened" | "finished" | null,
+        feedBagsUsed: bagsUsed,
         waterGiven: form.waterGiven,
         temperature: form.temperature || null,
         medicationGiven: form.medicationGiven || null,
@@ -156,6 +228,7 @@ export function DailyLogModal({
       qc.invalidateQueries({ queryKey: ["farm-batches"] });
       qc.invalidateQueries({ queryKey: ["batch-report"] });
       qc.invalidateQueries({ queryKey: ["daily-logs"] });
+      qc.invalidateQueries({ queryKey: ["batch-feed-ledger"] });
       onSaved(message);
     },
     onError: (e: Error) => setError(e.message),
@@ -262,25 +335,21 @@ export function DailyLogModal({
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-rose-900">Sick birds</label>
-                <input
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
+                <NumberField
+                  min={0}
                   placeholder="Nil"
                   value={form.sickCount}
-                  onChange={(e) => set("sickCount", e.target.value)}
+                  onValueChange={(_, raw) => set("sickCount", raw)}
                   className={inputCls}
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-rose-900">Dead birds (mortality)</label>
-                <input
-                  type="number"
-                  min="0"
-                  inputMode="numeric"
+                <NumberField
+                  min={0}
                   placeholder="Nil"
                   value={form.mortalityCount}
-                  onChange={(e) => set("mortalityCount", e.target.value)}
+                  onValueChange={(_, raw) => set("mortalityCount", raw)}
                   className={inputCls}
                 />
               </div>
@@ -325,40 +394,147 @@ export function DailyLogModal({
               </label>
             </div>
             {form.feedGiven && (
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-xs font-bold text-amber-900">Quantity (kg) – optional</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    inputMode="decimal"
-                    placeholder="e.g. 100"
-                    value={form.feedConsumedKg}
-                    onChange={(e) => set("feedConsumedKg", e.target.value)}
-                    className={inputCls}
-                  />
+              <div className="mt-3 space-y-3">
+                {/* Sequential Bag Tracker */}
+                <div className="rounded-xl border border-amber-300/80 bg-white/90 p-3 space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-amber-950">
+                      Feed Bag Sequence Tracker (Optional)
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {feedLedger && feedLedger.bagsBought > 0 && (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
+                          {feedLedger.bagsBought} bought · {feedLedger.bagsInStock} left ({feedLedger.defaultKgPerBag}kg/bag)
+                        </span>
+                      )}
+                      {prevLogWithBag && (
+                        <button
+                          type="button"
+                          onClick={() => applyBagSequence(String(suggestedNextBagNo), "opened")}
+                          className="rounded-full bg-[#0F3D24] px-2.5 py-0.5 text-[10px] font-bold text-white hover:bg-[#1B5E3A]"
+                        >
+                          Use Next: Bag #{suggestedNextBagNo}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {prevLogWithBag && (
+                    <p className="text-[11px] text-amber-900/75">
+                      Previous entry ({prevLogWithBag.activityDate}):{" "}
+                      <strong>
+                        Bag #{prevLogWithBag.feedBagNo}{" "}
+                        {prevLogWithBag.feedBagStatus === "finished" ? "Finished" : "Opened"}
+                      </strong>{" "}
+                      ({prevBagsUsed} total bags finished before this day)
+                    </p>
+                  )}
+
+                  <div className="grid gap-2 sm:grid-cols-2 items-end">
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-900">Bag #</label>
+                      <NumberField
+                        min={1}
+                        placeholder={`e.g. ${suggestedNextBagNo}`}
+                        value={form.feedBagNo}
+                        onValueChange={(_, raw) =>
+                          applyBagSequence(
+                            raw,
+                            raw.trim() === "" ? "" : form.feedBagStatus || "opened",
+                          )
+                        }
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-900 mb-1">Bag Status</label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            applyBagSequence(
+                              form.feedBagNo || String(suggestedNextBagNo),
+                              "opened",
+                            )
+                          }
+                          className={`rounded-xl py-2 text-xs font-bold border transition ${
+                            form.feedBagStatus === "opened"
+                              ? "bg-amber-600 text-white border-amber-600"
+                              : "bg-white text-amber-900 border-amber-300 hover:bg-amber-50"
+                          }`}
+                        >
+                          Opened
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            applyBagSequence(
+                              form.feedBagNo || String(suggestedNextBagNo),
+                              "finished",
+                            )
+                          }
+                          className={`rounded-xl py-2 text-xs font-bold border transition ${
+                            form.feedBagStatus === "finished"
+                              ? "bg-[#0F3D24] text-white border-[#0F3D24]"
+                              : "bg-white text-[#0F3D24] border-amber-300 hover:bg-emerald-50"
+                          }`}
+                        >
+                          Finished
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {feedLedger &&
+                    feedLedger.bagsBought > 0 &&
+                    Number(form.feedBagNo || 0) > feedLedger.bagsBought && (
+                      <p className="text-[11px] font-semibold text-rose-700 bg-rose-50 rounded-lg px-2.5 py-1.5 border border-rose-200">
+                        Heads up: Bag #{form.feedBagNo} exceeds the {feedLedger.bagsBought} purchased bags logged under Expenses for this batch.
+                      </p>
+                    )}
+
+                  {hasNewerBagLogs && (
+                    <p className="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5 border border-amber-200">
+                      Note: Later dates already have Bag # logs recorded. Updating this earlier date will not overwrite newer entries.
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-amber-900">Feed brand / type</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. New Hope"
-                    value={form.feedBrand}
-                    onChange={(e) => set("feedBrand", e.target.value)}
-                    className={inputCls}
-                  />
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {FEED_BRAND_CHIPS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        onClick={() => set("feedBrand", c)}
-                        className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-amber-900 hover:bg-amber-100"
-                      >
-                        {c}
-                      </button>
-                    ))}
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900">
+                      Quantity (kg) {form.feedBagNo && form.feedBagStatus ? "· Auto-calculated (editable)" : "– optional"}
+                    </label>
+                    <NumberField
+                      allowDecimal
+                      min={0}
+                      placeholder="e.g. 100"
+                      value={form.feedConsumedKg}
+                      onValueChange={(_, raw) => set("feedConsumedKg", raw)}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-amber-900">Feed brand / type</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. New Hope"
+                      value={form.feedBrand}
+                      onChange={(e) => set("feedBrand", e.target.value)}
+                      className={inputCls}
+                    />
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {FEED_BRAND_CHIPS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => set("feedBrand", c)}
+                          className="rounded-full border border-amber-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-amber-900 hover:bg-amber-100"
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -396,12 +572,10 @@ export function DailyLogModal({
           {isLayer && (
             <div>
               <label className="block text-xs font-bold text-[#0F3D24]">Eggs collected (pieces)</label>
-              <input
-                type="number"
-                min="0"
-                inputMode="numeric"
+              <NumberField
+                min={0}
                 value={form.eggsCollected}
-                onChange={(e) => set("eggsCollected", e.target.value)}
+                onValueChange={(_, raw) => set("eggsCollected", raw)}
                 className={inputCls}
               />
             </div>

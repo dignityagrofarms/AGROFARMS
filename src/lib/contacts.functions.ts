@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { checkPasscode, type AdminRole } from "./orders.functions";
+import { checkPasscode, parseAdminCredential, type AdminRole } from "./orders.functions";
+import { assertBatchOpen } from "./farm.functions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,15 +73,13 @@ export interface SpecialContactsDashboardSummary {
 
 // ─── Guard Helper ─────────────────────────────────────────────────────────────
 
-async function checkOwnerOrManager(passcode: string) {
-  const auth = await checkPasscode(passcode);
-  if (!auth.ok) {
-    throw new Error("Invalid management passcode.");
-  }
-  if (auth.role === "staff") {
+async function checkOwnerOrManager(passcode: string): Promise<{ role: AdminRole; username: string }> {
+  const role = await checkPasscode(passcode);
+  if (role === "staff") {
     throw new Error("Access denied: Staff members cannot access Special Contacts management.");
   }
-  return auth;
+  const { username } = parseAdminCredential(passcode);
+  return { role, username };
 }
 
 // ─── 1. List Special Contacts with Computed Balance & Metrics ─────────────────
@@ -115,13 +114,15 @@ export const adminListSpecialContacts = createServerFn({ method: "POST" })
       };
     }
 
-    // Fetch all transactions to compute balances & metrics
-    const { data: txData, error: txErr } = await supabaseAdmin
+    // Fetch all approved transactions to compute balances & metrics
+    const { data: txData } = await supabaseAdmin
       .from("contact_transactions")
       .select("*")
       .order("transaction_date", { ascending: false });
 
-    const transactions = (txData || []) as any[];
+    const transactions = ((txData || []) as any[]).filter(
+      (tx) => !tx.approval_status || tx.approval_status === "approved",
+    );
 
     // Map metrics per contact
     const txByContact: Record<string, any[]> = {};
@@ -262,9 +263,11 @@ export const adminGetContactDetail = createServerFn({ method: "POST" })
       const paid = Number(t.amount_paid) || 0;
       const bal = Number(t.balance_due) ?? (amt - paid);
 
-      totalAmount += amt;
-      totalPaid += paid;
-      balanceDue += bal;
+      if (!t.approval_status || t.approval_status === "approved") {
+        totalAmount += amt;
+        totalPaid += paid;
+        balanceDue += bal;
+      }
 
       return {
         id: t.id,
@@ -377,17 +380,22 @@ export const adminCreateSpecialContact = createServerFn({ method: "POST" })
     // If an initial offload / transaction is keyed in at creation:
     if (data.initialOffload && data.initialOffload.totalAmount > 0) {
       const off = data.initialOffload;
+      if (!off.batchId) {
+        throw new Error("Please select an active batch for the initial transaction.");
+      }
+      await assertBatchOpen(supabaseAdmin, off.batchId);
       const amt = Number(off.totalAmount) || 0;
       const paid = Number(off.amountPaid) || 0;
       const bal = Math.max(0, amt - paid);
       const pStatus = paid >= amt ? "paid" : paid > 0 ? "partial" : "pending";
       const txType =
         data.contactType === "supplier" ? "purchase_from_supplier" : "sale_to_contact";
+      const approvalStatus = auth.role === "owner" ? "approved" : "pending_approval";
 
-      await supabaseAdmin.from("contact_transactions").insert({
+      const { error: initTxErr } = await supabaseAdmin.from("contact_transactions").insert({
         contact_id: newContact.id,
         transaction_type: txType,
-        batch_id: off.batchId || null,
+        batch_id: off.batchId,
         transaction_date: new Date().toISOString().slice(0, 10),
         item_description: off.itemDescription,
         quantity: off.quantity || 1,
@@ -398,8 +406,27 @@ export const adminCreateSpecialContact = createServerFn({ method: "POST" })
         balance_due: bal,
         payment_method: off.paymentMethod || "Bank Transfer",
         payment_status: pStatus,
+        approval_status: approvalStatus,
         recorded_by: auth.username,
-      });
+      } as any);
+      if (initTxErr && /approval_status/i.test(initTxErr.message)) {
+        await supabaseAdmin.from("contact_transactions").insert({
+          contact_id: newContact.id,
+          transaction_type: txType,
+          batch_id: off.batchId,
+          transaction_date: new Date().toISOString().slice(0, 10),
+          item_description: off.itemDescription,
+          quantity: off.quantity || 1,
+          unit: off.unit || "birds",
+          unit_price: off.unitPrice || 0,
+          total_amount: amt,
+          amount_paid: paid,
+          balance_due: bal,
+          payment_method: off.paymentMethod || "Bank Transfer",
+          payment_status: pStatus,
+          recorded_by: auth.username,
+        });
+      }
     }
 
     return { success: true, contact: newContact };
@@ -492,7 +519,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
         "purchase_from_supplier",
         "payment_to_supplier",
       ]),
-      batchId: z.string().optional().nullable(),
+      batchId: z.string().uuid("Please select an active batch."),
       transactionDate: z.string(),
       itemDescription: z.string().min(2, "Description is required"),
       quantity: z.number().default(1),
@@ -510,19 +537,22 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
     const auth = await checkOwnerOrManager(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    await assertBatchOpen(supabaseAdmin, data.batchId);
+
     const amt = Number(data.totalAmount) || 0;
     const paid = Number(data.amountPaid) || 0;
     const bal = Math.max(0, amt - paid);
     const pStatus: PaymentStatus =
       paid >= amt ? "paid" : paid > 0 ? "partial" : "pending";
+    const approvalStatus = auth.role === "owner" ? "approved" : "pending_approval";
 
     // Insert transaction
-    const { data: newTx, error: txErr } = await supabaseAdmin
+    let { data: newTx, error: txErr } = await supabaseAdmin
       .from("contact_transactions")
       .insert({
         contact_id: data.contactId,
         transaction_type: data.transactionType,
-        batch_id: data.batchId || null,
+        batch_id: data.batchId,
         transaction_date: data.transactionDate,
         item_description: data.itemDescription.trim(),
         quantity: data.quantity || 1,
@@ -535,10 +565,38 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
         payment_status: pStatus,
         reference_no: data.referenceNo?.trim() || null,
         notes: data.notes?.trim() || null,
+        approval_status: approvalStatus,
         recorded_by: auth.username,
-      })
+      } as any)
       .select("*")
       .single();
+
+    if (txErr && /approval_status/i.test(txErr.message)) {
+      const retry = await supabaseAdmin
+        .from("contact_transactions")
+        .insert({
+          contact_id: data.contactId,
+          transaction_type: data.transactionType,
+          batch_id: data.batchId,
+          transaction_date: data.transactionDate,
+          item_description: data.itemDescription.trim(),
+          quantity: data.quantity || 1,
+          unit: data.unit || "birds",
+          unit_price: data.unitPrice || 0,
+          total_amount: amt,
+          amount_paid: paid,
+          balance_due: bal,
+          payment_method: data.paymentMethod || "Bank Transfer",
+          payment_status: pStatus,
+          reference_no: data.referenceNo?.trim() || null,
+          notes: data.notes?.trim() || null,
+          recorded_by: auth.username,
+        })
+        .select("*")
+        .single();
+      newTx = retry.data;
+      txErr = retry.error;
+    }
 
     if (txErr) {
       throw new Error(`Failed to record transaction: ${txErr.message}`);
@@ -566,6 +624,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
             payment_method: data.paymentMethod || "Bank Transfer",
             transaction_date: data.transactionDate,
             reference_no: data.referenceNo || `OFFLOAD-${data.contactId.slice(0, 5)}`,
+            approval_status: approvalStatus,
             recorded_by: auth.username,
           });
         } else if (data.transactionType === "purchase_from_supplier") {
@@ -579,6 +638,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
             payment_method: data.paymentMethod || "Bank Transfer",
             transaction_date: data.transactionDate,
             reference_no: data.referenceNo || `SUPPLY-${data.contactId.slice(0, 5)}`,
+            approval_status: approvalStatus,
             recorded_by: auth.username,
           });
         }

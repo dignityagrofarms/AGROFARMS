@@ -18,6 +18,7 @@ import {
 import { createOrder, MIN_ORDER_SUBTOTAL, type AdminRole } from "@/lib/orders.functions";
 import { getPreorderSettings } from "@/lib/preorders.functions";
 import { PRODUCTS } from "@/lib/products";
+import { NumberField } from "@/components/ui/number-field";
 
 const OWERRI_TOWNS = [
   "Farm Pickup (Owerri)",
@@ -538,13 +539,13 @@ export function AdminQuickOrderModal({
                           <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                             Qty
                           </label>
-                          <input
-                            type="number"
+                          <NumberField
                             min={1}
                             max={500}
+                            clampOnBlur
                             value={line.qty}
-                            onChange={(e) =>
-                              updateLine(index, { qty: Math.max(1, Number(e.target.value) || 1) })
+                            onValueChange={(n) =>
+                              updateLine(index, { qty: Math.max(1, n ?? 1) })
                             }
                             className="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 font-bold text-center text-[#0F3D24]"
                           />

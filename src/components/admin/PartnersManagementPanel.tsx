@@ -72,6 +72,7 @@ import {
 import { buildChartData } from "@/lib/partner-settlement";
 import { adminListBatches } from "@/lib/farm.functions";
 import type { AdminRole } from "@/lib/orders.functions";
+import { NumberField } from "@/components/ui/number-field";
 import { PartnerCharts } from "@/components/partners/PartnerCharts";
 import {
   TermsBanner,
@@ -1514,13 +1515,13 @@ function PartnerFinancialsSubPanel({
 
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Amount (₦) *</label>
-            <input
-              type="number"
+            <NumberField
+              allowDecimal
               required
               min={1}
               placeholder="e.g. 150000"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onValueChange={(_, raw) => setAmount(raw)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24] tabular-nums outline-none focus:border-[#0F3D24]"
             />
           </div>
@@ -1899,6 +1900,18 @@ function PartnerActivitiesSubPanel({
               {summary.totalMortalityCount} ({summary.mortalityRatePercent}%)
             </strong>
           </p>
+          {summary.feedBagStats && (
+            <div className="mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-[11px] font-semibold text-amber-950">
+              Feed Bags (Share):{" "}
+              <strong>
+                {summary.feedBagStats.bagsFinished} / {summary.feedBagStats.bagsBought} bags used
+              </strong>{" "}
+              · {summary.feedBagStats.bagsInStock} left
+              {summary.feedBagStats.currentOpenBagNo
+                ? ` · Bag #${summary.feedBagStats.currentOpenBagNo} open`
+                : ""}
+            </div>
+          )}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
@@ -1936,11 +1949,10 @@ function PartnerActivitiesSubPanel({
               <label className="block font-bold text-[#0F3D24] mb-1">
                 Birds Received / Stocked (Headcount)
               </label>
-              <input
-                type="number"
+              <NumberField
                 min={1}
                 value={stockHeadcount}
-                onChange={(e) => setStockHeadcount(e.target.value)}
+                onValueChange={(_, raw) => setStockHeadcount(raw)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24]"
               />
             </div>
@@ -1949,12 +1961,11 @@ function PartnerActivitiesSubPanel({
           {activityType === "Feeding" && (
             <div>
               <label className="block font-bold text-[#0F3D24] mb-1">Feed Consumed Today (Kg)</label>
-              <input
-                type="number"
-                step="0.1"
+              <NumberField
+                allowDecimal
                 min={0}
                 value={feedConsumedKg}
-                onChange={(e) => setFeedConsumedKg(e.target.value)}
+                onValueChange={(_, raw) => setFeedConsumedKg(raw)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24]"
               />
             </div>
@@ -1964,11 +1975,10 @@ function PartnerActivitiesSubPanel({
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block font-bold text-rose-800 mb-1">Mortality Count</label>
-                <input
-                  type="number"
+                <NumberField
                   min={1}
                   value={mortalityCount}
-                  onChange={(e) => setMortalityCount(e.target.value)}
+                  onValueChange={(_, raw) => setMortalityCount(raw)}
                   className="w-full rounded-xl border border-rose-300 bg-rose-50/50 px-3 py-2 font-bold text-rose-900"
                 />
               </div>
@@ -1988,13 +1998,12 @@ function PartnerActivitiesSubPanel({
           {activityType === "Weight Check" && (
             <div>
               <label className="block font-bold text-[#0F3D24] mb-1">Average Bird Weight (Kg)</label>
-              <input
-                type="number"
-                step="0.01"
+              <NumberField
+                allowDecimal
                 min={0}
                 placeholder="e.g. 2.15"
                 value={averageWeightKg}
-                onChange={(e) => setAverageWeightKg(e.target.value)}
+                onValueChange={(_, raw) => setAverageWeightKg(raw)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-bold text-[#0F3D24]"
               />
             </div>
@@ -2375,25 +2384,24 @@ function PartnerCredentialsSubPanel({
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Capital Invested (₦) *</label>
-            <input
-              type="number"
+            <NumberField
+              allowDecimal
               required
               min={0}
               value={initialInvestment}
-              onChange={(e) => setInitialInvestment(e.target.value)}
+              onValueChange={(_, raw) => setInitialInvestment(raw)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 font-bold text-[#0F3D24]"
             />
           </div>
           <div>
             <label className="block font-bold text-emerald-800 mb-1">Partner Profit Share (%)</label>
-            <input
-              type="number"
+            <NumberField
+              allowDecimal
               required
               min={0}
               max={100}
-              step="0.5"
               value={profitShare}
-              onChange={(e) => setProfitShare(e.target.value)}
+              onValueChange={(_, raw) => setProfitShare(raw)}
               className="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2 font-black text-emerald-900"
             />
           </div>
@@ -2987,13 +2995,13 @@ function AddPartnerModal({
                 <label className="block font-black text-emerald-950 text-sm">Capital Invested by Partner (₦) *</label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-3 text-lg font-black text-emerald-800">₦</span>
-                  <input
-                    type="number"
+                  <NumberField
+                    allowDecimal
                     required
                     min={1}
                     placeholder="e.g. 2500000"
                     value={initialInvestment}
-                    onChange={(e) => setInitialInvestment(e.target.value)}
+                    onValueChange={(_, raw) => setInitialInvestment(raw)}
                     className="w-full rounded-xl border border-emerald-300 bg-white pl-8 pr-4 py-2.5 text-lg font-black text-emerald-950 outline-none focus:ring-2 focus:ring-[#3F8F3F]"
                   />
                 </div>
@@ -3765,14 +3773,13 @@ export function EditPartnerModal({
                   <label className="block font-bold text-[#0F3D24]">Committed Investment Capital (₦) *</label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-slate-500 font-bold">₦</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
+                    <NumberField
+                      allowDecimal
+                      min={0}
                       required
                       placeholder="e.g. 500000"
                       value={initialInvestment}
-                      onChange={(e) => setInitialInvestment(e.target.value)}
+                      onValueChange={(_, raw) => setInitialInvestment(raw)}
                       className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-[#0F3D24] font-mono font-bold outline-none focus:border-[#0F3D24]"
                     />
                   </div>

@@ -37,6 +37,9 @@ import {
   LayoutGrid,
   List,
   FileSpreadsheet,
+  Lock,
+  Unlock,
+  CreditCard,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
 import { ExportReportModal } from "./ExportReportModal";
@@ -45,6 +48,8 @@ import { FinancialImportModal } from "./FinancialImportModal";
 import { ActivityImportModal } from "./ActivityImportModal";
 import { DailyLogModal } from "./DailyLogModal";
 import { ReminderModal } from "./ReminderModal";
+import { DebtorsCreditorsPanel, RecordFinancialPaymentModal } from "./DebtorsCreditorsPanel";
+import { NumberField } from "@/components/ui/number-field";
 import { adminListOrders, type AdminOrder, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, type Preorder } from "@/lib/preorders.functions";
 import {
@@ -52,11 +57,15 @@ import {
   adminCreateBatch,
   adminUpdateBatch,
   adminDeleteBatch,
+  adminCloseBatch,
+  adminReopenBatch,
   adminListFinancials,
   adminCreateFinancial,
   adminUpdateFinancial,
   adminDeleteFinancial,
   adminGetBatchReport,
+  adminGetBatchFeedLedger,
+  adminListDebtorsCreditorsReport,
   adminListLeads,
   adminCreateLead,
   adminUpdateLead,
@@ -78,14 +87,24 @@ const formatNaira = (val: number) =>
 
 // ─── 1. BATCHES & FINANCIALS PANEL ───────────────────────────────────────────
 
-export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: string; role?: AdminRole }) {
+export function BatchFinancialsPanel({
+  passcode,
+  role = "owner",
+  onNavigateToContacts,
+}: {
+  passcode: string;
+  role?: AdminRole;
+  onNavigateToContacts?: () => void;
+}) {
   const queryClient = useQueryClient();
+  const [finSubView, setFinSubView] = useState<"overview" | "debtors_creditors">("overview");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showFinancialModal, setShowFinancialModal] = useState(false);
   const [showFinancialImportModal, setShowFinancialImportModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState<FarmBatch | null>(null);
   const [editingFinancial, setEditingFinancial] = useState<FarmFinancial | null>(null);
+  const [payingFinancial, setPayingFinancial] = useState<FarmFinancial | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -106,6 +125,8 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   const createBatchFn = useServerFn(adminCreateBatch);
   const updateBatchFn = useServerFn(adminUpdateBatch);
   const deleteBatchFn = useServerFn(adminDeleteBatch);
+  const closeBatchFn = useServerFn(adminCloseBatch);
+  const reopenBatchFn = useServerFn(adminReopenBatch);
   const listFinancialsFn = useServerFn(adminListFinancials);
   const createFinancialFn = useServerFn(adminCreateFinancial);
   const updateFinancialFn = useServerFn(adminUpdateFinancial);
@@ -138,15 +159,16 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   });
 
   const financialsQuery = useQuery({
-    queryKey: ["farm-financials", passcode, selectedBatchId],
+    queryKey: ["farm-financials", passcode],
     queryFn: () =>
       listFinancialsFn({
         data: {
           passcode,
-          batchId: selectedBatchId === "all" ? null : selectedBatchId,
+          batchId: null,
         },
       }),
     enabled: Boolean(passcode) && role !== "staff",
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   });
 
@@ -175,6 +197,22 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
 
+  const debtorsSummaryQuery = useQuery({
+    queryKey: ["debtors-creditors", "all-count"],
+    queryFn: () => adminListDebtorsCreditorsReport({ data: { passcode, batchId: null } }),
+    enabled: Boolean(passcode) && role !== "staff",
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
+  });
+
+  const feedLedgerQuery = useQuery({
+    queryKey: ["batch-feed-ledger", passcode, selectedBatchId],
+    queryFn: () => adminGetBatchFeedLedger({ data: { passcode, batchId: selectedBatchId } }),
+    enabled: Boolean(passcode) && role !== "staff" && selectedBatchId !== "all",
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
+  });
+
   // Batch Form State
   const [batchForm, setBatchForm] = useState({
     batchName: "",
@@ -191,10 +229,16 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     type: "expense" as "expense" | "income",
     category: "Feed",
     amount: "",
+    amountPaid: "",
+    partyName: "",
+    dueDate: "",
     description: "",
     paymentMethod: "Bank Transfer",
     transactionDate: new Date().toISOString().split("T")[0],
     referenceNo: "",
+    feedBags: "",
+    feedKgPerBag: "25",
+    feedBrand: "",
   });
 
   const createBatchMut = useMutation({
@@ -251,21 +295,59 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
     onError: (e: Error) => setFeedback("Error updating batch: " + e.message),
   });
 
+  const closeBatchMut = useMutation({
+    mutationFn: (id: string) => closeBatchFn({ data: { passcode, id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+      setFeedback("Batch closed. New entries can no longer target this batch until reopened.");
+    },
+    onError: (e: Error) => setFeedback("Error closing batch: " + e.message),
+  });
+
+  const reopenBatchMut = useMutation({
+    mutationFn: (id: string) => reopenBatchFn({ data: { passcode, id } }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+      setFeedback("Batch reopened and active for new records.");
+    },
+    onError: (e: Error) => setFeedback("Error reopening batch: " + e.message),
+  });
+
   const createFinancialMut = useMutation({
-    mutationFn: () =>
-      createFinancialFn({
+    mutationFn: () => {
+      const totalAmt = Number(finForm.amount);
+      const parsedPaid =
+        finForm.amountPaid.trim() === "" ? totalAmt : Math.max(0, Number(finForm.amountPaid));
+      const isFeedExp = (role === "staff" || finForm.type === "expense") && finForm.category === "Feed";
+      const parsedBags = isFeedExp && finForm.feedBags.trim() !== "" ? Number(finForm.feedBags) : null;
+      const parsedKgPerBag =
+        isFeedExp && parsedBags && parsedBags > 0 && finForm.feedKgPerBag.trim() !== ""
+          ? Number(finForm.feedKgPerBag)
+          : isFeedExp && parsedBags && parsedBags > 0
+            ? 25
+            : null;
+      return createFinancialFn({
         data: {
           passcode,
-          batchId: finForm.batchId || null,
+          batchId: finForm.batchId,
           type: role === "staff" ? "expense" : finForm.type,
           category: finForm.category,
-          amount: Number(finForm.amount),
+          amount: totalAmt,
+          amountPaid: parsedPaid,
+          partyName: finForm.partyName.trim() || null,
+          dueDate: finForm.dueDate.trim() || null,
           description: finForm.description,
           paymentMethod: finForm.paymentMethod,
           transactionDate: finForm.transactionDate,
           referenceNo: finForm.referenceNo || null,
+          feedBags: parsedBags,
+          feedKgPerBag: parsedKgPerBag,
+          feedBrand: isFeedExp ? finForm.feedBrand.trim() || null : null,
         },
-      }),
+      });
+    },
     onSuccess: (res) => {
       if (role === "staff") {
         const matchedBatch = (batchesQuery.data || []).find((b) => b.id === finForm.batchId);
@@ -282,7 +364,10 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         ]);
       } else {
         queryClient.invalidateQueries({ queryKey: ["farm-financials"] });
+        queryClient.invalidateQueries({ queryKey: ["farm-financials-all"] });
+        queryClient.invalidateQueries({ queryKey: ["debtors-creditors"] });
         queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+        queryClient.invalidateQueries({ queryKey: ["batch-feed-ledger"] });
       }
       setShowFinancialModal(false);
       setFinForm({
@@ -290,10 +375,16 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         type: "expense",
         category: "Feed",
         amount: "",
+        amountPaid: "",
+        partyName: "",
+        dueDate: "",
         description: "",
         paymentMethod: "Bank Transfer",
         transactionDate: new Date().toISOString().split("T")[0],
         referenceNo: "",
+        feedBags: "",
+        feedKgPerBag: "25",
+        feedBrand: "",
       });
       setFeedback(
         role === "staff"
@@ -314,15 +405,24 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           type: f.type,
           category: f.category,
           amount: Number(f.amount),
+          amountPaid: f.amountPaid !== null && f.amountPaid !== undefined ? Number(f.amountPaid) : Number(f.amount),
+          partyName: f.partyName || null,
+          dueDate: f.dueDate || null,
           description: f.description,
           paymentMethod: f.paymentMethod,
           transactionDate: f.transactionDate,
           referenceNo: f.referenceNo || null,
+          feedBags: f.type === "expense" && f.category === "Feed" ? f.feedBags ?? null : null,
+          feedKgPerBag: f.type === "expense" && f.category === "Feed" ? f.feedKgPerBag ?? null : null,
+          feedBrand: f.type === "expense" && f.category === "Feed" ? f.feedBrand ?? null : null,
         },
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["farm-financials"] });
+      queryClient.invalidateQueries({ queryKey: ["farm-financials-all"] });
+      queryClient.invalidateQueries({ queryKey: ["debtors-creditors"] });
       queryClient.invalidateQueries({ queryKey: ["batch-report"] });
+      queryClient.invalidateQueries({ queryKey: ["batch-feed-ledger"] });
       setEditingFinancial(null);
       setFeedback("Financial record updated successfully.");
     },
@@ -340,9 +440,89 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
   });
 
   const batches = batchesQuery.data || [];
-  const rawFinancials = financialsQuery.data || [];
+  const activeBatches = useMemo(() => batches.filter((b) => b.status === "active"), [batches]);
+  const allFarmFinancials = financialsQuery.data || [];
+  const rawFinancials = useMemo(
+    () =>
+      selectedBatchId === "all"
+        ? allFarmFinancials
+        : allFarmFinancials.filter((f) => f.batchId === selectedBatchId),
+    [allFarmFinancials, selectedBatchId],
+  );
   const orders = ordersQuery.data?.orders || [];
   const preorders = preordersQuery.data?.preorders || [];
+
+  // Farm-wide totals (all batches combined, permanent regardless of selectedBatchId filter)
+  const farmWideTotals = useMemo(() => {
+    const storeInc = orders
+      .filter((o) => o.status !== "cancelled")
+      .reduce((s, o) => s + (o.total || 0), 0);
+    const preorderInc = preorders.reduce((s, p) => s + (p.amountPaid || p.totalAmount || 0), 0);
+    const manualInc = allFarmFinancials
+      .filter((f) => f.type === "income")
+      .reduce((s, f) => s + f.amount, 0);
+    const exp = allFarmFinancials
+      .filter((f) => f.type === "expense")
+      .reduce((s, f) => s + f.amount, 0);
+    const inc = storeInc + preorderInc + manualInc;
+    return { totalIncome: inc, totalExpense: exp, netProfit: inc - exp };
+  }, [orders, preorders, allFarmFinancials]);
+
+  // Per-batch financial breakdown for breakdown table & exports
+  const perBatchBreakdown = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        id: string;
+        batchName: string;
+        batchType: string;
+        status: FarmBatch["status"];
+        currentHeadcount: number;
+        income: number;
+        expense: number;
+      }
+    >();
+    for (const b of batches) {
+      map.set(b.id, {
+        id: b.id,
+        batchName: b.batchName,
+        batchType: b.batchType,
+        status: b.status,
+        currentHeadcount: b.currentHeadcount,
+        income: 0,
+        expense: 0,
+      });
+    }
+    const ensureOther = () => {
+      if (!map.has("__general__")) {
+        map.set("__general__", {
+          id: "__general__",
+          batchName: "Unassigned / Storefront",
+          batchType: "General",
+          status: "active",
+          currentHeadcount: 0,
+          income: 0,
+          expense: 0,
+        });
+      }
+      return map.get("__general__")!;
+    };
+    for (const f of allFarmFinancials) {
+      const target = f.batchId && map.has(f.batchId) ? map.get(f.batchId)! : ensureOther();
+      if (f.type === "income") target.income += f.amount;
+      else target.expense += f.amount;
+    }
+    for (const o of orders) {
+      if (o.status === "cancelled") continue;
+      const target = o.batchId && map.has(o.batchId) ? map.get(o.batchId)! : ensureOther();
+      target.income += o.total || 0;
+    }
+    for (const p of preorders) {
+      const target = p.batchId && map.has(p.batchId) ? map.get(p.batchId)! : ensureOther();
+      target.income += p.amountPaid || p.totalAmount || 0;
+    }
+    return Array.from(map.values());
+  }, [batches, allFarmFinancials, orders, preorders]);
 
   // Convert non-cancelled store orders to financial income records
   const storeOrderTransactions = useMemo(() => {
@@ -488,6 +668,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
       `"TOTAL REVENUE (INCOME)",,,,,,"${calcIncome}"`,
       `"TOTAL EXPENSES",,,,,,"${calcExpense}"`,
       `"NET PROFIT / LOSS",,,,,,"${calcIncome - calcExpense}"`,
+      "",
+      `"=== PER-BATCH BREAKDOWN & GRAND TOTAL (ALL BATCHES) ==="`,
+      "Batch,Type,Status,Revenue (NGN),Expenses (NGN),Net Profit (NGN)",
+      ...perBatchBreakdown.map(
+        (b) =>
+          `"${b.batchName.replace(/"/g, '""')}","${b.batchType}","${b.status}",${b.income},${b.expense},${b.income - b.expense}`,
+      ),
+      `"GRAND TOTAL (ALL BATCHES)",,,${farmWideTotals.totalIncome},${farmWideTotals.totalExpense},${farmWideTotals.netProfit}`,
     ];
 
     const csvContent = "\uFEFF" + csvLines.join("\n");
@@ -542,14 +730,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-bold text-[#0F3D24]">Assign to Batch</label>
+              <label className="block text-xs font-bold text-[#0F3D24]">Assign to Active Batch *</label>
               <select
                 value={finForm.batchId}
                 onChange={(e) => setFinForm({ ...finForm, batchId: e.target.value, type: "expense" })}
                 className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
               >
-                <option value="">General Farm Expense</option>
-                {batches.map((b) => (
+                <option value="">Select active batch...</option>
+                {activeBatches.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.batchName} ({b.batchType})
                   </option>
@@ -578,12 +766,12 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
             <div>
               <label className="block text-xs font-bold text-[#0F3D24]">Amount Spent (₦) *</label>
-              <input
-                type="number"
+              <NumberField
+                allowDecimal
                 min={1}
                 placeholder="Enter amount spent"
                 value={finForm.amount}
-                onChange={(e) => setFinForm({ ...finForm, amount: e.target.value, type: "expense" })}
+                onValueChange={(_, raw) => setFinForm({ ...finForm, amount: raw, type: "expense" })}
                 className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-bold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
               />
             </div>
@@ -632,12 +820,97 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                 className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-medium text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
               />
             </div>
+
+            {finForm.category === "Feed" && (
+              <div className="sm:col-span-2 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-900">Number of Bags *</label>
+                  <NumberField
+                    allowDecimal
+                    min={0}
+                    placeholder="e.g. 10"
+                    value={finForm.feedBags}
+                    onValueChange={(_, raw) => setFinForm({ ...finForm, feedBags: raw, type: "expense" })}
+                    className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[#0F3D24] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-900">Bag Weight (kg)</label>
+                  <NumberField
+                    allowDecimal
+                    min={1}
+                    placeholder="25"
+                    value={finForm.feedKgPerBag}
+                    onValueChange={(_, raw) => setFinForm({ ...finForm, feedKgPerBag: raw, type: "expense" })}
+                    className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-[#0F3D24] outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-900">Feed Brand (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. New Hope, Ultima"
+                    value={finForm.feedBrand}
+                    onChange={(e) => setFinForm({ ...finForm, feedBrand: e.target.value, type: "expense" })}
+                    className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-medium text-[#0F3D24] outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-bold text-[#0F3D24]">
+                Amount Paid Now (₦) <span className="font-normal text-[#0F3D24]/60">(Leave blank if paid in full)</span>
+              </label>
+              <NumberField
+                allowDecimal
+                min={0}
+                placeholder={finForm.amount ? `Full amount (₦${finForm.amount})` : "Full payment"}
+                value={finForm.amountPaid}
+                onValueChange={(_, raw) => setFinForm({ ...finForm, amountPaid: raw, type: "expense" })}
+                className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 bg-[#F7F5F0]/50 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              />
+            </div>
+
+            {finForm.amountPaid.trim() !== "" &&
+              Number(finForm.amount || 0) > Number(finForm.amountPaid || 0) && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-rose-700">Supplier Name (Credit / Unpaid Balance) *</label>
+                    <input
+                      type="text"
+                      placeholder="Who we owe"
+                      value={finForm.partyName}
+                      onChange={(e) => setFinForm({ ...finForm, partyName: e.target.value, type: "expense" })}
+                      className="mt-1 w-full rounded-xl border border-rose-300 bg-rose-50/40 px-3.5 py-2.5 text-xs font-medium text-[#0F3D24] outline-none focus:border-rose-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-rose-700">Due Date for Balance *</label>
+                    <input
+                      type="date"
+                      value={finForm.dueDate}
+                      onChange={(e) => setFinForm({ ...finForm, dueDate: e.target.value, type: "expense" })}
+                      className="mt-1 w-full rounded-xl border border-rose-300 bg-rose-50/40 px-3.5 py-2.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-rose-500"
+                    />
+                  </div>
+                </>
+              )}
           </div>
 
           <div className="flex justify-end pt-2">
             <button
               type="button"
-              disabled={!finForm.amount || Number(finForm.amount) <= 0 || !finForm.description.trim() || createFinancialMut.isPending}
+              disabled={
+                !finForm.batchId ||
+                !finForm.amount ||
+                Number(finForm.amount) <= 0 ||
+                !finForm.description.trim() ||
+                (finForm.amountPaid.trim() !== "" &&
+                  Number(finForm.amount) > Number(finForm.amountPaid || 0) &&
+                  (!finForm.partyName.trim() || !finForm.dueDate.trim())) ||
+                createFinancialMut.isPending
+              }
               onClick={() => createFinancialMut.mutate()}
               className="inline-flex items-center gap-2 rounded-full bg-rose-700 px-6 py-2.5 text-xs font-extrabold text-white shadow-sm hover:bg-rose-800 disabled:opacity-50 transition"
             >
@@ -699,15 +972,24 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {role === "owner" && (
+            <button
+              onClick={() => setShowBatchModal(true)}
+              className="flex items-center gap-2 rounded-full border border-[#0F3D24]/20 bg-white px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#0F3D24]/5 transition"
+            >
+              <Layers size={16} className="text-[#3F8F3F]" />
+              New Batch
+            </button>
+          )}
           <button
-            onClick={() => setShowBatchModal(true)}
-            className="flex items-center gap-2 rounded-full border border-[#0F3D24]/20 bg-white px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#0F3D24]/5 transition"
-          >
-            <Layers size={16} className="text-[#3F8F3F]" />
-            New Batch
-          </button>
-          <button
-            onClick={() => setShowFinancialModal(true)}
+            onClick={() => {
+              const preferred =
+                selectedBatchId !== "all" && activeBatches.some((b) => b.id === selectedBatchId)
+                  ? selectedBatchId
+                  : activeBatches[0]?.id || "";
+              setFinForm((prev) => ({ ...prev, batchId: preferred }));
+              setShowFinancialModal(true);
+            }}
             className="flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-[#134a2c] transition"
           >
             <PlusCircle size={16} />
@@ -741,6 +1023,53 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
         </div>
       )}
 
+      {/* Sub-View Switch: Overview & Ledger vs Debtors & Creditors */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFinSubView("overview")}
+          className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold transition ${
+            finSubView === "overview"
+              ? "bg-[#0F3D24] text-white shadow-sm"
+              : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#0F3D24]/5"
+          }`}
+        >
+          <TrendingUp size={14} /> Overview &amp; Ledger
+        </button>
+        <button
+          type="button"
+          onClick={() => setFinSubView("debtors_creditors")}
+          className={`inline-flex items-center gap-2 rounded-full px-5 py-2 text-xs font-bold transition ${
+            finSubView === "debtors_creditors"
+              ? "bg-[#0F3D24] text-white shadow-sm"
+              : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#0F3D24]/5"
+          }`}
+        >
+          <CreditCard size={14} /> Debtors &amp; Creditors
+          {debtorsSummaryQuery.data &&
+            debtorsSummaryQuery.data.summary.debtorCount + debtorsSummaryQuery.data.summary.creditorCount > 0 && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
+                  finSubView === "debtors_creditors" ? "bg-amber-400 text-[#0F3D24]" : "bg-rose-100 text-rose-700"
+                }`}
+              >
+                {debtorsSummaryQuery.data.summary.debtorCount + debtorsSummaryQuery.data.summary.creditorCount}
+              </span>
+            )}
+        </button>
+      </div>
+
+      {finSubView === "debtors_creditors" ? (
+        <DebtorsCreditorsPanel
+          passcode={passcode}
+          role={role}
+          batches={batches}
+          selectedBatchId={selectedBatchId === "all" ? "" : selectedBatchId}
+          onSelectBatchId={(id) => setSelectedBatchId(id || "all")}
+          onNavigateToContacts={onNavigateToContacts}
+        />
+      ) : (
+      <>
       {/* Batch Selector Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#F7F5F0] p-4">
         <div className="flex flex-wrap items-center gap-3">
@@ -754,23 +1083,55 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
             <option value="all">All Batches (Farm Overview)</option>
             {batches.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.batchName} ({b.batchType} • {b.currentHeadcount}/{b.initialHeadcount} heads • {b.status})
+                {b.batchName} ({b.batchType} • {b.currentHeadcount}/{b.initialHeadcount} heads • {b.status === "active" ? "Active" : b.status === "completed" ? "Closed" : "Archived"})
               </option>
             ))}
           </select>
-          {selectedBatchId !== "all" && (
-            <button
-              onClick={() => {
-                const target = batches.find((b) => b.id === selectedBatchId);
-                if (target) setEditingBatch({ ...target });
-              }}
-              className="flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] hover:bg-[#0F3D24]/5 transition"
-              title="Edit Batch Name & Details"
-            >
-              <Pencil size={14} className="text-[#3F8F3F]" />
-              Edit Batch
-            </button>
-          )}
+          {selectedBatchId !== "all" && role === "owner" && (() => {
+            const target = batches.find((b) => b.id === selectedBatchId);
+            if (!target) return null;
+            return (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setEditingBatch({ ...target })}
+                  className="flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] hover:bg-[#0F3D24]/5 transition"
+                  title="Edit Batch Name & Details"
+                >
+                  <Pencil size={14} className="text-[#3F8F3F]" />
+                  Edit Batch
+                </button>
+                {target.status === "active" ? (
+                  <button
+                    disabled={closeBatchMut.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Close batch "${target.batchName}"? Closed batches remain visible in reports, but staff and managers will not be able to log new entries into this batch.`)) {
+                        closeBatchMut.mutate(target.id);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50 transition"
+                    title="Close completed batch"
+                  >
+                    <Lock size={14} className="text-amber-700" />
+                    {closeBatchMut.isPending ? "Closing..." : "Close Batch"}
+                  </button>
+                ) : (
+                  <button
+                    disabled={reopenBatchMut.isPending}
+                    onClick={() => {
+                      if (window.confirm(`Reopen batch "${target.batchName}" so new records can be logged into it again?`)) {
+                        reopenBatchMut.mutate(target.id);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900 hover:bg-emerald-100 disabled:opacity-50 transition"
+                    title="Reopen closed batch"
+                  >
+                    <Unlock size={14} className="text-emerald-700" />
+                    {reopenBatchMut.isPending ? "Reopening..." : "Reopen Batch"}
+                  </button>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {selectedBatchId !== "all" && reportQuery.data && (
@@ -830,6 +1191,50 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           </div>
         );
       })()}
+
+      {/* Permanent Farm-wide Grand Total Banner (Always reflects ALL batches combined) */}
+      <div className="rounded-3xl bg-[#0F3D24] p-5 text-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+              Farm-wide Grand Total (All Batches Combined · Approved Records)
+            </span>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+              <span>
+                Total Revenue:{" "}
+                <strong className="text-lg font-extrabold text-white tabular-nums">
+                  {formatNaira(farmWideTotals.totalIncome)}
+                </strong>
+              </span>
+              <span>
+                Total Expenses:{" "}
+                <strong className="text-lg font-extrabold text-rose-300 tabular-nums">
+                  {formatNaira(farmWideTotals.totalExpense)}
+                </strong>
+              </span>
+              <span>
+                Net Position:{" "}
+                <strong
+                  className={`text-lg font-extrabold tabular-nums ${
+                    farmWideTotals.netProfit >= 0 ? "text-emerald-300" : "text-rose-300"
+                  }`}
+                >
+                  {formatNaira(farmWideTotals.netProfit)}
+                </strong>
+              </span>
+            </div>
+          </div>
+          {selectedBatchId !== "all" && (
+            <button
+              type="button"
+              onClick={() => setSelectedBatchId("all")}
+              className="rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-white/25 transition"
+            >
+              View All Batches
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -891,6 +1296,187 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           </span>
         </div>
       </div>
+
+      {/* Sequential Feed Bag Inventory & Usage Ledger (when inspecting a single batch) */}
+      {selectedBatchId !== "all" && feedLedgerQuery.data && (
+        <div className="rounded-3xl bg-amber-50/70 border border-amber-200/80 p-5 shadow-sm space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                Feed Bag Inventory &amp; Consumption Ledger
+              </h3>
+              <p className="text-[11px] text-amber-900/70">
+                Links Feed purchases from Expenses with sequential Bag # logs from Daily Farm Reports.
+              </p>
+            </div>
+            {feedLedgerQuery.data.lastEntry && (
+              <span className="rounded-full bg-white border border-amber-300 px-3 py-1 text-[11px] font-bold text-amber-900">
+                Last Logged: Bag #{feedLedgerQuery.data.lastEntry.feedBagNo}{" "}
+                {feedLedgerQuery.data.lastEntry.feedBagStatus === "finished" ? "Finished" : "Opened"} (
+                {feedLedgerQuery.data.lastEntry.activityDate})
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200/60">
+              <div className="text-[10px] font-bold uppercase text-amber-900/60">Bags Bought</div>
+              <div className="text-lg font-extrabold text-[#0F3D24]">
+                {feedLedgerQuery.data.bagsBought} <span className="text-xs font-medium">bags</span>
+              </div>
+              <div className="text-[10px] text-[#718096]">{feedLedgerQuery.data.totalKgBought} kg stock</div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200/60">
+              <div className="text-[10px] font-bold uppercase text-amber-900/60">Bags Finished</div>
+              <div className="text-lg font-extrabold text-amber-800">
+                {feedLedgerQuery.data.bagsFinished} <span className="text-xs font-medium">bags</span>
+              </div>
+              <div className="text-[10px] text-[#718096]">
+                {feedLedgerQuery.data.currentOpenBagNo
+                  ? `Bag #${feedLedgerQuery.data.currentOpenBagNo} open now`
+                  : "No open bag"}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200/60">
+              <div className="text-[10px] font-bold uppercase text-amber-900/60">Bags Remaining</div>
+              <div
+                className={`text-lg font-extrabold ${
+                  feedLedgerQuery.data.bagsInStock <= 2 && feedLedgerQuery.data.bagsBought > 0
+                    ? "text-rose-700"
+                    : "text-emerald-700"
+                }`}
+              >
+                {feedLedgerQuery.data.bagsInStock} <span className="text-xs font-medium">bags</span>
+              </div>
+              <div className="text-[10px] text-[#718096]">~{feedLedgerQuery.data.defaultKgPerBag} kg/bag</div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200/60">
+              <div className="text-[10px] font-bold uppercase text-amber-900/60">Avg Cost / Bag</div>
+              <div className="text-lg font-extrabold text-[#0F3D24]">
+                {formatNaira(feedLedgerQuery.data.avgCostPerBag)}
+              </div>
+              <div className="text-[10px] text-[#718096]">
+                Spent: {formatNaira(feedLedgerQuery.data.totalFeedSpend)}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200/60">
+              <div className="text-[10px] font-bold uppercase text-amber-900/60">Used Feed Value</div>
+              <div className="text-lg font-extrabold text-[#0F3D24]">
+                {formatNaira(feedLedgerQuery.data.usedFeedValue)}
+              </div>
+              <div className="text-[10px] text-[#718096]">{feedLedgerQuery.data.totalKgUsed} kg fed</div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-3 ring-1 ring-amber-200/60">
+              <div className="text-[10px] font-bold uppercase text-amber-900/60">Stock Value Left</div>
+              <div className="text-lg font-extrabold text-emerald-700">
+                {formatNaira(feedLedgerQuery.data.remainingStockValue)}
+              </div>
+              <div className="text-[10px] text-[#718096]">Unconsumed inventory</div>
+            </div>
+          </div>
+
+          {feedLedgerQuery.data.brandBreakdown.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <span className="text-[10px] font-bold uppercase text-amber-900/70">Purchased Brands:</span>
+              {feedLedgerQuery.data.brandBreakdown.map((br) => (
+                <span
+                  key={br.brand}
+                  className="rounded-full bg-white border border-amber-200 px-3 py-0.5 text-[11px] font-semibold text-[#0F3D24]"
+                >
+                  {br.brand}: {br.bagsBought > 0 ? `${br.bagsBought} bags · ` : ""}
+                  {formatNaira(br.spend)}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Per-Batch Breakdown Table with Grand Total Footer */}
+      {perBatchBreakdown.length > 0 && (
+        <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-sm font-bold text-[#0F3D24]">Per-Batch Financial Summary</h3>
+            <span className="text-[11px] text-[#0F3D24]/60">Click any batch row to filter</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F7F5F0] text-[#0F3D24]/80 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="p-3">Batch</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Live Birds</th>
+                  <th className="p-3 text-right">Revenue</th>
+                  <th className="p-3 text-right">Expenses</th>
+                  <th className="p-3 text-right">Net Profit / Loss</th>
+                  <th className="p-3 text-right">ROI</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#0F3D24]/5">
+                {perBatchBreakdown.map((b) => {
+                  const net = b.income - b.expense;
+                  const roi = b.expense > 0 ? `${((net / b.expense) * 100).toFixed(1)}%` : b.income > 0 ? "100%" : "0%";
+                  const clickable = b.id !== "__general__";
+                  return (
+                    <tr
+                      key={b.id}
+                      onClick={() => clickable && setSelectedBatchId(b.id)}
+                      className={`${clickable ? "cursor-pointer hover:bg-[#F7F5F0]/60" : ""} ${
+                        selectedBatchId === b.id ? "bg-emerald-50/70 font-semibold" : ""
+                      }`}
+                    >
+                      <td className="p-3 font-bold text-[#0F3D24]">
+                        {b.batchName} <span className="text-[10px] font-normal text-slate-500">({b.batchType})</span>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                            b.status === "active"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {b.status === "active" ? "Active" : b.status === "completed" ? "Closed" : "Archived"}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right tabular-nums">{b.currentHeadcount.toLocaleString()}</td>
+                      <td className="p-3 text-right font-semibold text-emerald-700 tabular-nums">{formatNaira(b.income)}</td>
+                      <td className="p-3 text-right font-semibold text-rose-700 tabular-nums">{formatNaira(b.expense)}</td>
+                      <td className={`p-3 text-right font-bold tabular-nums ${net >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                        {formatNaira(net)}
+                      </td>
+                      <td className="p-3 text-right text-slate-600 tabular-nums">{roi}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="bg-[#0F3D24] text-white font-extrabold">
+                  <td className="p-3 rounded-bl-xl" colSpan={2}>GRAND TOTAL (ALL BATCHES COMBINED)</td>
+                  <td className="p-3 text-right tabular-nums">
+                    {batches.reduce((s, b) => s + b.currentHeadcount, 0).toLocaleString()}
+                  </td>
+                  <td className="p-3 text-right tabular-nums">{formatNaira(farmWideTotals.totalIncome)}</td>
+                  <td className="p-3 text-right text-rose-200 tabular-nums">{formatNaira(farmWideTotals.totalExpense)}</td>
+                  <td className={`p-3 text-right tabular-nums ${farmWideTotals.netProfit >= 0 ? "text-emerald-300" : "text-rose-300"}`}>
+                    {formatNaira(farmWideTotals.netProfit)}
+                  </td>
+                  <td className="p-3 text-right rounded-br-xl tabular-nums">
+                    {farmWideTotals.totalExpense > 0
+                      ? `${((farmWideTotals.netProfit / farmWideTotals.totalExpense) * 100).toFixed(1)}%`
+                      : "—"}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Sales & Revenue Line Chart */}
       <FinanceSalesChart
@@ -1050,11 +1636,29 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-xs max-w-xs truncate" title={f.description}>
-                      {f.description}
+                      <div>{f.description}</div>
+                      {"feedBags" in f && Number((f as FarmFinancial).feedBags || 0) > 0 && (
+                        <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900 mr-1">
+                          {(f as FarmFinancial).feedBags} bags × {(f as FarmFinancial).feedKgPerBag || 25}kg
+                          {(f as FarmFinancial).feedBrand ? ` (${(f as FarmFinancial).feedBrand})` : ""}
+                        </div>
+                      )}
+                      {"balanceDue" in f && Number((f as FarmFinancial).balanceDue || 0) > 0.005 && (
+                        <div className="mt-1 inline-flex flex-wrap items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                          <span>{(f as FarmFinancial).partyName || "Credit"}:</span>
+                          <span>Bal {formatNaira(Number((f as FarmFinancial).balanceDue || 0))}</span>
+                          {(f as FarmFinancial).dueDate && <span>(Due {(f as FarmFinancial).dueDate})</span>}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-xs text-[#0F3D24]/70">{f.paymentMethod}</td>
                     <td className={`px-4 py-3.5 text-right font-bold whitespace-nowrap ${f.type === "income" ? "text-emerald-700" : "text-rose-700"}`}>
-                      {f.type === "income" ? "+" : "-"}{formatNaira(f.amount)}
+                      <div>{f.type === "income" ? "+" : "-"}{formatNaira(f.amount)}</div>
+                      {"balanceDue" in f && Number((f as FarmFinancial).balanceDue || 0) > 0.005 && (
+                        <div className="text-[10px] font-semibold text-[#718096]">
+                          Paid: {formatNaira(Number((f as FarmFinancial).amountPaid || 0))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-center">
                       {"isDecemberPreorder" in f && f.isDecemberPreorder ? (
@@ -1067,6 +1671,16 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                         </span>
                       ) : (
                         <div className="flex items-center justify-center gap-1">
+                          {"balanceDue" in f && Number((f as FarmFinancial).balanceDue || 0) > 0.005 && (
+                            <button
+                              type="button"
+                              onClick={() => setPayingFinancial(f as FarmFinancial)}
+                              className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900 hover:bg-amber-200 transition"
+                              title="Record partial or full follow-up payment"
+                            >
+                              <CreditCard size={11} /> Pay Bal
+                            </button>
+                          )}
                           {role === "owner" && (
                             <>
                               <button
@@ -1097,6 +1711,27 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
           </div>
         )}
       </div>
+      </>
+      )}
+
+      {payingFinancial && (
+        <RecordFinancialPaymentModal
+          passcode={passcode}
+          role={role}
+          item={{
+            id: payingFinancial.id,
+            partyName: payingFinancial.partyName || "Unnamed Party",
+            description: payingFinancial.description,
+            totalAmount: payingFinancial.amount,
+            amountPaid: Number(payingFinancial.amountPaid ?? payingFinancial.amount),
+            balanceDue: Number(payingFinancial.balanceDue || 0),
+            dueDate: payingFinancial.dueDate || null,
+            kind: payingFinancial.type === "income" ? "debtor" : "creditor",
+          }}
+          onClose={() => setPayingFinancial(null)}
+          onSuccess={(msg) => setFeedback(msg)}
+        />
+      )}
 
       {/* Modal: New Batch */}
       {showBatchModal && (
@@ -1139,10 +1774,10 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Initial Headcount</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    min={0}
                     value={batchForm.initialHeadcount}
-                    onChange={(e) => setBatchForm({ ...batchForm, initialHeadcount: Number(e.target.value) })}
+                    onValueChange={(n) => setBatchForm({ ...batchForm, initialHeadcount: n ?? 0 })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
@@ -1230,14 +1865,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-[#0F3D24]">Assign to Batch</label>
+                <label className="block text-xs font-bold text-[#0F3D24]">Assign to Active Batch *</label>
                 <select
                   value={finForm.batchId}
                   onChange={(e) => setFinForm({ ...finForm, batchId: e.target.value })}
                   className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                 >
-                  <option value="">General Farm Expense / Income</option>
-                  {batches.map((b) => (
+                  <option value="">Select active batch...</option>
+                  {activeBatches.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.batchName} ({b.batchType})
                     </option>
@@ -1279,11 +1914,12 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Amount (₦) *</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    allowDecimal
+                    min={0}
                     placeholder="e.g. 150000"
                     value={finForm.amount}
-                    onChange={(e) => setFinForm({ ...finForm, amount: e.target.value })}
+                    onValueChange={(_, raw) => setFinForm({ ...finForm, amount: raw })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
@@ -1299,6 +1935,64 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                   className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                 />
               </div>
+
+              {finForm.type === "expense" && finForm.category === "Feed" && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 space-y-2.5">
+                  <div className="text-xs font-bold text-amber-950">
+                    Feed Bag Inventory Details (Links with Daily Farm Logs)
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-900">Number of Bags</label>
+                      <NumberField
+                        allowDecimal
+                        min={0}
+                        placeholder="e.g. 10"
+                        value={finForm.feedBags}
+                        onValueChange={(_, raw) => setFinForm({ ...finForm, feedBags: raw })}
+                        className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-[#0F3D24] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-900">Bag Weight (kg)</label>
+                      <NumberField
+                        allowDecimal
+                        min={1}
+                        placeholder="25"
+                        value={finForm.feedKgPerBag}
+                        onValueChange={(_, raw) => setFinForm({ ...finForm, feedKgPerBag: raw })}
+                        className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-[#0F3D24] outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-900">Feed Brand</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. New Hope"
+                        value={finForm.feedBrand}
+                        onChange={(e) => setFinForm({ ...finForm, feedBrand: e.target.value })}
+                        className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm text-[#0F3D24] outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {["New Hope", "Ultima", "TopFeed", "Vital Feed"].map((b) => (
+                      <button
+                        key={b}
+                        type="button"
+                        onClick={() => setFinForm({ ...finForm, feedBrand: b })}
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          finForm.feedBrand === b
+                            ? "bg-amber-700 text-white"
+                            : "bg-white text-amber-900 border border-amber-200 hover:bg-amber-100"
+                        }`}
+                      >
+                        {b}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -1324,6 +2018,58 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                   />
                 </div>
               </div>
+
+              {/* Partial / Credit Payment Fields */}
+              <div className="rounded-2xl bg-[#F7F5F0]/70 p-3.5 space-y-3 border border-[#0F3D24]/10">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-[#0F3D24]">
+                    Amount Paid Now (₦){" "}
+                    <span className="font-normal text-[#0F3D24]/60">(Leave blank if fully settled)</span>
+                  </label>
+                  {finForm.amountPaid.trim() !== "" &&
+                    Number(finForm.amount || 0) > Number(finForm.amountPaid || 0) && (
+                      <span className="text-[11px] font-extrabold text-rose-700">
+                        Balance: {formatNaira(Math.max(0, Number(finForm.amount || 0) - Number(finForm.amountPaid || 0)))}
+                      </span>
+                    )}
+                </div>
+                <NumberField
+                  allowDecimal
+                  min={0}
+                  max={Number(finForm.amount || 0) || undefined}
+                  placeholder={finForm.amount ? `Full payment (₦${finForm.amount})` : "Full payment"}
+                  value={finForm.amountPaid}
+                  onValueChange={(_, raw) => setFinForm({ ...finForm, amountPaid: raw })}
+                  className="w-full rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+
+                {finForm.amountPaid.trim() !== "" &&
+                  Number(finForm.amount || 0) > Number(finForm.amountPaid || 0) && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-bold text-rose-700">
+                          {finForm.type === "income" ? "Customer Name *" : "Supplier Name *"}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={finForm.type === "income" ? "Who owes us?" : "Who do we owe?"}
+                          value={finForm.partyName}
+                          onChange={(e) => setFinForm({ ...finForm, partyName: e.target.value })}
+                          className="mt-1 w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm outline-none focus:border-rose-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-rose-700">Due Date *</label>
+                        <input
+                          type="date"
+                          value={finForm.dueDate}
+                          onChange={(e) => setFinForm({ ...finForm, dueDate: e.target.value })}
+                          className="mt-1 w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm outline-none focus:border-rose-500"
+                        />
+                      </div>
+                    </div>
+                  )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -1334,7 +2080,16 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                 Cancel
               </button>
               <button
-                disabled={!finForm.amount || !finForm.description.trim() || createFinancialMut.isPending}
+                disabled={
+                  !finForm.batchId ||
+                  !finForm.amount ||
+                  Number(finForm.amount) <= 0 ||
+                  !finForm.description.trim() ||
+                  (finForm.amountPaid.trim() !== "" &&
+                    Number(finForm.amount) > Number(finForm.amountPaid || 0) &&
+                    (!finForm.partyName.trim() || !finForm.dueDate.trim())) ||
+                  createFinancialMut.isPending
+                }
                 onClick={() => createFinancialMut.mutate()}
                 className={`rounded-full px-6 py-2 text-xs font-semibold text-white disabled:opacity-50 ${finForm.type === "income" ? "bg-emerald-700 hover:bg-emerald-800" : "bg-rose-700 hover:bg-rose-800"}`}
               >
@@ -1390,7 +2145,7 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   >
                     <option value="active">Active</option>
-                    <option value="harvested">Harvested / Completed</option>
+                    <option value="completed">Closed / Completed</option>
                     <option value="archived">Archived</option>
                   </select>
                 </div>
@@ -1399,19 +2154,19 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Initial Headcount</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    min={0}
                     value={editingBatch.initialHeadcount}
-                    onChange={(e) => setEditingBatch({ ...editingBatch, initialHeadcount: Number(e.target.value) })}
+                    onValueChange={(n) => setEditingBatch({ ...editingBatch, initialHeadcount: n ?? 0 })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Current Live Headcount</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    min={0}
                     value={editingBatch.currentHeadcount}
-                    onChange={(e) => setEditingBatch({ ...editingBatch, currentHeadcount: Number(e.target.value) })}
+                    onValueChange={(n) => setEditingBatch({ ...editingBatch, currentHeadcount: n ?? 0 })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
@@ -1502,12 +2257,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                   onChange={(e) => setEditingFinancial({ ...editingFinancial, batchId: e.target.value || null })}
                   className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                 >
-                  <option value="">General Farm Expense / Income</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.batchName} ({b.batchType})
-                    </option>
-                  ))}
+                  {!editingFinancial.batchId && <option value="">Unassigned (Legacy)</option>}
+                  {batches
+                    .filter((b) => b.status === "active" || b.id === editingFinancial.batchId)
+                    .map((b) => (
+                      <option key={b.id} value={b.id} disabled={b.status !== "active"}>
+                        {b.batchName} ({b.batchType}){b.status !== "active" ? " (Closed)" : ""}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -1545,10 +2302,11 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
 
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Amount (₦) *</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    allowDecimal
+                    min={0}
                     value={editingFinancial.amount}
-                    onChange={(e) => setEditingFinancial({ ...editingFinancial, amount: Number(e.target.value) })}
+                    onValueChange={(n) => setEditingFinancial({ ...editingFinancial, amount: n ?? 0 })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
@@ -1563,6 +2321,40 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                   className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                 />
               </div>
+
+              {editingFinancial.type === "expense" && editingFinancial.category === "Feed" && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 grid gap-3 sm:grid-cols-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-amber-900">Number of Bags</label>
+                    <NumberField
+                      allowDecimal
+                      min={0}
+                      value={editingFinancial.feedBags ?? ""}
+                      onValueChange={(n) => setEditingFinancial({ ...editingFinancial, feedBags: n ?? null })}
+                      className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-[#0F3D24] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-amber-900">Bag Weight (kg)</label>
+                    <NumberField
+                      allowDecimal
+                      min={1}
+                      value={editingFinancial.feedKgPerBag ?? 25}
+                      onValueChange={(n) => setEditingFinancial({ ...editingFinancial, feedKgPerBag: n ?? 25 })}
+                      className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-bold text-[#0F3D24] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-amber-900">Feed Brand</label>
+                    <input
+                      type="text"
+                      value={editingFinancial.feedBrand || ""}
+                      onChange={(e) => setEditingFinancial({ ...editingFinancial, feedBrand: e.target.value })}
+                      className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm text-[#0F3D24] outline-none"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
@@ -1588,6 +2380,67 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                   />
                 </div>
               </div>
+
+              <div className="rounded-2xl bg-[#F7F5F0]/70 p-3.5 space-y-3 border border-[#0F3D24]/10">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-bold text-[#0F3D24]">Amount Paid (₦)</label>
+                  {Number(editingFinancial.amount || 0) >
+                    Number(editingFinancial.amountPaid ?? editingFinancial.amount ?? 0) && (
+                    <span className="text-[11px] font-extrabold text-rose-700">
+                      Balance:{" "}
+                      {formatNaira(
+                        Math.max(
+                          0,
+                          Number(editingFinancial.amount || 0) -
+                            Number(editingFinancial.amountPaid ?? editingFinancial.amount ?? 0),
+                        ),
+                      )}
+                    </span>
+                  )}
+                </div>
+                <NumberField
+                  allowDecimal
+                  min={0}
+                  max={Number(editingFinancial.amount || 0) || undefined}
+                  value={editingFinancial.amountPaid ?? editingFinancial.amount}
+                  onValueChange={(n) =>
+                    setEditingFinancial({
+                      ...editingFinancial,
+                      amountPaid: n ?? 0,
+                    })
+                  }
+                  className="w-full rounded-xl border border-[#0F3D24]/15 bg-white px-4 py-2 text-sm outline-none focus:border-[#3F8F3F]"
+                />
+                {Number(editingFinancial.amount || 0) >
+                  Number(editingFinancial.amountPaid ?? editingFinancial.amount ?? 0) && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-xs font-bold text-rose-700">
+                        {editingFinancial.type === "income" ? "Customer Name *" : "Supplier Name *"}
+                      </label>
+                      <input
+                        type="text"
+                        value={editingFinancial.partyName || ""}
+                        onChange={(e) =>
+                          setEditingFinancial({ ...editingFinancial, partyName: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm outline-none focus:border-rose-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-rose-700">Due Date *</label>
+                      <input
+                        type="date"
+                        value={editingFinancial.dueDate || ""}
+                        onChange={(e) =>
+                          setEditingFinancial({ ...editingFinancial, dueDate: e.target.value })
+                        }
+                        className="mt-1 w-full rounded-xl border border-rose-300 bg-white px-3 py-2 text-sm outline-none focus:border-rose-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
@@ -1598,7 +2451,14 @@ export function BatchFinancialsPanel({ passcode, role = "owner" }: { passcode: s
                 Cancel
               </button>
               <button
-                disabled={!editingFinancial.amount || !editingFinancial.description.trim() || updateFinancialMut.isPending}
+                disabled={
+                  !editingFinancial.amount ||
+                  !editingFinancial.description.trim() ||
+                  (Number(editingFinancial.amount || 0) >
+                    Number(editingFinancial.amountPaid ?? editingFinancial.amount ?? 0) &&
+                    (!editingFinancial.partyName?.trim() || !editingFinancial.dueDate?.trim())) ||
+                  updateFinancialMut.isPending
+                }
                 onClick={() => updateFinancialMut.mutate(editingFinancial)}
                 className="rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-semibold text-white disabled:opacity-50"
               >
@@ -2306,11 +3166,12 @@ export function LeadCrmPanel({ passcode, role = "owner" }: { passcode: string; r
                 {role === "owner" && (
                   <div>
                     <label className="block text-xs font-bold text-[#0F3D24]">Estimated Value (₦)</label>
-                    <input
-                      type="number"
+                    <NumberField
+                      allowDecimal
+                      min={0}
                       placeholder="e.g. 150000"
                       value={leadForm.estimatedValue}
-                      onChange={(e) => setLeadForm({ ...leadForm, estimatedValue: e.target.value })}
+                      onValueChange={(_, raw) => setLeadForm({ ...leadForm, estimatedValue: raw })}
                       className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                     />
                   </div>
@@ -2689,6 +3550,7 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
   });
 
   const batches = batchesQuery.data || [];
+  const activeActBatches = useMemo(() => batches.filter((b) => b.status === "active"), [batches]);
   const activities = activitiesQuery.data || [];
 
   const filteredActivities = activities.filter((a) => {
@@ -2725,7 +3587,14 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
             Import Activities (CSV/Excel)
           </button>
           <button
-            onClick={() => setShowActivityModal(true)}
+            onClick={() => {
+              const preferred =
+                selectedBatchId !== "all" && activeActBatches.some((b) => b.id === selectedBatchId)
+                  ? selectedBatchId
+                  : activeActBatches[0]?.id || "";
+              setActForm((prev) => ({ ...prev, batchId: preferred }));
+              setShowActivityModal(true);
+            }}
             className="flex items-center gap-2 rounded-full border border-[#0F3D24]/20 bg-white px-4 py-2.5 text-xs font-semibold text-[#0F3D24] shadow-sm hover:bg-[#0F3D24]/5 transition"
             title="Log a single activity such as weight check, pen maintenance or egg collection"
           >
@@ -2791,7 +3660,7 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
             <option value="all">All Batches</option>
             {batches.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.batchName} ({b.batchType})
+                {b.batchName} ({b.batchType}){b.status !== "active" ? " (Closed)" : ""}
               </option>
             ))}
           </select>
@@ -2865,6 +3734,9 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
                           </span>
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">
                             Feed: {act.feedGiven === false ? "Not given" : act.feedBrand || "Given"}
+                            {act.feedBagNo && act.feedBagStatus
+                              ? ` · Bag #${act.feedBagNo} (${act.feedBagStatus === "finished" ? "Finished" : "Opened"})`
+                              : ""}
                             {act.feedConsumedKg > 0 ? ` · ${act.feedConsumedKg} kg` : ""}
                           </span>
                           <span className="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-800">
@@ -2925,14 +3797,14 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
             <div className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-[#0F3D24]">Select Batch</label>
+                  <label className="block text-xs font-bold text-[#0F3D24]">Select Active Batch *</label>
                   <select
                     value={actForm.batchId}
                     onChange={(e) => setActForm({ ...actForm, batchId: e.target.value })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   >
-                    <option value="">General Farm Activity</option>
-                    {batches.map((b) => (
+                    <option value="">Select active batch...</option>
+                    {activeActBatches.map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.batchName} ({b.batchType})
                       </option>
@@ -2973,12 +3845,11 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label className="block text-xs font-bold text-rose-900">Mortality Count *</label>
-                      <input
-                        type="number"
-                        min="1"
+                      <NumberField
+                        min={1}
                         placeholder="e.g. 2"
                         value={actForm.mortalityCount || ""}
-                        onChange={(e) => setActForm({ ...actForm, mortalityCount: Number(e.target.value) })}
+                        onValueChange={(n) => setActForm({ ...actForm, mortalityCount: n ?? 0 })}
                         className="mt-1 w-full rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm outline-none"
                       />
                     </div>
@@ -2999,11 +3870,12 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
               {actForm.activityType === "Feeding" && (
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Feed Consumed (kg)</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    allowDecimal
+                    min={0}
                     placeholder="e.g. 100"
                     value={actForm.feedConsumedKg || ""}
-                    onChange={(e) => setActForm({ ...actForm, feedConsumedKg: Number(e.target.value) })}
+                    onValueChange={(n) => setActForm({ ...actForm, feedConsumedKg: n ?? 0 })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
@@ -3012,11 +3884,11 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
               {actForm.activityType === "Egg Collection" && (
                 <div>
                   <label className="block text-xs font-bold text-[#0F3D24]">Eggs Collected (Pieces)</label>
-                  <input
-                    type="number"
+                  <NumberField
+                    min={0}
                     placeholder="e.g. 300"
                     value={actForm.eggsCollected || ""}
-                    onChange={(e) => setActForm({ ...actForm, eggsCollected: Number(e.target.value) })}
+                    onValueChange={(n) => setActForm({ ...actForm, eggsCollected: n ?? 0 })}
                     className="mt-1 w-full rounded-xl border border-[#0F3D24]/15 px-4 py-2.5 text-sm outline-none focus:border-[#3F8F3F]"
                   />
                 </div>
@@ -3055,7 +3927,7 @@ export function DailyActivitiesPanel({ passcode, role = "owner" }: { passcode: s
                 Cancel
               </button>
               <button
-                disabled={createActivityMut.isPending}
+                disabled={!actForm.batchId || createActivityMut.isPending}
                 onClick={() => createActivityMut.mutate()}
                 className="rounded-full bg-[#0F3D24] px-6 py-2 text-xs font-semibold text-white disabled:opacity-50"
               >

@@ -27,6 +27,7 @@ import {
   type PartnerActivity,
   type PartnerDashboardSummary,
 } from "@/lib/partners.functions";
+import { NumberField } from "@/components/ui/number-field";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
 const fmtDate = (s?: string | null) =>
@@ -622,14 +623,13 @@ export function RolloverCycleModal({
                 <div className="text-[11px] text-slate-500">Enter any custom sum</div>
               </button>
             </div>
-            <input
-              type="number"
-              min="0"
-              step="any"
+            <NumberField
+              allowDecimal
+              min={0}
               required
               value={newInitialInvestment}
-              onChange={(e) => {
-                setNewInitialInvestment(e.target.value);
+              onValueChange={(_, raw) => {
+                setNewInitialInvestment(raw);
                 setCapitalPreset("custom");
               }}
               className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2.5 text-sm font-black text-[#0F3D24] tabular-nums outline-none focus:border-[#0F3D24]"
@@ -642,14 +642,13 @@ export function RolloverCycleModal({
               <label className="block font-bold text-[#0F3D24] mb-1">
                 Partner Profit Share (%) for {newCycleName}
               </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
+              <NumberField
+                allowDecimal
+                min={0}
+                max={100}
                 required
                 value={newProfitShare}
-                onChange={(e) => setNewProfitShare(e.target.value)}
+                onValueChange={(_, raw) => setNewProfitShare(raw)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-black text-emerald-700 tabular-nums outline-none focus:border-[#0F3D24]"
               />
               <span className="mt-1 block text-[10px] text-slate-500">
@@ -660,14 +659,13 @@ export function RolloverCycleModal({
               <label className="block font-bold text-[#0F3D24] mb-1">
                 Partner Loss Responsibility (%) for {newCycleName}
               </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
+              <NumberField
+                allowDecimal
+                min={0}
+                max={100}
                 required
                 value={newLossShare}
-                onChange={(e) => setNewLossShare(e.target.value)}
+                onValueChange={(_, raw) => setNewLossShare(raw)}
                 className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-black text-rose-700 tabular-nums outline-none focus:border-[#0F3D24]"
               />
               <span className="mt-1 block text-[10px] text-slate-500">
@@ -855,13 +853,13 @@ export function BatchSyncModal({
             <label className="block font-bold text-[#0F3D24] mb-1">
               Partner Share of Batch (%)
             </label>
-            <input
-              type="number"
-              min="1"
-              max="100"
+            <NumberField
+              allowDecimal
+              min={1}
+              max={100}
               required
               value={allocationPct}
-              onChange={(e) => setAllocationPct(e.target.value)}
+              onValueChange={(_, raw) => setAllocationPct(raw)}
               className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 font-black text-[#0F3D24] tabular-nums outline-none focus:border-[#0F3D24]"
             />
             <span className="mt-1 block text-[11px] text-slate-500">

@@ -9,7 +9,7 @@ import { OrderTimeline } from "@/components/site/OrderTimeline";
 import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
 import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, ADMIN_STORAGE_KEY, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
 import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, getPreorderSettings, adminUpdatePreorderSettings, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
-import { adminListBatches, adminEnsureLeadAndLogComm, type FarmBatch } from "@/lib/farm.functions";
+import { adminListBatches, adminEnsureLeadAndLogComm, adminGetPendingApprovalsCount, type FarmBatch } from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
 import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
@@ -30,6 +30,7 @@ import { AdminQuickOrderModal } from "@/components/admin/AdminQuickOrderModal";
 import { PartnersManagementPanel } from "@/components/admin/PartnersManagementPanel";
 import { SpecialContactsPanel } from "@/components/admin/SpecialContactsPanel";
 import { adminGetPartnerSettings } from "@/lib/partners.functions";
+import { NumberField } from "@/components/ui/number-field";
 
 // Global context to bypass background autoplay restrictions
 let globalAudioCtx: AudioContext | null = null;
@@ -280,7 +281,7 @@ function AdminOrders() {
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "clients" | "leads" | "contacts" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr" | "partners">("orders");
+  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "approvals" | "clients" | "leads" | "contacts" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr" | "partners">("orders");
   const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -318,6 +319,17 @@ function AdminOrders() {
     refetchOnWindowFocus: false,
   });
   const hidePartnersFromManager = partnerSettingsQuery.data?.hideFromManager ?? false;
+
+  const getPendingApprovalsCountFn = useServerFn(adminGetPendingApprovalsCount);
+  const pendingApprovalsCountQuery = useQuery({
+    queryKey: ["pending-approvals-count", passcode],
+    queryFn: () => getPendingApprovalsCountFn({ data: { passcode: passcode! } }),
+    enabled: !!passcode && role === "owner",
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+  const pendingApprovalsCount = pendingApprovalsCountQuery.data?.count ?? 0;
 
   useEffect(() => {
     if (role === "staff") {
@@ -662,6 +674,23 @@ function AdminOrders() {
                 </button>
               </li>
               <li>
+                <button onClick={() => { setActiveTab("approvals"); setIsMobileMenuOpen(false); }} className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "approvals" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>{role === "owner" ? "Approvals" : "My Submissions"}</span>}
+                  </div>
+                  {role === "owner" && pendingApprovalsCount > 0 && (
+                    !isSidebarCollapsed ? (
+                      <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
+                        {pendingApprovalsCount}
+                      </span>
+                    ) : (
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
+                    )
+                  )}
+                </button>
+              </li>
+              <li>
                 <button onClick={() => { setActiveTab("tasks"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "tasks" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
                   <CheckCircle2 size={18} className="shrink-0" />
                   {!isSidebarCollapsed && <span>{role === "staff" ? "Staff Workspace" : "Staff Tasks"}</span>}
@@ -824,6 +853,24 @@ function AdminOrders() {
             );
           })()}
 
+          {role === "owner" && pendingApprovalsCount > 0 && activeTab !== "approvals" && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-xs">
+              <div className="flex items-center gap-2.5 text-xs font-semibold text-amber-950">
+                <ShieldAlert size={18} className="text-amber-600 shrink-0" />
+                <span>
+                  <strong>{pendingApprovalsCount}</strong> staff/manager record(s) are awaiting your approval before updating dashboard totals.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("approvals")}
+                className="rounded-full bg-[#0F3D24] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#165232] transition cursor-pointer"
+              >
+                Review Approvals →
+              </button>
+            </div>
+          )}
+
           {query.isLoading ? (
             <div className="flex items-center justify-center h-64">
               <p className="text-center text-[#0F3D24]/60 font-medium">Loading data…</p>
@@ -843,6 +890,7 @@ function AdminOrders() {
                   <>
                     <ReportsPanel
                       orders={scoped}
+                      batches={batchesQuery.data || []}
                       role={role}
                       from={from} setFrom={setFrom}
                       to={to} setTo={setTo}
@@ -898,9 +946,15 @@ function AdminOrders() {
                     </div>
                   </>
                 ) : activeTab === "financials" ? (
-                  <BatchFinancialsPanel passcode={passcode} role={role} />
+                  <BatchFinancialsPanel
+                    passcode={passcode}
+                    role={role}
+                    onNavigateToContacts={() => setActiveTab("contacts")}
+                  />
                 ) : activeTab === "activities" ? (
                   <DailyActivitiesPanel passcode={passcode} role={role} />
+                ) : activeTab === "approvals" ? (
+                  <PendingApprovalsPanel passcode={passcode!} role={role} />
                 ) : activeTab === "clients" ? (
                   <ClientCrmPanel passcode={passcode} />
                 ) : activeTab === "leads" ? (
@@ -1495,11 +1549,11 @@ function VoucherPanel({ passcode }: { passcode: string }) {
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Voucher name (optional)<input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="e.g. New customer offer" className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Code (optional)<input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} placeholder="Auto generate if blank" className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Discount type<select value={form.discountType} onChange={(event) => setForm({ ...form, discountType: event.target.value as AdminVoucher["discountType"] })} className={inputClass}><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Value<input required type="number" min={1} max={form.discountType === "percent" ? 100 : undefined} value={form.discountValue} onChange={(event) => setForm({ ...form, discountValue: event.target.value })} placeholder={form.discountType === "percent" ? "e.g. 10" : "e.g. 1000"} className={inputClass} /></label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Value<NumberField required allowDecimal min={1} max={form.discountType === "percent" ? 100 : undefined} value={form.discountValue} onValueChange={(_, raw) => setForm({ ...form, discountValue: raw })} placeholder={form.discountType === "percent" ? "e.g. 10" : "e.g. 1000"} className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Expires on<input type="date" value={form.expiresAt} onChange={(event) => setForm({ ...form, expiresAt: event.target.value })} className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Recipient name<input value={form.recipientName} onChange={(event) => setForm({ ...form, recipientName: event.target.value })} placeholder="Optional" className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Recipient phone<input type="tel" value={form.recipientPhone} onChange={(event) => setForm({ ...form, recipientPhone: event.target.value })} placeholder="Optional" className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Maximum uses<input type="number" min={1} value={form.maxUses} onChange={(event) => setForm({ ...form, maxUses: event.target.value })} placeholder="Unlimited" className={inputClass} /></label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Maximum uses<NumberField min={1} value={form.maxUses} onValueChange={(_, raw) => setForm({ ...form, maxUses: raw })} placeholder="Unlimited" className={inputClass} /></label>
           <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Internal note<input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Optional" className={inputClass} /></label>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -1686,10 +1740,11 @@ function VoucherPanel({ passcode }: { passcode: string }) {
 
               <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
                 Discount Value
-                <input
-                  type="number"
+                <NumberField
+                  allowDecimal
+                  min={1}
                   value={editingVoucher.discountValue}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, discountValue: Number(e.target.value) })}
+                  onValueChange={(n) => setEditingVoucher({ ...editingVoucher, discountValue: n ?? 0 })}
                   className={inputClass}
                 />
               </label>
@@ -1724,10 +1779,10 @@ function VoucherPanel({ passcode }: { passcode: string }) {
 
               <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
                 Max Uses
-                <input
-                  type="number"
-                  value={editingVoucher.maxUses || ""}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, maxUses: e.target.value ? Number(e.target.value) : null })}
+                <NumberField
+                  min={1}
+                  value={editingVoucher.maxUses ?? ""}
+                  onValueChange={(n) => setEditingVoucher({ ...editingVoucher, maxUses: n ?? null })}
                   className={inputClass}
                 />
               </label>
@@ -1848,11 +1903,12 @@ function FilterBtn({
 }
 
 function ReportsPanel({
-  orders, role, from, setFrom, to, setTo, statusFilter, setStatusFilter, payFilter, setPayFilter,
+  orders, batches, role, from, setFrom, to, setTo, statusFilter, setStatusFilter, payFilter, setPayFilter,
   zoneFilter, setZoneFilter, search, setSearch, reasonFilter, setReasonFilter, reasonOptions,
   onApply, onReset, onQuickRange,
 }: {
   orders: AdminOrder[];
+  batches: FarmBatch[];
   role: AdminRole;
   from: string; setFrom: (v: string) => void;
   to: string; setTo: (v: string) => void;
@@ -1864,11 +1920,51 @@ function ReportsPanel({
   onApply: () => void; onReset: () => void; onQuickRange: (d: number | "month") => void;
 }) {
   const [zipping, setZipping] = useState(false);
+  const [batchFilter, setBatchFilter] = useState<string>("");
   const isOwner = role === "owner";
-  const paidOrders = orders.filter((o) => o.paymentStatus === "approved");
+  const allPaidOrders = orders.filter((o) => o.paymentStatus === "approved");
+  const allBatchesRevenue = allPaidOrders.reduce((s, o) => s + o.total, 0);
+
+  const visibleOrders = batchFilter
+    ? batchFilter === "__unassigned__"
+      ? orders.filter((o) => !o.batchId)
+      : orders.filter((o) => o.batchId === batchFilter)
+    : orders;
+  const paidOrders = visibleOrders.filter((o) => o.paymentStatus === "approved");
   const revenue = paidOrders.reduce((s, o) => s + o.total, 0);
   const fees = paidOrders.reduce((s, o) => s + o.deliveryFee, 0);
   const avg = paidOrders.length ? Math.round(revenue / paidOrders.length) : 0;
+
+  const perBatchTotals = (() => {
+    const map = new Map<string, { name: string; count: number; revenue: number }>();
+    for (const b of batches) {
+      map.set(b.id, { name: b.batchName, count: 0, revenue: 0 });
+    }
+    let unassignedCount = 0;
+    let unassignedRev = 0;
+    for (const o of allPaidOrders) {
+      if (o.batchId) {
+        const entry = map.get(o.batchId) || {
+          name: o.batchName || "Assigned Batch",
+          count: 0,
+          revenue: 0,
+        };
+        entry.count += 1;
+        entry.revenue += o.total;
+        map.set(o.batchId, entry);
+      } else {
+        unassignedCount += 1;
+        unassignedRev += o.total;
+      }
+    }
+    const list = Array.from(map.entries())
+      .map(([id, v]) => ({ id, ...v }))
+      .filter((x) => x.count > 0);
+    if (unassignedCount > 0) {
+      list.push({ id: "__unassigned__", name: "Unassigned / Storefront", count: unassignedCount, revenue: unassignedRev });
+    }
+    return list;
+  })();
 
   const exportCsv = () => {
     const head = isOwner
@@ -2194,6 +2290,18 @@ function ReportsPanel({
           </select>
         </label>
         <label className={labelCls}>
+          Batch filter
+          <select value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)} className={inputCls}>
+            <option value="">All batches combined</option>
+            <option value="__unassigned__">Unassigned / Storefront</option>
+            {batches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.batchName}{b.status !== "active" ? " (Closed)" : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={labelCls}>
           Search
           <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onApply()} placeholder="Order code, name or phone" className={inputCls} />
         </label>
@@ -2203,24 +2311,65 @@ function ReportsPanel({
         <button onClick={onApply} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2 text-sm font-semibold text-white hover:bg-[#134a2c]">
           <Search size={14} /> Apply filters
         </button>
-        <button onClick={onReset} className="rounded-full bg-[#F7F5F0] px-5 py-2 text-sm font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white">
+        <button onClick={() => { setBatchFilter(""); onReset(); }} className="rounded-full bg-[#F7F5F0] px-5 py-2 text-sm font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white">
           Reset
         </button>
       </div>
 
+      {isOwner && (
+        <div className="mt-5 rounded-2xl border border-[#3F8F3F]/25 bg-[#0F3D24] p-4 text-white">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                Overall Orders Grand Total (All Batches Combined)
+              </div>
+              <div className="mt-1 text-2xl font-extrabold tabular-nums">
+                {naira(allBatchesRevenue)}
+                <span className="ml-2 text-xs font-medium text-white/75">
+                  ({allPaidOrders.length} approved orders across all batches)
+                </span>
+              </div>
+            </div>
+            {batchFilter && (
+              <span className="rounded-full bg-white/15 px-3 py-1 text-[11px] font-semibold">
+                Showing filtered batch below: {naira(revenue)}
+              </span>
+            )}
+          </div>
+          {perBatchTotals.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2 pt-3 border-t border-white/15 text-[11px]">
+              {perBatchTotals.map((bt) => (
+                <button
+                  key={bt.id}
+                  type="button"
+                  onClick={() => setBatchFilter(batchFilter === bt.id ? "" : bt.id)}
+                  className={`rounded-full px-3 py-1 font-semibold transition cursor-pointer ${
+                    batchFilter === bt.id
+                      ? "bg-[#3F8F3F] text-white"
+                      : "bg-white/10 text-white/90 hover:bg-white/20"
+                  }`}
+                >
+                  {bt.name}: <strong className="tabular-nums">{naira(bt.revenue)}</strong> ({bt.count})
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Orders" value={String(orders.length)} />
+        <Stat label="Orders" value={String(visibleOrders.length)} />
         {isOwner ? (
           <>
-            <Stat label="Revenue (approved)" value={naira(revenue)} />
+            <Stat label={batchFilter ? "Filtered Batch Revenue" : "Revenue (approved)"} value={naira(revenue)} />
             <Stat label="Delivery fees" value={naira(fees)} />
             <Stat label="Avg order value" value={naira(avg)} />
           </>
         ) : (
           <Stat label="Approved / Paid Orders" value={String(paidOrders.length)} />
         )}
-        <Stat label="Cancelled" value={String(orders.filter((o) => o.status === "cancelled").length)} />
-        <Stat label="Not completed" value={String(orders.filter(isNotCompleted).length)} />
+        <Stat label="Cancelled" value={String(visibleOrders.filter((o) => o.status === "cancelled").length)} />
+        <Stat label="Not completed" value={String(visibleOrders.filter(isNotCompleted).length)} />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#0F3D24]/70">
@@ -2403,11 +2552,13 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                 className="rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
               >
                 <option value="">Unassigned</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.batchName} ({b.batchType})
-                  </option>
-                ))}
+                {batches
+                  .filter((b) => b.status === "active" || b.id === order.batchId)
+                  .map((b) => (
+                    <option key={b.id} value={b.id} disabled={b.status !== "active"}>
+                      {b.batchName} ({b.batchType}){b.status !== "active" ? " (Closed)" : ""}
+                    </option>
+                  ))}
               </select>
               {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
             </div>
@@ -3371,11 +3522,13 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                 className="rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
               >
                 <option value="">Unassigned</option>
-                {batches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.batchName} ({b.batchType})
-                  </option>
-                ))}
+                {batches
+                  .filter((b) => b.status === "active" || b.id === preorder.batchId)
+                  .map((b) => (
+                    <option key={b.id} value={b.id} disabled={b.status !== "active"}>
+                      {b.batchName} ({b.batchType}){b.status !== "active" ? " (Closed)" : ""}
+                    </option>
+                  ))}
               </select>
               {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
             </div>
