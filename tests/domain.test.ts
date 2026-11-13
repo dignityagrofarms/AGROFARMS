@@ -3,6 +3,44 @@ import assert from "node:assert/strict";
 import { resolveAdminRole } from "../src/lib/admin-auth.ts";
 import { receivedAmount, orderReceipts, preorderReceipts } from "../src/lib/financial-report.ts";
 import { computeSettlement } from "../src/lib/partner-settlement.ts";
+import { completedBatchWeeks } from "../src/lib/batch-age.ts";
+
+test("batch age counts completed weeks at weekly boundaries", () => {
+  for (const [day, expected] of [
+    [0, 0],
+    [6, 0],
+    [7, 1],
+    [41, 5],
+    [42, 6],
+    [43, 6],
+    [48, 6],
+    [49, 7],
+  ]) {
+    const now = new Date(Date.parse("2026-10-02T12:00:00+01:00") + day * 86_400_000);
+    assert.equal(completedBatchWeeks("2026-10-02", now), expected, `day ${day}`);
+  }
+});
+
+test("November 13 stays at six weeks throughout the Lagos calendar day", () => {
+  for (const time of ["00:00:00", "12:00:00", "23:59:59"]) {
+    assert.equal(completedBatchWeeks("2026-10-02", new Date(`2026-11-13T${time}+01:00`)), 6);
+  }
+  assert.equal(completedBatchWeeks("2026-10-02", new Date("2026-11-19T22:59:59Z")), 6);
+  assert.equal(completedBatchWeeks("2026-10-02", new Date("2026-11-19T23:00:00Z")), 7);
+});
+
+test("Lagos midnight advances age independently of the execution timezone", () => {
+  assert.equal(completedBatchWeeks("2026-10-02", new Date("2026-10-08T22:59:59Z")), 0);
+  assert.equal(completedBatchWeeks("2026-10-02", new Date("2026-10-08T23:00:00Z")), 1);
+});
+
+test("batch age handles future and invalid dates without inventing an age", () => {
+  assert.equal(completedBatchWeeks("2026-12-01", new Date("2026-11-13T12:00:00Z")), 0);
+  for (const value of ["", "invalid", "2026-02-30", "2026-13-01", "2026-10-02T00:00:00Z"]) {
+    assert.equal(completedBatchWeeks(value, new Date("2026-11-13T12:00:00Z")), null);
+  }
+  assert.equal(completedBatchWeeks("2026-10-02", new Date("invalid")), null);
+});
 const base = {
   username: "staff",
   suppliedPasscode: "staff-only",

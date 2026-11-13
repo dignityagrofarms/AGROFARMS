@@ -1,4 +1,5 @@
 import { adminReceiptReport } from "@/lib/report.functions";
+import { completedBatchWeeks } from "@/lib/batch-age";
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -1757,14 +1758,9 @@ export function BatchFinancialsPanel({
             (() => {
               const b = reportQuery.data.batch;
               const targetW = (b as any).targetWeeks || 7;
-              const startMs = new Date(b.startDate).getTime();
-              const nowMs = new Date().getTime();
-              const elapsedWeeks = Math.max(
-                1,
-                Math.ceil((nowMs - startMs) / (1000 * 60 * 60 * 24 * 7)),
-              );
-              const currentW = Math.min(targetW, elapsedWeeks);
-              const pct = Math.round((currentW / targetW) * 100);
+              const elapsedWeeks = completedBatchWeeks(b.startDate);
+              const currentW = elapsedWeeks === null ? null : Math.min(targetW, elapsedWeeks);
+              const pct = currentW === null ? 0 : Math.round((currentW / targetW) * 100);
 
               return (
                 <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1790,7 +1786,7 @@ export function BatchFinancialsPanel({
                       </svg>
                       <div className="absolute text-center">
                         <span className="text-sm font-black text-[#0F3D24]">
-                          {currentW}/{targetW}
+                          {currentW ?? "—"}/{targetW}
                         </span>
                         <span className="block text-[8px] uppercase font-bold text-[#3F8F3F]">
                           Weeks
@@ -1804,10 +1800,15 @@ export function BatchFinancialsPanel({
                       <p className="text-xs font-semibold text-[#0F3D24]/70 mt-0.5">
                         {b.batchName} · {b.currentHeadcount} Live Heads
                       </p>
+                      <p className="text-[10px] text-[#0F3D24]/60">
+                        Age in completed weeks · Africa/Lagos
+                      </p>
                       <span className="inline-block mt-1.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2.5 py-0.5">
-                        {currentW >= targetW
-                          ? "✓ Healthy & Ready for Harvest"
-                          : `${targetW - currentW} weeks until target harvest`}
+                        {elapsedWeeks === null
+                          ? "Age unavailable"
+                          : elapsedWeeks >= targetW
+                            ? "✓ Healthy & Ready for Harvest"
+                            : `${targetW - elapsedWeeks} ${targetW - elapsedWeeks === 1 ? "week" : "weeks"} until target harvest`}
                       </span>
                     </div>
                   </div>
