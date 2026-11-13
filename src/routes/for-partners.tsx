@@ -1,3 +1,4 @@
+import { isSessionDenied } from "@/lib/admin-session";
 import { buildChartData } from "@/lib/partner-settlement";
 import { OfficialAgreementPanel } from "@/components/agreements/OfficialAgreementPanel";
 import { useState, useEffect } from "react";
@@ -261,7 +262,7 @@ function PublicPartnersLanding({
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
-                  <Loader2 size={16} className="animate-spin" /> Verifying Access...
+                  <Loader2 size={16} className="animate-spin" /> Signing in…
                 </span>
               ) : (
                 "Open Partners Account →"
@@ -392,6 +393,7 @@ function PartnersAccountPortal({
     queryKey: ["partner-dashboard", session.token],
     queryFn: () => getDashboardFn({ data: { token: session.token } }),
     refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   if (dashboardQuery.isLoading) {
@@ -408,7 +410,7 @@ function PartnersAccountPortal({
     );
   }
 
-  if (dashboardQuery.isError || !dashboardQuery.data) {
+  if (!dashboardQuery.data || isSessionDenied(dashboardQuery.error)) {
     return (
       <div className="rounded-3xl bg-white p-12 text-center shadow-sm max-w-lg mx-auto space-y-4">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-700">

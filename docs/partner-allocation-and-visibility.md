@@ -18,7 +18,7 @@ The owner opens **Settings & Roles → Financial figures — staff & managers**.
 
 Restricted users use Operations: stock counts, sales/expense submission, their own dated history, daily farm reports, task/attendance/leave tools and order fulfilment. They may enter and review money for their own submissions, including partial payment information. Other records' amounts, financial reports, payroll receipts, contacts' financial ledgers, partner records, receipt downloads and exports are denied. Fulfilment data includes delivery contacts and product quantities, with prices and receipts excluded.
 
-A global server-function middleware authenticates the credential and checks visibility on every request. Restricted roles can use only a reviewed operational allowlist; new endpoints are denied by default until reviewed. Operational responses remove funding values, sensitive notes and attachments. Role capability checks refresh every 15 seconds and on window focus; the client removes financial query caches when access is revoked. The server rejects subsequent restricted requests immediately. Previously downloaded information cannot be recalled.
+A global server-function middleware authenticates the credential and checks visibility on every request. Restricted roles can use only a reviewed operational allowlist; new endpoints are denied by default until reviewed. Operational responses remove funding values, sensitive notes and attachments. Role capability checks refresh silently every 60 seconds; the client removes financial query caches when access is revoked. The server rejects subsequent restricted requests immediately. Previously downloaded information cannot be recalled.
 
 Partner login is separate. Its current and archived ledger responses use an explicit allowlist: generic categories, allocated amounts, dates and safe farm quantities. Customer names, contact/address fields, source references, free descriptions, receipt links, staff identities and photos are excluded. Whole-batch sales quantities are grouped by record date without identifying customers. Partner exports consume the same sanitized data.
 
@@ -31,3 +31,19 @@ Partner login is separate. Its current and archived ledger responses use an expl
 - Mobile browser checks cover allocation validation, previews and restricted workspaces. Real role tests use temporary QA accounts, which are removed afterward, and do not submit business transactions or change real allocations.
 
 Apply `20261114003000_automatic_bird_allocations.sql` transactionally after a private backup. It adds funding/allocated-bird fields and a retained allocation register without rewriting existing ownership or financial records. An old-client compatibility RPC rejects manual percentage submissions with a refresh instruction. Never replay unrelated historical migrations or rewrite published git history.
+
+## Undo a mistaken assignment
+
+The owner can select **Undo batch allocation** in the partner workspace or an existing row in **Allocate Partners**. The preview shows current and previous batch, birds, capital, ownership, profit/loss percentages and synchronization settings. Enter a reason and confirm. If the partner previously had no batch, undo returns them to that unassigned state; otherwise it restores the earlier assignment. The farm's batch is never deleted.
+
+Previous values are recovered from immutable audit history for older changes, and explicit protected snapshots for new changes. Missing or incomplete history disables automatic undo. Unrelated profile edits and manually keyed ledger entries remain. Wrong synchronized copies are retired, previous copies are retained/restored and the restored automatic assignment is reconciled against current farm sources. Actual farm transactions are not reversed. Incorrect unsigned drafts are superseded; signed documents are never changed.
+
+Undo is blocked after a signature, payout or settlement, and when the allocation, capacity or shared funding no longer permits the previewed restoration. Signed legacy agreements also block undo. Every confirmation rechecks the preview under batch/partner locks. Undone allocations remain as voided history and stop reserving birds. A closed, settled allocation remains reserved. A change can be undone only once.
+
+Partner payouts now use an atomic server RPC with the allocation version reviewed by the form. A payout, signature and undo cannot race past each other's checks. Older payout forms without the version receive a reload instruction.
+
+The session activity timer updates timestamps in storage without changing authentication/query identity. Access polls run silently every 60 seconds; transient network failures preserve the last loaded screen. Confirmed session denial or permission revocation still removes access. Initial loads use a neutral skeleton, and user-requested actions retain their normal progress feedback.
+
+Additional checks: `tests/allocation-undo.sql`, `tests/undo-concurrency.py` (disposable local database only), and the browser fixture test covering activity timestamp changes, background access failure, preserved form state and the undo preview. Migrations `20261114004000_partner_allocation_undo.sql` and `20261114004500_undo_legacy_agreement_compatibility.sql` record history and add guards, including compatibility with installations missing the optional legacy signature column; rollout never executes an undo against a real partner.
+
+Run `python3 tests/undo-legacy-schema.py` against the disposable local cluster to verify the production schema variant.

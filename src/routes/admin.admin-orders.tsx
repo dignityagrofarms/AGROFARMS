@@ -1,3 +1,4 @@
+import { stableAdminCredential, isSessionDenied } from "@/lib/admin-session";
 import { getFinancialAccess } from "@/lib/financial-access.functions";
 import { OperationalWorkspace } from "@/components/admin/OperationalWorkspace";
 import React, { useEffect, useState, useRef } from "react";
@@ -382,12 +383,13 @@ function AdminOrders() {
     setMounted(true);
     const saved = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (saved) {
-      setPasscode(saved);
+      setPasscode(stableAdminCredential(saved));
     }
   }, []);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
+  const [manualRefreshing, setManualRefreshing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [filter, setFilter] = useState<
     "all" | "awaiting" | "cancelled_customer" | "cancelled_admin" | "not_completed"
@@ -457,16 +459,16 @@ function AdminOrders() {
     queryKey: ["financial-access", passcode],
     queryFn: () => getAccessFn({ data: { passcode: passcode! } }),
     enabled: !!passcode,
-    refetchInterval: 15000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 60000,
+    staleTime: 60000,
+    refetchOnWindowFocus: false,
     retry: 1,
   });
   const previousAccess = useRef<boolean | null>(null);
   useEffect(() => {
-    const permitted =
-      accessQuery.isError || query.data?.financialsRestricted
-        ? false
-        : accessQuery.data?.canViewFinancials;
+    const permitted = query.data?.financialsRestricted
+      ? false
+      : accessQuery.data?.canViewFinancials;
     if (permitted === undefined) return;
     if (query.data?.financialsRestricted && accessQuery.data?.canViewFinancials)
       qc.setQueryData<typeof accessQuery.data>(["financial-access", passcode], (old) =>
@@ -726,6 +728,14 @@ function AdminOrders() {
   };
 
   useEffect(() => {
+    if (isSessionDenied(accessQuery.error) || isSessionDenied(query.error)) {
+      localStorage.removeItem(STORAGE_KEY);
+      setPasscode(null);
+      qc.clear();
+    }
+  }, [accessQuery.error, query.error, qc]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     let throttleTimeout: NodeJS.Timeout | null = null;
 
@@ -741,8 +751,8 @@ function AdminOrders() {
         }
 
         const now = Date.now();
-        // If we have query.data.role use it, else guess based on username
-        const role = query.data?.role || (parsed.username === "staff" ? "staff" : "owner");
+        // Use the last verified role; activity timestamps never change query identity.
+        const role = accessQuery.data?.role || query.data?.role;
 
         if (role === "owner") {
           // Admin absolute expiry 24 hours
@@ -757,17 +767,17 @@ function AdminOrders() {
             return;
           }
         }
-        setPasscode(saved);
+        setPasscode(stableAdminCredential(saved));
       } catch {
         // Fallback for old plaintext passcodes
         const migrated = JSON.stringify({
-          username: "unknown",
+          username: parseAdminCredential(saved).username,
           passcode: saved,
           loginAt: Date.now(),
           lastActive: Date.now(),
         });
         localStorage.setItem(STORAGE_KEY, migrated);
-        setPasscode(migrated);
+        setPasscode(stableAdminCredential(migrated));
       }
     };
 
@@ -804,7 +814,7 @@ function AdminOrders() {
       window.removeEventListener("click", updateActivity);
       window.removeEventListener("touchstart", updateActivity);
     };
-  }, [query.data?.role, qc]);
+  }, [accessQuery.data?.role, query.data?.role, qc]);
 
   const applyFilters = () => {
     setApplied({
@@ -884,6 +894,9 @@ function AdminOrders() {
         loginAt: Date.now(),
         lastActive: Date.now(),
       });
+      const canonical = stableAdminCredential(credential);
+      const access = await getAccessFn({ data: { passcode: canonical } });
+      qc.setQueryData(["financial-access", canonical], access);
       if (rememberMe) {
         localStorage.setItem(STORAGE_KEY, credential);
         localStorage.setItem("daf_admin_passcode", credential);
@@ -891,7 +904,7 @@ function AdminOrders() {
       } else {
         localStorage.setItem(STORAGE_KEY, credential);
       }
-      setPasscode(credential);
+      setPasscode(canonical);
       setInput("");
       setUsername("");
     } catch (err: any) {
@@ -926,20 +939,26 @@ function AdminOrders() {
     );
   }
 
-  if (!accessQuery.data || accessQuery.isError)
+  if (!accessQuery.data)
     return (
-      <main className="p-6">
-        <p>
-          {accessQuery.error
-            ? "Access settings are unavailable. Please retry."
-            : "Checking access…"}
-        </p>
-        <button className="min-h-11 underline" onClick={() => accessQuery.refetch()}>
-          Retry
-        </button>
-        <button className="ml-4 min-h-11 underline" onClick={signOut}>
-          Sign out
-        </button>
+      <main
+        className="min-h-dvh space-y-5 bg-[#f4f7f5] p-4"
+        aria-busy="true"
+        aria-label="Loading dashboard"
+      >
+        <div className="h-16 rounded-xl bg-white" />
+        <div className="h-56 rounded-2xl bg-white" />
+        {accessQuery.error && (
+          <div role="alert">
+            <p>The dashboard is temporarily unavailable.</p>
+            <button className="min-h-11 underline" onClick={() => accessQuery.refetch()}>
+              Retry
+            </button>
+            <button className="ml-4 min-h-11 underline" onClick={signOut}>
+              Sign out
+            </button>
+          </div>
+        )}
       </main>
     );
   if (!accessQuery.data.canViewFinancials || query.data?.financialsRestricted)
@@ -1634,12 +1653,19 @@ function AdminOrders() {
               <Home size={14} /> <span className="hidden sm:inline">Back to Website</span>
             </Link>
             <button
-              onClick={() => query.refetch()}
+              onClick={async () => {
+                setManualRefreshing(true);
+                try {
+                  await query.refetch();
+                } finally {
+                  setManualRefreshing(false);
+                }
+              }}
               className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition shadow-sm"
             >
               <RefreshCw
                 size={14}
-                className={query.isFetching ? "animate-spin text-[#3F8F3F]" : ""}
+                className={manualRefreshing ? "animate-spin text-[#3F8F3F]" : ""}
               />
             </button>
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
@@ -5312,7 +5338,7 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         </div>
       </div>
 
-      {query.isError && (
+      {query.isError && !query.data && (
         <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-200">
           <strong className="block mb-1">Failed to load pre-orders:</strong>
           {query.error instanceof Error ? query.error.message : "Unknown error occurred"}

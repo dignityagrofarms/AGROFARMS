@@ -112,3 +112,26 @@ test("settlement preserves commercial terms and ignores removed copies", () => {
   assert.equal(loss.payoutDue, 0);
   assert.equal(loss.lossWasCapped, true);
 });
+
+test("activity timestamps do not change authentication identity; credentials remain isolated", async () => {
+  const { stableAdminCredential, isSessionDenied } = await import("../src/lib/admin-session.ts");
+  const a = JSON.stringify({
+    username: "Owner",
+    passcode: "test-secret",
+    loginAt: 1,
+    lastActive: 2,
+  });
+  const b = JSON.stringify({
+    username: "owner",
+    passcode: "test-secret",
+    loginAt: 1,
+    lastActive: 999,
+  });
+  assert.equal(stableAdminCredential(a), stableAdminCredential(b));
+  assert.notEqual(
+    stableAdminCredential(a),
+    stableAdminCredential(JSON.stringify({ username: "other", passcode: "test-secret" })),
+  );
+  assert(!isSessionDenied(new Error("Login is temporarily unavailable.")));
+  assert(isSessionDenied(new Error("This account is deactivated. Contact your Administrator.")));
+});

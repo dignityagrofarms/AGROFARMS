@@ -1,3 +1,4 @@
+import { UndoPartnerAllocation } from "./UndoPartnerAllocation";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -355,6 +356,18 @@ export function BatchMultiInvestorModal({
                 <section className="space-y-3 rounded-xl border p-4" key={row.partnerId}>
                   <div className="flex justify-between gap-2">
                     <h3 className="font-bold">{row.fullName}</h3>
+                    {query.data!.investors.some((i) => i.partnerId === row.partnerId) && (
+                      <UndoPartnerAllocation
+                        passcode={passcode}
+                        partnerId={row.partnerId}
+                        onUndone={() => {
+                          setMessage(
+                            "The previous allocation details were restored. History was preserved.",
+                          );
+                          query.refetch();
+                        }}
+                      />
+                    )}
                     {!query.data!.investors.some((i) => i.partnerId === row.partnerId) && (
                       <button
                         onClick={() => {

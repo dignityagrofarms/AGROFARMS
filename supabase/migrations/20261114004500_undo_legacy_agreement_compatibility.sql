@@ -1,0 +1,27 @@
+-- Some existing installations never had the legacy agreement_signed column.
+-- Read the optional flag through JSON while retaining immutable signature checks.
+CREATE OR REPLACE FUNCTION public.partner_undo_preview(partner_input uuid) RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=public AS $$
+DECLARE p public.farm_partners; c public.partner_allocation_changes; why text; previous_batch public.farm_batches; current_batch public.farm_batches; previous_birds integer; BEGIN
+ SELECT * INTO p FROM public.farm_partners WHERE id=partner_input;
+ IF NOT FOUND THEN RAISE EXCEPTION 'Partner not found';END IF;
+ SELECT * INTO c FROM public.partner_allocation_changes WHERE partner_id=p.id AND cycle_name=p.cycle_name ORDER BY source_event_id DESC LIMIT 1;
+ IF c.id IS NULL THEN why:='Previous allocation details were not recorded. Review this assignment manually.';
+ ELSIF c.undone_at IS NOT NULL THEN why:='The last allocation change has already been undone.';
+ ELSIF NOT c.snapshot_complete THEN why:='Previous linked records cannot be recovered reliably. Review this assignment manually.';
+ ELSIF NOT p.active OR p.cycle_status='closed' OR p.settled_at IS NOT NULL OR p.settlement_snapshot IS NOT NULL OR EXISTS(SELECT 1 FROM public.record_audit_events e WHERE e.source_table='farm_partners' AND e.source_id=p.id AND e.after_data->>'cycle_name'=p.cycle_name AND (e.after_data->>'cycle_status'='closed' OR e.after_data->>'settled_at' IS NOT NULL)) THEN why:='Closed or settled cycles cannot be undone.';
+ ELSIF allocation_fields(to_jsonb(p))<>c.after_fields THEN why:='The allocation changed. Reload the partner workspace before undoing.';
+ ELSIF coalesce((to_jsonb(p)->>'agreement_signed')::boolean,false) OR EXISTS(SELECT 1 FROM public.record_audit_events e WHERE e.source_table='farm_partners' AND e.source_id=p.id AND e.after_data->>'cycle_name'=p.cycle_name AND e.after_data->>'agreement_signed'='true') OR EXISTS(SELECT 1 FROM public.official_agreements a JOIN public.official_agreement_signatures s ON s.agreement_id=a.id WHERE a.partner_id=p.id AND a.cycle_name=p.cycle_name) THEN why:='An agreement has already been signed for this cycle. Undo is blocked.';
+ ELSIF EXISTS(SELECT 1 FROM public.partner_financials WHERE partner_id=p.id AND type='payout' AND coalesce(cycle_name,p.cycle_name)=p.cycle_name) THEN why:='A payout has been recorded for this cycle. Undo is blocked.';
+ END IF;
+ SELECT * INTO current_batch FROM public.farm_batches WHERE id=p.batch_id;
+ SELECT * INTO previous_batch FROM public.farm_batches WHERE id=(c.before_fields->>'batch_id')::uuid;
+ previous_birds:=(c.before_fields->>'allocated_birds')::integer;
+ IF why IS NULL AND (EXISTS(SELECT 1 FROM jsonb_array_elements(c.before_financials) x WHERE NOT EXISTS(SELECT 1 FROM public.partner_financials f WHERE f.id=(x->>'id')::uuid AND f.partner_id=p.id) OR (x->>'source_financial_id' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.farm_financials f WHERE f.id=(x->>'source_financial_id')::uuid)) OR (x->>'source_order_id' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.orders f WHERE f.id=(x->>'source_order_id')::uuid)) OR (x->>'source_preorder_id' IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.preorders f WHERE f.id=(x->>'source_preorder_id')::uuid))) OR EXISTS(SELECT 1 FROM jsonb_array_elements(c.before_activities) x WHERE NOT EXISTS(SELECT 1 FROM public.partner_activities a WHERE a.id=(x->>'id')::uuid AND a.partner_id=p.id) OR NOT EXISTS(SELECT 1 FROM public.farm_activities a WHERE a.id=(x->>'source_activity_id')::uuid))) THEN why:='Original source history changed and cannot be restored reliably. Review this assignment manually.';END IF;
+ IF why IS NULL AND previous_birds IS NOT NULL THEN
+  IF previous_batch.id IS NULL OR previous_batch.status<>'active' OR previous_batch.funding_per_bird*previous_birds<>(c.before_fields->>'initial_investment')::numeric THEN why:='Shared batch funding changed. Review allocations together before restoring this assignment.';
+  ELSIF previous_birds+coalesce((SELECT sum(birds) FROM public.batch_bird_allocations WHERE batch_id=previous_batch.id AND partner_id<>p.id AND voided_at IS NULL),0)+coalesce((SELECT sum(birds) FROM public.batch_bird_allocations WHERE batch_id=previous_batch.id AND partner_id=p.id AND closed_at IS NOT NULL AND voided_at IS NULL),0)>previous_batch.initial_headcount THEN why:='Restoring the previous allocation would exceed batch capacity.';END IF;
+ END IF;
+ RETURN jsonb_build_object('canUndo',why IS NULL,'reason',why,'changeId',c.id,'partnerId',p.id,'partnerName',p.full_name,'cycleName',p.cycle_name,'allocationVersion',p.allocation_version,'batchRevision',current_batch.allocation_revision,'previousBatchRevision',previous_batch.allocation_revision,'current',allocation_fields(to_jsonb(p))||jsonb_build_object('batch_name',current_batch.batch_name),'previous',c.before_fields||jsonb_build_object('batch_name',previous_batch.batch_name),'linkedFinancialCount',(SELECT count(*) FROM public.partner_financials WHERE partner_id=p.id AND removed_at IS NULL AND (source_financial_id IS NOT NULL OR source_order_id IS NOT NULL OR source_preorder_id IS NOT NULL)),'linkedActivityCount',(SELECT count(*) FROM public.partner_activities WHERE partner_id=p.id AND removed_at IS NULL AND source_activity_id IS NOT NULL));
+END $$;
+REVOKE ALL ON FUNCTION public.partner_undo_preview(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.partner_undo_preview(uuid) TO service_role;

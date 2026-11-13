@@ -95,6 +95,7 @@ export interface FarmPartner {
   batchName?: string | null;
   batchAllocationPercentage: number;
   allocatedBirds?: number | null;
+  allocationVersion?: number;
   autoSyncBatch: boolean;
   status: "active" | "matured" | "completed" | "paused";
   active: boolean;
@@ -532,6 +533,7 @@ function mapPartner(p: any, finRows: any[], actRows: any[] = []): FarmPartner {
     batchName: p.farm_batches?.batch_name ?? null,
     batchAllocationPercentage: Number(p.batch_allocation_percentage ?? 100),
     allocatedBirds: p.allocated_birds == null ? null : Number(p.allocated_birds),
+    allocationVersion: Number(p.allocation_version || 0),
     autoSyncBatch: p.auto_sync_batch !== false,
     status: p.status,
     active: Boolean(p.active),
@@ -1493,6 +1495,7 @@ export const adminRecordPartnerFinancial = createServerFn({ method: "POST" })
         passcode: z.string().min(1),
         partnerId: z.string().uuid(),
         batchId: z.string().uuid().optional().nullable(),
+        expectedAllocationVersion: z.number().int().min(0).optional(),
         type: z.enum(["expense", "income", "payout"]),
         category: z.string().trim().min(2),
         amount: z.number().min(0.01, "Amount must be greater than zero"),
@@ -1551,6 +1554,25 @@ export const adminRecordPartnerFinancial = createServerFn({ method: "POST" })
       reference_no: data.referenceNo || null,
       recorded_by: username,
     };
+
+    if (data.type === "payout") {
+      if (data.expectedAllocationVersion === undefined)
+        throw new Error("Reload the partner workspace before recording a payout");
+      const { data: id, error: payoutError } = await (supabaseAdmin as any).rpc(
+        "record_partner_payout",
+        {
+          partner_input: data.partnerId,
+          version_input: data.expectedAllocationVersion,
+          row_input: {
+            ...baseRow,
+            receipt_url: data.receiptUrl || null,
+            attachment_name: data.attachmentName || null,
+          },
+        },
+      );
+      if (payoutError) throw new Error(payoutError.message);
+      return { ok: true, id: id as string, approvalStatus: "approved" };
+    }
 
     const { data: inserted, error } = await supabaseAdmin
       .from("partner_financials")
@@ -2039,6 +2061,7 @@ export const adminGetBatchInvestors = createServerFn({ method: "POST" })
     const { data: retainedAllocations, error: retainedError } = await (supabaseAdmin as any)
       .from("batch_bird_allocations")
       .select("partner_id,birds,closed_at,cycle_name")
+      .is("voided_at", null)
       .eq("batch_id", data.batchId);
     if (retainedError) throw new Error("Could not load retained bird allocations");
     const investors = (partnerRows || []).map((p: any) => {

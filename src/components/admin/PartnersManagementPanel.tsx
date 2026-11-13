@@ -1,3 +1,4 @@
+import { UndoPartnerAllocation } from "./UndoPartnerAllocation";
 import { OfficialAgreementPanel } from "@/components/agreements/OfficialAgreementPanel";
 import React, { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
@@ -345,11 +346,6 @@ export function PartnersManagementPanel({
                 <h3 className="text-base font-black text-[#0F3D24]">
                   Registered Partners Directory
                 </h3>
-                {partnersQuery.isFetching && partnersQuery.data && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-                    <RefreshCw size={9} className="animate-spin text-emerald-600" /> Updating...
-                  </span>
-                )}
               </div>
               <p className="text-xs text-slate-500">
                 Select a partner to inspect unit economics, approve logs, sync batch records, or
@@ -647,6 +643,7 @@ function PartnerDetailView({
   onBack: () => void;
 }) {
   const qc = useQueryClient();
+  const [allocationNotice, setAllocationNotice] = useState("");
   const [activeSubTab, setActiveSubTab] = useState<
     "overview" | "financials" | "activities" | "credentials"
   >("overview");
@@ -832,10 +829,17 @@ function PartnerDetailView({
           <ArrowLeft size={16} /> &larr; Back to Partners Directory
         </button>
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-          {detailQuery.isFetching && (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 animate-pulse">
-              <RefreshCw size={10} className="animate-spin text-emerald-600" /> Auto-syncing...
-            </span>
+          {viewerRole === "owner" && !isViewingArchive && livePartner.batchId && (
+            <UndoPartnerAllocation
+              passcode={passcode}
+              partnerId={partnerId}
+              onUndone={() => {
+                setAllocationNotice(
+                  "The previous batch allocation details have been restored. Financial history was preserved.",
+                );
+                refreshDetail();
+              }}
+            />
           )}
           <span>Current Partner Workspace:</span>
           <strong className="rounded-lg bg-[#0F3D24]/10 px-2.5 py-1 font-black text-[#0F3D24]">
@@ -844,6 +848,11 @@ function PartnerDetailView({
         </div>
       </div>
 
+      {allocationNotice && (
+        <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-950">
+          {allocationNotice}
+        </p>
+      )}
       {/* Multi-Cycle Switcher Bar */}
       <CycleSwitcherBar
         partner={livePartner}
@@ -1395,6 +1404,7 @@ function PartnerFinancialsSubPanel({
         data: {
           passcode,
           partnerId: partner.id,
+          expectedAllocationVersion: partner.allocationVersion || 0,
           batchId: partner.batchId,
           type,
           category,
