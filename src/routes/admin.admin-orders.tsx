@@ -2,20 +2,124 @@ import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
-import { LogOut, RefreshCw, ShieldCheck, Shield, Calendar, MessageCircle, MessageSquare, CheckCircle2, XCircle, Clock, Download, FileSpreadsheet, FileText, Search, Ban, AlertTriangle, FileArchive, Users, TicketPercent, Copy, ImageDown, Share2, Sparkles, X, Pencil, Trash2, Gift, Loader2, TrendingUp, Activity, UserPlus, ChevronDown, ChevronUp, Bell, KeyRound, Layers, ShieldAlert, Menu, Home, ChevronLeft, ChevronRight, Eye, Phone, Plus, Handshake, Contact } from "lucide-react";
+import {
+  LogOut,
+  RefreshCw,
+  ShieldCheck,
+  Shield,
+  Calendar,
+  MessageCircle,
+  MessageSquare,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Search,
+  Ban,
+  AlertTriangle,
+  FileArchive,
+  Users,
+  TicketPercent,
+  Copy,
+  ImageDown,
+  Share2,
+  Sparkles,
+  X,
+  Pencil,
+  Trash2,
+  Gift,
+  Loader2,
+  TrendingUp,
+  Activity,
+  UserPlus,
+  ChevronDown,
+  ChevronUp,
+  Bell,
+  KeyRound,
+  Layers,
+  ShieldAlert,
+  Menu,
+  Home,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Phone,
+  Plus,
+  Handshake,
+  Contact,
+  Flag,
+} from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { PwaInstallPrompt } from "@/components/site/PwaInstallPrompt";
 import { OrderTimeline } from "@/components/site/OrderTimeline";
-import { receiptHtml, preorderPaymentReceiptHtml, preorderCompleteReceiptHtml } from "@/lib/receipt-html";
-import { adminListOrders, adminUpdateOrder, adminDecidePayment, adminGetPasscode, adminSetPasscode, adminListClients, adminListVouchers, adminCreateVoucher, adminToggleVoucher, adminUpdateVoucher, adminDeleteVoucher, adminCorrectOrder, adminDeleteOrder, adminAssignOrderBatch, adminVerifyLogin, parseAdminCredential, ADMIN_STORAGE_KEY, type AdminOrder, type ClientRecord, type AdminVoucher, type AdminRole } from "@/lib/orders.functions";
-import { adminListPreorders, adminGetPreorderDetail, adminConfirmPreorderPayment, adminDeletePreorderPayment, adminUpdatePreorderDelivery, adminAddPreorderPayment, adminListPendingPayments, adminDeletePreorder, adminCorrectPreorder, adminAssignPreorderBatch, getPreorderSettings, adminUpdatePreorderSettings, type Preorder, type PreorderPayment } from "@/lib/preorders.functions";
-import { adminListBatches, adminEnsureLeadAndLogComm, adminGetPendingApprovalsCount, type FarmBatch } from "@/lib/farm.functions";
+import {
+  receiptHtml,
+  preorderPaymentReceiptHtml,
+  preorderCompleteReceiptHtml,
+} from "@/lib/receipt-html";
+import {
+  adminListOrders,
+  adminUpdateOrder,
+  adminDecidePayment,
+  adminGetPasscode,
+  adminSetPasscode,
+  adminListClients,
+  adminListVouchers,
+  adminCreateVoucher,
+  adminToggleVoucher,
+  adminUpdateVoucher,
+  adminDeleteVoucher,
+  adminCorrectOrder,
+  adminDeleteOrder,
+  adminAssignOrderBatch,
+  adminVerifyLogin,
+  parseAdminCredential,
+  ADMIN_STORAGE_KEY,
+  type AdminOrder,
+  type ClientRecord,
+  type AdminVoucher,
+  type AdminRole,
+} from "@/lib/orders.functions";
+import {
+  adminListPreorders,
+  adminGetPreorderDetail,
+  adminConfirmPreorderPayment,
+  adminDeletePreorderPayment,
+  adminUpdatePreorderDelivery,
+  adminAddPreorderPayment,
+  adminListPendingPayments,
+  adminDeletePreorder,
+  adminCorrectPreorder,
+  adminAssignPreorderBatch,
+  getPreorderSettings,
+  adminUpdatePreorderSettings,
+  type Preorder,
+  type PreorderPayment,
+} from "@/lib/preorders.functions";
+import {
+  adminListBatches,
+  adminEnsureLeadAndLogComm,
+  adminGetPendingApprovalsCount,
+  adminListMySubmissions,
+  type FarmActivity,
+  type FarmBatch,
+  type FarmFinancial,
+  type MySubmissionItem,
+} from "@/lib/farm.functions";
 import { downloadPdf } from "@/lib/pdf";
-import { BatchFinancialsPanel, LeadCrmPanel, DailyActivitiesPanel } from "@/components/admin/FarmManagementPanels";
+import {
+  BatchFinancialsPanel,
+  LeadCrmPanel,
+  DailyActivitiesPanel,
+} from "@/components/admin/FarmManagementPanels";
 import { OrganizedOrdersList } from "@/components/admin/OrganizedOrdersList";
 import { ReminderModal } from "@/components/admin/ReminderModal";
 import { UserAccountsPanel } from "@/components/admin/UserAccountsPanel";
 import { PendingApprovalsPanel } from "@/components/admin/PendingApprovalsPanel";
+import { DailyLogModal } from "@/components/admin/DailyLogModal";
+import { ActivityEditModal, FinancialEditModal } from "@/components/admin/SubmissionEditModals";
 import { PasswordRecoveryModal } from "@/components/admin/PasswordRecoveryModal";
 import { FlyerGeneratorModal, type FlyerOrderData } from "@/components/admin/FlyerGeneratorModal";
 import { drawSocialProofFlyerCanvas } from "@/lib/flyer-generator";
@@ -61,7 +165,7 @@ function playNewOrderChime() {
     const ctx = globalAudioCtx;
     if (!ctx) return;
     const now = ctx.currentTime;
-    
+
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = "sine";
@@ -112,8 +216,13 @@ export const Route = createFileRoute("/admin/admin-orders")({
   component: AdminOrders,
 });
 
-
-function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (next: string) => void }) {
+function PasscodePanel({
+  passcode,
+  onChanged,
+}: {
+  passcode: string;
+  onChanged: (next: string) => void;
+}) {
   const [revealed, setRevealed] = useState<string | null>(null);
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -147,7 +256,8 @@ function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (
         <ShieldCheck size={18} className="text-[#3F8F3F]" /> Staff passcode
       </h2>
       <p className="mt-1 text-sm text-[#0F3D24]/70">
-        Review the passcode currently in use, or set a new one. If you ever forget it, sign in with the farm's permanent master passcode and set a new one here.
+        Review the passcode currently in use, or set a new one. If you ever forget it, sign in with
+        the farm's permanent master passcode and set a new one here.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -157,7 +267,9 @@ function PasscodePanel({ passcode, onChanged }: { passcode: string; onChanged: (
         >
           {reveal.isPending ? "Checking…" : "Show current passcode"}
         </button>
-        {revealed && <code className="rounded-lg bg-[#F7F5F0] px-3 py-2 font-mono text-sm">{revealed}</code>}
+        {revealed && (
+          <code className="rounded-lg bg-[#F7F5F0] px-3 py-2 font-mono text-sm">{revealed}</code>
+        )}
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
@@ -219,7 +331,10 @@ const STATUS_MESSAGES: Record<AdminOrder["status"], (o: AdminOrder) => string> =
     `Hi ${o.customerName.split(" ")[0]}, your order ${o.orderCode} has been cancelled.${o.statusNote ? ` Reason: ${o.statusNote}` : ""} Please contact us on 08167099492 if you have questions.`,
 };
 
-function waLink(order: AdminOrder, overrides?: Partial<Pick<AdminOrder, "status" | "statusNote" | "eta">>): string {
+function waLink(
+  order: AdminOrder,
+  overrides?: Partial<Pick<AdminOrder, "status" | "statusNote" | "eta">>,
+): string {
   const merged = { ...order, ...overrides } as AdminOrder;
   const digits = merged.phone.replace(/\D+/g, "");
   const text = encodeURIComponent(STATUS_MESSAGES[merged.status](merged));
@@ -243,7 +358,11 @@ const STATUS_LABEL: Record<AdminOrder["status"], string> = {
   cancelled: "Cancelled",
 };
 
-function paymentWaLink(order: AdminOrder, decision: "approved" | "rejected", reason?: string): string {
+function paymentWaLink(
+  order: AdminOrder,
+  decision: "approved" | "rejected",
+  reason?: string,
+): string {
   const digits = order.phone.replace(/\D+/g, "");
   const first = order.customerName.split(" ")[0];
   const text =
@@ -268,7 +387,9 @@ function AdminOrders() {
   const [input, setInput] = useState("");
   const [username, setUsername] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "awaiting" | "cancelled_customer" | "cancelled_admin" | "not_completed">("all");
+  const [filter, setFilter] = useState<
+    "all" | "awaiting" | "cancelled_customer" | "cancelled_admin" | "not_completed"
+  >("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -281,13 +402,35 @@ function AdminOrders() {
   const [selectedFlyerOrder, setSelectedFlyerOrder] = useState<FlyerOrderData | null>(null);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<"orders" | "financials" | "activities" | "approvals" | "clients" | "leads" | "contacts" | "vouchers" | "flyers" | "december" | "tasks" | "complaints" | "hr" | "partners">("orders");
-  const [applied, setApplied] = useState({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+  const [activeTab, setActiveTab] = useState<
+    | "orders"
+    | "financials"
+    | "activities"
+    | "approvals"
+    | "clients"
+    | "leads"
+    | "contacts"
+    | "vouchers"
+    | "flyers"
+    | "december"
+    | "tasks"
+    | "complaints"
+    | "hr"
+    | "partners"
+  >("orders");
+  const [applied, setApplied] = useState({
+    from: "",
+    to: "",
+    status: "",
+    paymentStatus: "",
+    zone: "",
+    search: "",
+  });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
-  const currentUsername = passcode ? (parseAdminCredential(passcode).username || "owner") : "owner";
-  
+
+  const currentUsername = passcode ? parseAdminCredential(passcode).username || "owner" : "owner";
+
   // Real-time Order Alerts & SMS Target state
   const [orderSmsTarget, setOrderSmsTarget] = useState<AdminOrder | null>(null);
   const [newOrderPopupAlert, setNewOrderPopupAlert] = useState<AdminOrder | null>(null);
@@ -329,15 +472,155 @@ function AdminOrders() {
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
-  const pendingApprovalsCount = pendingApprovalsCountQuery.data?.count ?? 0;
+  const pendingApprovalsSummary = pendingApprovalsCountQuery.data;
+  const pendingApprovalsCount = pendingApprovalsSummary?.count ?? 0;
+  const partnerPendingCount = pendingApprovalsSummary?.partnerPendingCount ?? 0;
+  const totalOwnerNotificationsCount = pendingApprovalsCount + partnerPendingCount;
+
+  const listMySubmissionsFn = useServerFn(adminListMySubmissions);
+  const mySubmissionsQuery = useQuery({
+    queryKey: ["my-submissions", passcode],
+    queryFn: () => listMySubmissionsFn({ data: { passcode: passcode! } }),
+    enabled: !!passcode && role !== "owner",
+    refetchInterval: 25_000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
+  });
+  const mySubmissions = mySubmissionsQuery.data || [];
+  const myFlaggedItems = mySubmissions.filter((s) => s.approvalStatus === "flagged");
+  const myFlaggedOrRejectedItems = mySubmissions.filter(
+    (s) => s.approvalStatus === "flagged" || s.approvalStatus === "rejected",
+  );
+  const myPendingOrRejectedCount = mySubmissions.filter(
+    (s) =>
+      s.approvalStatus === "pending_approval" ||
+      s.approvalStatus === "pending" ||
+      s.approvalStatus === "flagged" ||
+      s.approvalStatus === "rejected",
+  ).length;
+
+  const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
+  const [showOwnerArrivalModal, setShowOwnerArrivalModal] = useState(false);
+  const [showStaffArrivalModal, setShowStaffArrivalModal] = useState(false);
+  const [quickEditFin, setQuickEditFin] = useState<FarmFinancial | null>(null);
+  const [quickEditAct, setQuickEditAct] = useState<FarmActivity | null>(null);
+  const [quickEditDailyLog, setQuickEditDailyLog] = useState<{
+    batchId: string | null;
+    date: string;
+  } | null>(null);
+  const arrivalShownRef = useRef(false);
+  const prevPendingCountRef = useRef<number | null>(null);
+  const staffArrivalShownRef = useRef(false);
+  const prevFlaggedCountRef = useRef<number | null>(null);
+
+  const openQuickEditSubmission = (item: MySubmissionItem) => {
+    setShowNotificationsMenu(false);
+    setShowStaffArrivalModal(false);
+    if (item.targetType === "financial" && item.financialRecord) {
+      setQuickEditFin(item.financialRecord);
+      return;
+    }
+    if (item.targetType === "activity" && item.activityRecord) {
+      if (item.activityRecord.activityType === "Daily Log") {
+        setQuickEditDailyLog({
+          batchId: item.activityRecord.batchId ?? null,
+          date: item.activityRecord.activityDate,
+        });
+      } else {
+        setQuickEditAct(item.activityRecord);
+      }
+      return;
+    }
+    setActiveTab("approvals");
+  };
+
+  useEffect(() => {
+    if (role !== "owner" || !pendingApprovalsSummary) return;
+    const total = pendingApprovalsSummary.count + pendingApprovalsSummary.partnerPendingCount;
+
+    if (!arrivalShownRef.current) {
+      arrivalShownRef.current = true;
+      prevPendingCountRef.current = total;
+      if (total > 0) {
+        setShowOwnerArrivalModal(true);
+      }
+      return;
+    }
+
+    if (prevPendingCountRef.current !== null && total > prevPendingCountRef.current) {
+      const latest = pendingApprovalsSummary.recentItems[0];
+      playNewOrderChime();
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted" &&
+        latest
+      ) {
+        new Notification(
+          `New ${latest.submitterRole === "manager" ? "Manager" : "Staff"} Entry for Approval`,
+          {
+            body: `${latest.submitterName}: ${latest.title}`,
+          },
+        );
+      }
+    }
+    prevPendingCountRef.current = total;
+  }, [role, pendingApprovalsSummary]);
+
+  useEffect(() => {
+    if (role === "owner" || !mySubmissionsQuery.data) return;
+    const flaggedCount = mySubmissionsQuery.data.filter(
+      (s) => s.approvalStatus === "flagged",
+    ).length;
+
+    if (!staffArrivalShownRef.current) {
+      staffArrivalShownRef.current = true;
+      prevFlaggedCountRef.current = flaggedCount;
+      if (flaggedCount > 0) {
+        setShowStaffArrivalModal(true);
+      }
+      return;
+    }
+
+    if (prevFlaggedCountRef.current !== null && flaggedCount > prevFlaggedCountRef.current) {
+      const latestFlagged = mySubmissionsQuery.data.find((s) => s.approvalStatus === "flagged");
+      playNewOrderChime();
+      if (
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted" &&
+        latestFlagged
+      ) {
+        new Notification("Farm Owner Flagged an Entry", {
+          body: `${latestFlagged.title}${latestFlagged.rejectionReason ? ` — ${latestFlagged.rejectionReason}` : ""}`,
+        });
+      }
+    }
+    prevFlaggedCountRef.current = flaggedCount;
+  }, [role, mySubmissionsQuery.data]);
 
   useEffect(() => {
     if (role === "staff") {
-      if (["orders", "december", "clients", "complaints", "vouchers", "flyers", "hr", "partners", "contacts"].includes(activeTab)) {
+      if (
+        [
+          "orders",
+          "december",
+          "clients",
+          "complaints",
+          "vouchers",
+          "flyers",
+          "hr",
+          "partners",
+          "contacts",
+        ].includes(activeTab)
+      ) {
         setActiveTab("tasks");
       }
     } else if (role === "manager") {
-      if (["vouchers", "flyers"].includes(activeTab) || (hidePartnersFromManager && activeTab === "partners")) {
+      if (
+        ["vouchers", "flyers"].includes(activeTab) ||
+        (hidePartnersFromManager && activeTab === "partners")
+      ) {
         setActiveTab("orders");
       }
     }
@@ -354,7 +637,9 @@ function AdminOrders() {
     }
 
     const newlyReceived = orders.find(
-      (o) => !initializedOrderIds.current!.has(o.id) && (o.status === "received" || o.paymentStatus === "pending")
+      (o) =>
+        !initializedOrderIds.current!.has(o.id) &&
+        (o.status === "received" || o.paymentStatus === "pending"),
     );
 
     orders.forEach((o) => initializedOrderIds.current!.add(o.id));
@@ -368,7 +653,11 @@ function AdminOrders() {
 
   // Request browser desktop notification permission
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+    if (
+      typeof window !== "undefined" &&
+      "Notification" in window &&
+      Notification.permission === "default"
+    ) {
       Notification.requestPermission();
     }
   }, []);
@@ -421,7 +710,12 @@ function AdminOrders() {
         setPasscode(saved);
       } catch {
         // Fallback for old plaintext passcodes
-        const migrated = JSON.stringify({ username: "unknown", passcode: saved, loginAt: Date.now(), lastActive: Date.now() });
+        const migrated = JSON.stringify({
+          username: "unknown",
+          passcode: saved,
+          loginAt: Date.now(),
+          lastActive: Date.now(),
+        });
         localStorage.setItem(STORAGE_KEY, migrated);
         setPasscode(migrated);
       }
@@ -429,14 +723,18 @@ function AdminOrders() {
 
     const updateActivity = () => {
       if (throttleTimeout) return;
-      throttleTimeout = setTimeout(() => { throttleTimeout = null; }, 5000);
+      throttleTimeout = setTimeout(() => {
+        throttleTimeout = null;
+      }, 5000);
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           parsed.lastActive = Date.now();
           localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }
     };
 
@@ -458,23 +756,43 @@ function AdminOrders() {
     };
   }, [query.data?.role, qc]);
 
-
-
   const applyFilters = () => {
-    setApplied({ from, to, status: statusFilter, paymentStatus: payFilter, zone: zoneFilter, search: search.trim() });
+    setApplied({
+      from,
+      to,
+      status: statusFilter,
+      paymentStatus: payFilter,
+      zone: zoneFilter,
+      search: search.trim(),
+    });
   };
 
   const setRange = (days: number | "month") => {
     const now = new Date();
     const iso = (d: Date) => d.toISOString().slice(0, 10);
-    const start = days === "month" ? new Date(now.getFullYear(), now.getMonth(), 1) : new Date(now.getTime() - (days - 1) * 86400000);
+    const start =
+      days === "month"
+        ? new Date(now.getFullYear(), now.getMonth(), 1)
+        : new Date(now.getTime() - (days - 1) * 86400000);
     setFrom(iso(start));
     setTo(iso(now));
-    setApplied({ from: iso(start), to: iso(now), status: statusFilter, paymentStatus: payFilter, zone: zoneFilter, search: search.trim() });
+    setApplied({
+      from: iso(start),
+      to: iso(now),
+      status: statusFilter,
+      paymentStatus: payFilter,
+      zone: zoneFilter,
+      search: search.trim(),
+    });
   };
 
   const resetFilters = () => {
-    setFrom(""); setTo(""); setStatusFilter(""); setPayFilter(""); setZoneFilter(""); setSearch("");
+    setFrom("");
+    setTo("");
+    setStatusFilter("");
+    setPayFilter("");
+    setZoneFilter("");
+    setSearch("");
     setReasonFilter("");
     setFilter("all");
     setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
@@ -483,7 +801,11 @@ function AdminOrders() {
   useEffect(() => {
     if (query.error && passcode) {
       const errMsg = (query.error as Error).message || "";
-      if (errMsg.includes("UNAUTHORIZED") || errMsg.includes("Invalid passcode") || errMsg.includes("Invalid credential")) {
+      if (
+        errMsg.includes("UNAUTHORIZED") ||
+        errMsg.includes("Invalid passcode") ||
+        errMsg.includes("Invalid credential")
+      ) {
         setAuthError(errMsg);
         localStorage.removeItem(STORAGE_KEY);
         setPasscode(null);
@@ -492,15 +814,26 @@ function AdminOrders() {
     }
   }, [query.error, passcode, qc]);
 
-
-
-  const handleAdminLogin = async ({ username: u, passcode: p, rememberMe }: { username: string; passcode: string; rememberMe: boolean }) => {
+  const handleAdminLogin = async ({
+    username: u,
+    passcode: p,
+    rememberMe,
+  }: {
+    username: string;
+    passcode: string;
+    rememberMe: boolean;
+  }) => {
     setAuthError(null);
     setIsLoggingIn(true);
     try {
       const res = await verifyLoginFn({ data: { username: u, passcode: p } });
       qc.clear();
-      const credential = JSON.stringify({ username: res.username, passcode: p, loginAt: Date.now(), lastActive: Date.now() });
+      const credential = JSON.stringify({
+        username: res.username,
+        passcode: p,
+        loginAt: Date.now(),
+        lastActive: Date.now(),
+      });
       if (rememberMe) {
         localStorage.setItem(STORAGE_KEY, credential);
         localStorage.setItem("daf_admin_passcode", credential);
@@ -544,23 +877,25 @@ function AdminOrders() {
   }
 
   const awaitingApprovalOrdersCount = (query.data?.orders || []).filter(
-    (o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")
+    (o) =>
+      o.paymentStatus === "submitted" ||
+      (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved"),
   ).length;
 
   return (
     <div className="flex h-screen bg-[#f4f7f5] overflow-hidden text-[#0F3D24]">
       <PwaInstallPrompt />
-      
+
       {/* Mobile Overlay */}
       {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden" 
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
-      
+
       {/* Sidebar Navigation */}
-      <aside 
+      <aside
         className={`fixed inset-y-0 left-0 z-50 transform bg-[#0F3D24] text-white transition-all duration-300 ease-in-out md:relative md:translate-x-0 flex flex-col shadow-xl ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         } ${isSidebarCollapsed ? "w-20" : "w-64"}`}
@@ -578,8 +913,8 @@ function AdminOrders() {
               </div>
             )}
           </div>
-          <button 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
             className="hidden md:flex p-1 text-white/50 hover:text-white transition rounded-full hover:bg-white/10"
           >
             {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -606,42 +941,69 @@ function AdminOrders() {
 
           {/* Sales & CRM */}
           <div>
-            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Sales & CRM</h3>}
+            {!isSidebarCollapsed && (
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">
+                Sales & CRM
+              </h3>
+            )}
             <ul className="space-y-1">
               {(role === "owner" || role === "manager") && (
                 <>
                   <li>
-                    <button onClick={() => { setActiveTab("orders"); setIsMobileMenuOpen(false); }} className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <button
+                      onClick={() => {
+                        setActiveTab("orders");
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                    >
                       <div className="flex items-center gap-3">
                         <FileText size={18} className="shrink-0" />
                         {!isSidebarCollapsed && <span>Orders & Reports</span>}
                       </div>
-                      {awaitingApprovalOrdersCount > 0 && (
-                        !isSidebarCollapsed ? (
+                      {awaitingApprovalOrdersCount > 0 &&
+                        (!isSidebarCollapsed ? (
                           <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
                             <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
                             {awaitingApprovalOrdersCount}
                           </span>
                         ) : (
                           <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
-                        )
-                      )}
+                        ))}
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => { setActiveTab("december"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <button
+                      onClick={() => {
+                        setActiveTab("december");
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "december" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                    >
                       <Gift size={18} className="shrink-0" />
                       {!isSidebarCollapsed && <span>Dec Pre-Orders</span>}
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => { setActiveTab("clients"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <button
+                      onClick={() => {
+                        setActiveTab("clients");
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "clients" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                    >
                       <Users size={18} className="shrink-0" />
                       {!isSidebarCollapsed && <span>Order Clients</span>}
                     </button>
                   </li>
                   <li>
-                    <button onClick={() => { setActiveTab("contacts"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "contacts" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                    <button
+                      onClick={() => {
+                        setActiveTab("contacts");
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "contacts" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                    >
                       <Contact size={18} className="shrink-0" />
                       {!isSidebarCollapsed && <span>Special Contacts</span>}
                     </button>
@@ -649,7 +1011,13 @@ function AdminOrders() {
                 </>
               )}
               <li>
-                <button onClick={() => { setActiveTab("leads"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                <button
+                  onClick={() => {
+                    setActiveTab("leads");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "leads" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                >
                   <UserPlus size={18} className="shrink-0" />
                   {!isSidebarCollapsed && <span>Customer Leads</span>}
                 </button>
@@ -659,46 +1027,95 @@ function AdminOrders() {
 
           {/* Farm Operations */}
           <div>
-            {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Farm Operations</h3>}
+            {!isSidebarCollapsed && (
+              <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">
+                Farm Operations
+              </h3>
+            )}
             <ul className="space-y-1">
               <li>
-                <button onClick={() => { setActiveTab("financials"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                <button
+                  onClick={() => {
+                    setActiveTab("financials");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "financials" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                >
                   <TrendingUp size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>{role === "staff" ? "Record Expenses" : "Batches & Finances"}</span>}
+                  {!isSidebarCollapsed && (
+                    <span>{role === "staff" ? "Record Expenses" : "Batches & Finances"}</span>
+                  )}
                 </button>
               </li>
               <li>
-                <button onClick={() => { setActiveTab("activities"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "activities" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                <button
+                  onClick={() => {
+                    setActiveTab("activities");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "activities" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                >
                   <Activity size={18} className="shrink-0" />
                   {!isSidebarCollapsed && <span>Daily Activity</span>}
                 </button>
               </li>
               <li>
-                <button onClick={() => { setActiveTab("approvals"); setIsMobileMenuOpen(false); }} className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "approvals" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                <button
+                  onClick={() => {
+                    setActiveTab("approvals");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "approvals" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                >
                   <div className="flex items-center gap-3">
                     <ShieldCheck size={18} className="shrink-0" />
-                    {!isSidebarCollapsed && <span>{role === "owner" ? "Approvals" : "My Submissions"}</span>}
+                    {!isSidebarCollapsed && (
+                      <span>{role === "owner" ? "Approvals" : "My Submissions"}</span>
+                    )}
                   </div>
-                  {role === "owner" && pendingApprovalsCount > 0 && (
-                    !isSidebarCollapsed ? (
+                  {role === "owner" &&
+                    pendingApprovalsCount > 0 &&
+                    (!isSidebarCollapsed ? (
                       <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
                         {pendingApprovalsCount}
                       </span>
                     ) : (
                       <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
-                    )
-                  )}
+                    ))}
+                  {role !== "owner" &&
+                    myPendingOrRejectedCount > 0 &&
+                    (!isSidebarCollapsed ? (
+                      <span className="flex items-center gap-1 bg-amber-400 text-[#0F3D24] text-[10px] font-extrabold px-1.5 py-0.5 rounded-full shadow-xs">
+                        {myPendingOrRejectedCount}
+                      </span>
+                    ) : (
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#0F3D24]" />
+                    ))}
                 </button>
               </li>
               <li>
-                <button onClick={() => { setActiveTab("tasks"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "tasks" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                <button
+                  onClick={() => {
+                    setActiveTab("tasks");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "tasks" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                >
                   <CheckCircle2 size={18} className="shrink-0" />
-                  {!isSidebarCollapsed && <span>{role === "staff" ? "Staff Workspace" : "Staff Tasks"}</span>}
+                  {!isSidebarCollapsed && (
+                    <span>{role === "staff" ? "Staff Workspace" : "Staff Tasks"}</span>
+                  )}
                 </button>
               </li>
               {(role === "owner" || role === "manager") && (
                 <li>
-                  <button onClick={() => { setActiveTab("hr"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "hr" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <button
+                    onClick={() => {
+                      setActiveTab("hr");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "hr" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                  >
                     <Users size={18} className="shrink-0" />
                     {!isSidebarCollapsed && <span>HR Management</span>}
                   </button>
@@ -710,22 +1127,44 @@ function AdminOrders() {
           {/* Tools & Support */}
           {role === "owner" && (
             <div>
-              {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Tools & Support</h3>}
+              {!isSidebarCollapsed && (
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">
+                  Tools & Support
+                </h3>
+              )}
               <ul className="space-y-1">
                 <li>
-                  <button onClick={() => { setActiveTab("complaints"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "complaints" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <button
+                    onClick={() => {
+                      setActiveTab("complaints");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "complaints" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                  >
                     <ShieldAlert size={18} className="shrink-0" />
                     {!isSidebarCollapsed && <span>Complaints</span>}
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => { setActiveTab("vouchers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "vouchers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <button
+                    onClick={() => {
+                      setActiveTab("vouchers");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "vouchers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                  >
                     <TicketPercent size={18} className="shrink-0" />
                     {!isSidebarCollapsed && <span>Discount Vouchers</span>}
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => { setActiveTab("flyers"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "flyers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <button
+                    onClick={() => {
+                      setActiveTab("flyers");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "flyers" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                  >
                     <Sparkles size={18} className="shrink-0" />
                     {!isSidebarCollapsed && <span>Social Flyers</span>}
                   </button>
@@ -737,10 +1176,20 @@ function AdminOrders() {
           {/* Partnership & Investor Relations (Owner & Manager if not hidden) */}
           {(role === "owner" || (role === "manager" && !hidePartnersFromManager)) && (
             <div>
-              {!isSidebarCollapsed && <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">Partnership</h3>}
+              {!isSidebarCollapsed && (
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#3F8F3F] mb-3 ml-2">
+                  Partnership
+                </h3>
+              )}
               <ul className="space-y-1">
                 <li>
-                  <button onClick={() => { setActiveTab("partners"); setIsMobileMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "partners" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}>
+                  <button
+                    onClick={() => {
+                      setActiveTab("partners");
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "partners" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                  >
                     <Handshake size={18} className="shrink-0" />
                     {!isSidebarCollapsed && <span>For Partners</span>}
                   </button>
@@ -753,13 +1202,23 @@ function AdminOrders() {
         {/* Bottom Profile / Logout */}
         <div className="border-t border-white/10 p-3 shrink-0">
           <div className="flex flex-col gap-2">
-            <Link to="/admin/user-accounts" className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition text-white/80 hover:text-white">
+            <Link
+              to="/admin/user-accounts"
+              className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition text-white/80 hover:text-white"
+            >
               <ShieldCheck size={18} className="shrink-0" />
-              {!isSidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">Settings & Roles</span>}
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-medium whitespace-nowrap">Settings & Roles</span>
+              )}
             </Link>
-            <button onClick={signOut} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition text-white/80 hover:text-white w-full">
+            <button
+              onClick={signOut}
+              className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 transition text-white/80 hover:text-white w-full"
+            >
               <LogOut size={18} className="shrink-0" />
-              {!isSidebarCollapsed && <span className="text-sm font-medium whitespace-nowrap">Sign Out</span>}
+              {!isSidebarCollapsed && (
+                <span className="text-sm font-medium whitespace-nowrap">Sign Out</span>
+              )}
             </button>
           </div>
         </div>
@@ -770,14 +1229,16 @@ function AdminOrders() {
         {/* Top Header */}
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-4 shadow-sm backdrop-blur-md md:px-8 sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)} 
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
               className="mr-2 text-gray-500 hover:text-[#0F3D24] md:hidden"
             >
               <Menu size={24} />
             </button>
             <h2 className="text-lg font-bold text-gray-800 capitalize hidden sm:block">
-              {activeTab === "partners" ? "For Partners" : `${activeTab.replace("-", " ")} Dashboard`}
+              {activeTab === "partners"
+                ? "For Partners"
+                : `${activeTab.replace("-", " ")} Dashboard`}
             </h2>
           </div>
 
@@ -812,19 +1273,293 @@ function AdminOrders() {
                 </span>
               </button>
             )}
-            <Link to="/" className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition">
+            {role === "owner" && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowNotificationsMenu((v) => !v)}
+                  title="Pending Approvals & Staff/Manager Notifications"
+                  className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full border transition cursor-pointer ${
+                    totalOwnerNotificationsCount > 0
+                      ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
+                      : "bg-gray-100 border-transparent text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <Bell
+                    size={16}
+                    className={totalOwnerNotificationsCount > 0 ? "animate-bounce" : ""}
+                  />
+                  {totalOwnerNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-extrabold text-white shadow-xs">
+                      {totalOwnerNotificationsCount}
+                    </span>
+                  )}
+                </button>
+
+                {showNotificationsMenu && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/15 z-50 overflow-hidden">
+                    <div className="flex items-center justify-between bg-[#0F3D24] px-4 py-3 text-white">
+                      <div>
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider">
+                          Approval Notifications
+                        </h4>
+                        <p className="text-[10px] text-white/75">
+                          {totalOwnerNotificationsCount > 0
+                            ? `${pendingApprovalsSummary?.managerCount ?? 0} Manager · ${pendingApprovalsSummary?.staffCount ?? 0} Staff${partnerPendingCount > 0 ? ` · ${partnerPendingCount} Partner` : ""}`
+                            : "You are all caught up"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotificationsMenu(false)}
+                        className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                      {totalOwnerNotificationsCount === 0 ? (
+                        <div className="p-6 text-center text-xs text-gray-500">
+                          <CheckCircle2 size={22} className="mx-auto mb-1 text-emerald-600" />
+                          No pending staff or manager entries right now.
+                        </div>
+                      ) : (
+                        <>
+                          {pendingApprovalsSummary &&
+                            pendingApprovalsSummary.submitters.length > 0 && (
+                              <div className="p-3 bg-[#F7F5F0]/70 flex flex-wrap gap-1.5">
+                                {pendingApprovalsSummary.submitters.map((s) => (
+                                  <button
+                                    key={`${s.role}:${s.username}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveTab("approvals");
+                                      setShowNotificationsMenu(false);
+                                    }}
+                                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                      s.role === "manager"
+                                        ? "bg-indigo-100 text-indigo-900"
+                                        : "bg-amber-100 text-amber-900"
+                                    }`}
+                                  >
+                                    <span>{s.fullName}</span>
+                                    <span className="uppercase opacity-75">
+                                      ({s.role === "manager" ? "Mgr" : "Staff"}: {s.count})
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                          {pendingApprovalsSummary?.recentItems.map((item) => (
+                            <button
+                              key={`${item.targetType}-${item.id}`}
+                              type="button"
+                              onClick={() => {
+                                setActiveTab("approvals");
+                                setShowNotificationsMenu(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 hover:bg-amber-50/50 transition flex flex-col gap-0.5"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-[#0F3D24] truncate">
+                                  {item.title}
+                                </span>
+                                <span
+                                  className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase ${
+                                    item.submitterRole === "manager"
+                                      ? "bg-indigo-100 text-indigo-800"
+                                      : "bg-amber-100 text-amber-900"
+                                  }`}
+                                >
+                                  {item.submitterRole === "manager" ? "Manager" : "Staff"}:{" "}
+                                  {item.submitterName}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-gray-500">
+                                <span className="truncate">{item.subtitle}</span>
+                                <span className="shrink-0 ml-2">{item.date}</span>
+                              </div>
+                            </button>
+                          ))}
+
+                          {partnerPendingCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveTab("partners");
+                                setShowNotificationsMenu(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 bg-indigo-50/50 hover:bg-indigo-100/50 transition text-xs font-bold text-indigo-900"
+                            >
+                              {partnerPendingCount} manager partner record(s) awaiting approval →
+                              For Partners
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {pendingApprovalsCount > 0 && (
+                      <div className="border-t bg-gray-50 p-2.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab("approvals");
+                            setShowNotificationsMenu(false);
+                          }}
+                          className="w-full rounded-full bg-[#0F3D24] py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
+                        >
+                          Open Approvals Queue ({pendingApprovalsCount})
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {role !== "owner" && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowNotificationsMenu((v) => !v)}
+                  title="Flagged & Submission Notifications"
+                  className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full border transition cursor-pointer ${
+                    myFlaggedItems.length > 0
+                      ? "bg-orange-50 border-orange-300 text-orange-800 hover:bg-orange-100"
+                      : myFlaggedOrRejectedItems.length > 0
+                        ? "bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100"
+                        : "bg-gray-100 border-transparent text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  <Bell size={16} className={myFlaggedItems.length > 0 ? "animate-bounce" : ""} />
+                  {myFlaggedOrRejectedItems.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-extrabold text-white shadow-xs">
+                      {myFlaggedOrRejectedItems.length}
+                    </span>
+                  )}
+                </button>
+
+                {showNotificationsMenu && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/15 z-50 overflow-hidden">
+                    <div className="flex items-center justify-between bg-[#0F3D24] px-4 py-3 text-white">
+                      <div>
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider">
+                          Submission Alerts
+                        </h4>
+                        <p className="text-[10px] text-white/75">
+                          {myFlaggedItems.length > 0
+                            ? `${myFlaggedItems.length} Flagged for Correction · ${myPendingOrRejectedCount} Total Open`
+                            : myFlaggedOrRejectedItems.length > 0
+                              ? `${myFlaggedOrRejectedItems.length} Rejected entry needs review`
+                              : "No flagged or rejected entries"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotificationsMenu(false)}
+                        className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                      {myFlaggedOrRejectedItems.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-gray-500">
+                          <CheckCircle2 size={22} className="mx-auto mb-1 text-emerald-600" />
+                          No flagged or rejected submissions right now.
+                        </div>
+                      ) : (
+                        myFlaggedOrRejectedItems.map((item) => (
+                          <div
+                            key={`${item.targetType}-${item.id}`}
+                            className={`px-4 py-3 flex flex-col gap-1.5 ${
+                              item.approvalStatus === "flagged"
+                                ? "bg-orange-50/60"
+                                : "bg-rose-50/30"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-bold text-[#0F3D24] truncate">
+                                {item.title}
+                                {item.amount !== null ? ` · ₦${item.amount.toLocaleString()}` : ""}
+                              </span>
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase ${
+                                  item.approvalStatus === "flagged"
+                                    ? "bg-orange-100 text-orange-900"
+                                    : "bg-rose-100 text-rose-800"
+                                }`}
+                              >
+                                {item.approvalStatus === "flagged" ? "Flagged" : "Rejected"}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-600 truncate">
+                              {item.subtitle} · {item.date}
+                            </div>
+                            {item.rejectionReason && (
+                              <div className="rounded-lg bg-white/90 px-2.5 py-1 text-[11px] font-semibold text-orange-950 ring-1 ring-orange-200/70">
+                                Owner Note: {item.rejectionReason}
+                              </div>
+                            )}
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => openQuickEditSubmission(item)}
+                                className="inline-flex items-center gap-1 rounded-full bg-orange-600 px-3 py-1 text-[10px] font-bold text-white hover:bg-orange-700 transition"
+                              >
+                                <Pencil size={10} /> Fix &amp; Resubmit
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="border-t bg-gray-50 p-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab("approvals");
+                          setShowNotificationsMenu(false);
+                        }}
+                        className="w-full rounded-full bg-[#0F3D24] py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
+                      >
+                        Open My Submissions ({myPendingOrRejectedCount})
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition"
+            >
               <Home size={14} /> <span className="hidden sm:inline">Back to Website</span>
             </Link>
-            <button onClick={() => query.refetch()} className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition shadow-sm">
-              <RefreshCw size={14} className={query.isFetching ? "animate-spin text-[#3F8F3F]" : ""} />
+            <button
+              onClick={() => query.refetch()}
+              className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition shadow-sm"
+            >
+              <RefreshCw
+                size={14}
+                className={query.isFetching ? "animate-spin text-[#3F8F3F]" : ""}
+              />
             </button>
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#3F8F3F] font-bold text-white shadow-sm">
                 {currentUsername.charAt(0).toUpperCase()}
               </div>
               <div className="hidden flex-col md:flex">
-                <span className="text-xs font-bold leading-tight text-gray-800">{currentUsername}</span>
-                <span className="text-[10px] font-medium text-gray-500">{query.data?.role || "Admin"}</span>
+                <span className="text-xs font-bold leading-tight text-gray-800">
+                  {currentUsername}
+                </span>
+                <span className="text-[10px] font-medium text-gray-500">
+                  {query.data?.role || "Admin"}
+                </span>
               </div>
             </div>
           </div>
@@ -834,7 +1569,11 @@ function AdminOrders() {
         <div className="flex-1 p-4 md:p-8">
           {(() => {
             const unprocessedOrders = (query.data?.orders || []).filter(
-              (o) => (!o.status || o.status === "received") && (o.paymentStatus === "pending" || o.paymentStatus === "submitted" || !o.paymentStatus)
+              (o) =>
+                (!o.status || o.status === "received") &&
+                (o.paymentStatus === "pending" ||
+                  o.paymentStatus === "submitted" ||
+                  !o.paymentStatus),
             );
             if (unprocessedOrders.length === 0 || role === "staff") return null;
             return (
@@ -846,28 +1585,98 @@ function AdminOrders() {
                     setActiveTab("orders");
                     setFilter("all");
                     setStatusFilter("");
-                    setApplied({ from: "", to: "", status: "", paymentStatus: "", zone: "", search: "" });
+                    setApplied({
+                      from: "",
+                      to: "",
+                      status: "",
+                      paymentStatus: "",
+                      zone: "",
+                      search: "",
+                    });
                   }}
                 />
               </div>
             );
           })()}
 
-          {role === "owner" && pendingApprovalsCount > 0 && activeTab !== "approvals" && (
+          {role === "owner" && totalOwnerNotificationsCount > 0 && activeTab !== "approvals" && (
             <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 shadow-xs">
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-amber-950">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-amber-950">
                 <ShieldAlert size={18} className="text-amber-600 shrink-0" />
                 <span>
-                  <strong>{pendingApprovalsCount}</strong> staff/manager record(s) are awaiting your approval before updating dashboard totals.
+                  <strong>{pendingApprovalsCount}</strong> pending record(s) awaiting your approval
+                  {pendingApprovalsSummary &&
+                    (pendingApprovalsSummary.managerCount > 0 ||
+                      pendingApprovalsSummary.staffCount > 0) && (
+                      <>
+                        {" "}
+                        ({pendingApprovalsSummary.managerCount} from Managers,{" "}
+                        {pendingApprovalsSummary.staffCount} from Staff)
+                      </>
+                    )}
+                  {partnerPendingCount > 0 ? ` + ${partnerPendingCount} Partner log(s)` : ""}.
+                </span>
+                {pendingApprovalsSummary?.submitters.map((s) => (
+                  <span
+                    key={`${s.role}:${s.username}`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      s.role === "manager"
+                        ? "bg-indigo-100 text-indigo-900"
+                        : "bg-amber-200/80 text-amber-950"
+                    }`}
+                  >
+                    {s.fullName} ({s.role === "manager" ? "Manager" : "Staff"} · {s.count})
+                  </span>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                {partnerPendingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("partners")}
+                    className="rounded-full bg-indigo-700 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-indigo-800 transition cursor-pointer"
+                  >
+                    Partner Queue →
+                  </button>
+                )}
+                {pendingApprovalsCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("approvals")}
+                    className="rounded-full bg-[#0F3D24] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#165232] transition cursor-pointer"
+                  >
+                    Review Approvals →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {role !== "owner" && myFlaggedItems.length > 0 && (
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-300 bg-orange-50 px-4 py-3 shadow-xs">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs font-semibold text-orange-950">
+                <Flag size={18} className="text-orange-600 shrink-0" />
+                <span>
+                  <strong>{myFlaggedItems.length}</strong> entry/entries flagged by the Farm Owner
+                  for typo or record correction.
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab("approvals")}
-                className="rounded-full bg-[#0F3D24] px-4 py-1.5 text-xs font-bold text-white hover:bg-[#165232] transition cursor-pointer"
-              >
-                Review Approvals →
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openQuickEditSubmission(myFlaggedItems[0])}
+                  className="rounded-full bg-orange-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-orange-700 transition cursor-pointer"
+                >
+                  Review &amp; Fix Entry →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("approvals")}
+                  className="rounded-full bg-white px-3.5 py-1.5 text-xs font-bold text-orange-900 ring-1 ring-orange-300 hover:bg-orange-100 transition cursor-pointer"
+                >
+                  View All Submissions ({myPendingOrRejectedCount})
+                </button>
+              </div>
             </div>
           )}
 
@@ -876,304 +1685,679 @@ function AdminOrders() {
               <p className="text-center text-[#0F3D24]/60 font-medium">Loading data…</p>
             </div>
           ) : query.data ? (
-          (() => {
-            const allOrders = query.data.orders;
-            const reasonOptions = Array.from(
-              new Set(allOrders.map((o) => (o.cancelReason ?? "").trim()).filter(Boolean)),
-            ).sort();
-            const scoped = reasonFilter
-              ? allOrders.filter((o) => (o.cancelReason ?? "").trim() === reasonFilter)
-              : allOrders;
-            return (
-              <>
-                {activeTab === "orders" ? (
-                  <>
-                    <ReportsPanel
-                      orders={scoped}
-                      batches={batchesQuery.data || []}
+            (() => {
+              const allOrders = query.data.orders;
+              const reasonOptions = Array.from(
+                new Set(allOrders.map((o) => (o.cancelReason ?? "").trim()).filter(Boolean)),
+              ).sort();
+              const scoped = reasonFilter
+                ? allOrders.filter((o) => (o.cancelReason ?? "").trim() === reasonFilter)
+                : allOrders;
+              return (
+                <>
+                  {activeTab === "orders" ? (
+                    <>
+                      <ReportsPanel
+                        orders={scoped}
+                        batches={batchesQuery.data || []}
+                        role={role}
+                        from={from}
+                        setFrom={setFrom}
+                        to={to}
+                        setTo={setTo}
+                        statusFilter={statusFilter}
+                        setStatusFilter={setStatusFilter}
+                        payFilter={payFilter}
+                        setPayFilter={setPayFilter}
+                        zoneFilter={zoneFilter}
+                        setZoneFilter={setZoneFilter}
+                        search={search}
+                        setSearch={setSearch}
+                        reasonFilter={reasonFilter}
+                        setReasonFilter={setReasonFilter}
+                        reasonOptions={reasonOptions}
+                        onApply={applyFilters}
+                        onReset={resetFilters}
+                        onQuickRange={setRange}
+                      />
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        <FilterBtn
+                          active={filter === "all"}
+                          onClick={() => setFilter("all")}
+                          count={scoped.length}
+                        >
+                          All orders
+                        </FilterBtn>
+                        <FilterBtn
+                          active={filter === "awaiting"}
+                          onClick={() => setFilter("awaiting")}
+                          count={
+                            scoped.filter(
+                              (o) =>
+                                o.paymentStatus === "submitted" ||
+                                (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved"),
+                            ).length
+                          }
+                          isAlert
+                        >
+                          Awaiting payment approval
+                        </FilterBtn>
+                        <FilterBtn
+                          active={filter === "not_completed"}
+                          onClick={() => setFilter("not_completed")}
+                          count={scoped.filter(isNotCompleted).length}
+                        >
+                          Not completed
+                        </FilterBtn>
+                        <FilterBtn
+                          active={filter === "cancelled_customer"}
+                          onClick={() => setFilter("cancelled_customer")}
+                          count={
+                            scoped.filter(
+                              (o) => o.status === "cancelled" && o.cancelledBy === "customer",
+                            ).length
+                          }
+                        >
+                          Cancelled by customer
+                        </FilterBtn>
+                        <FilterBtn
+                          active={filter === "cancelled_admin"}
+                          onClick={() => setFilter("cancelled_admin")}
+                          count={
+                            scoped.filter(
+                              (o) => o.status === "cancelled" && o.cancelledBy !== "customer",
+                            ).length
+                          }
+                        >
+                          Cancelled by farm
+                        </FilterBtn>
+                      </div>
+                      <div className="mt-4">
+                        {(() => {
+                          const all = scoped;
+                          const filtered =
+                            filter === "awaiting"
+                              ? all.filter(
+                                  (o) =>
+                                    o.paymentStatus === "submitted" ||
+                                    (Boolean(o.paymentSubmittedAt) &&
+                                      o.paymentStatus !== "approved"),
+                                )
+                              : filter === "cancelled_customer"
+                                ? all.filter(
+                                    (o) => o.status === "cancelled" && o.cancelledBy === "customer",
+                                  )
+                                : filter === "cancelled_admin"
+                                  ? all.filter(
+                                      (o) =>
+                                        o.status === "cancelled" && o.cancelledBy !== "customer",
+                                    )
+                                  : filter === "not_completed"
+                                    ? all.filter(isNotCompleted)
+                                    : all;
+                          return (
+                            <OrganizedOrdersList
+                              orders={filtered}
+                              passcode={passcode}
+                              role={role}
+                              batches={batchesQuery.data || []}
+                              onSaved={() => query.refetch()}
+                              onOpenSmsModal={(order) => setOrderSmsTarget(order)}
+                            />
+                          );
+                        })()}
+                      </div>
+                    </>
+                  ) : activeTab === "financials" ? (
+                    <BatchFinancialsPanel
+                      passcode={passcode}
                       role={role}
-                      from={from} setFrom={setFrom}
-                      to={to} setTo={setTo}
-                      statusFilter={statusFilter} setStatusFilter={setStatusFilter}
-                      payFilter={payFilter} setPayFilter={setPayFilter}
-                      zoneFilter={zoneFilter} setZoneFilter={setZoneFilter}
-                      search={search} setSearch={setSearch}
-                      reasonFilter={reasonFilter} setReasonFilter={setReasonFilter} reasonOptions={reasonOptions}
-                      onApply={applyFilters} onReset={resetFilters} onQuickRange={setRange}
+                      username={currentUsername}
+                      onNavigateToContacts={() => setActiveTab("contacts")}
+                      pendingApprovalsCount={pendingApprovalsCount}
+                      onNavigateToApprovals={() => setActiveTab("approvals")}
                     />
-                    <div className="mb-4 flex flex-wrap gap-2">
-                      <FilterBtn active={filter === "all"} onClick={() => setFilter("all")} count={scoped.length}>
-                        All orders
-                      </FilterBtn>
-                      <FilterBtn
-                        active={filter === "awaiting"}
-                        onClick={() => setFilter("awaiting")}
-                        count={scoped.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved")).length}
-                        isAlert
-                      >
-                        Awaiting payment approval
-                      </FilterBtn>
-                      <FilterBtn active={filter === "not_completed"} onClick={() => setFilter("not_completed")} count={scoped.filter(isNotCompleted).length}>
-                        Not completed
-                      </FilterBtn>
-                      <FilterBtn active={filter === "cancelled_customer"} onClick={() => setFilter("cancelled_customer")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy === "customer").length}>
-                        Cancelled by customer
-                      </FilterBtn>
-                      <FilterBtn active={filter === "cancelled_admin"} onClick={() => setFilter("cancelled_admin")} count={scoped.filter(o => o.status === "cancelled" && o.cancelledBy !== "customer").length}>
-                        Cancelled by farm
-                      </FilterBtn>
-                    </div>
-                    <div className="mt-4">
-                      {(() => {
-                        const all = scoped;
-                        const filtered =
-                          filter === "awaiting" ? all.filter((o) => o.paymentStatus === "submitted" || (Boolean(o.paymentSubmittedAt) && o.paymentStatus !== "approved"))
-                            : filter === "cancelled_customer" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy === "customer")
-                              : filter === "cancelled_admin" ? all.filter((o) => o.status === "cancelled" && o.cancelledBy !== "customer")
-                                : filter === "not_completed" ? all.filter(isNotCompleted)
-                                  : all;
-                        return (
-                          <OrganizedOrdersList
-                            orders={filtered}
-                            passcode={passcode}
-                            role={role}
-                            batches={batchesQuery.data || []}
-                            onSaved={() => query.refetch()}
-                            onOpenSmsModal={(order) => setOrderSmsTarget(order)}
-                          />
-                        );
-                      })()}
-                    </div>
-                  </>
-                ) : activeTab === "financials" ? (
-                  <BatchFinancialsPanel
-                    passcode={passcode}
-                    role={role}
-                    onNavigateToContacts={() => setActiveTab("contacts")}
-                  />
-                ) : activeTab === "activities" ? (
-                  <DailyActivitiesPanel passcode={passcode} role={role} />
-                ) : activeTab === "approvals" ? (
-                  <PendingApprovalsPanel passcode={passcode!} role={role} />
-                ) : activeTab === "clients" ? (
-                  <ClientCrmPanel passcode={passcode} />
-                ) : activeTab === "leads" ? (
-                  <LeadCrmPanel passcode={passcode} role={role} />
-                ) : activeTab === "contacts" && (role === "owner" || role === "manager") ? (
-                  <SpecialContactsPanel passcode={passcode!} role={role} batches={batchesQuery.data || []} />
-                ) : activeTab === "vouchers" ? (
-                  <VoucherPanel passcode={passcode} />
-                ) : activeTab === "december" ? (
-                  <DecemberPreorderPanel passcode={passcode} />
-                ) : activeTab === "hr" && (role === "owner" || role === "manager") ? (
-                  <HrManagementPanel passcode={passcode} role={role} />
-                ) : activeTab === "flyers" ? (
-                  <div className="space-y-6">
-                    <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
-                      <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
-                      <h3 className="text-xl font-extrabold text-[#0F3D24]">Digital Promotion & Order Flyers</h3>
-                      <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
-                        Generate branded promotional posters for Christmas specials or single order verification graphics to post on WhatsApp and social media.
-                      </p>
-                      <button
-                        onClick={() => { setSelectedFlyerOrder(null); setShowFlyerModal(true); }}
-                        className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
-                      >
-                        Open Digital Flyer Generator
-                      </button>
-                    </div>
+                  ) : activeTab === "activities" ? (
+                    <DailyActivitiesPanel
+                      passcode={passcode}
+                      role={role}
+                      username={currentUsername}
+                      pendingApprovalsCount={pendingApprovalsCount}
+                      onNavigateToApprovals={() => setActiveTab("approvals")}
+                    />
+                  ) : activeTab === "approvals" ? (
+                    <PendingApprovalsPanel
+                      passcode={passcode!}
+                      role={role}
+                      username={currentUsername}
+                    />
+                  ) : activeTab === "clients" ? (
+                    <ClientCrmPanel passcode={passcode} />
+                  ) : activeTab === "leads" ? (
+                    <LeadCrmPanel passcode={passcode} role={role} />
+                  ) : activeTab === "contacts" && (role === "owner" || role === "manager") ? (
+                    <SpecialContactsPanel
+                      passcode={passcode!}
+                      role={role}
+                      batches={batchesQuery.data || []}
+                    />
+                  ) : activeTab === "vouchers" ? (
+                    <VoucherPanel passcode={passcode} />
+                  ) : activeTab === "december" ? (
+                    <DecemberPreorderPanel passcode={passcode} />
+                  ) : activeTab === "hr" && (role === "owner" || role === "manager") ? (
+                    <HrManagementPanel passcode={passcode} role={role} />
+                  ) : activeTab === "flyers" ? (
+                    <div className="space-y-6">
+                      <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
+                        <Sparkles size={40} className="mx-auto text-[#3F8F3F]" />
+                        <h3 className="text-xl font-extrabold text-[#0F3D24]">
+                          Digital Promotion & Order Flyers
+                        </h3>
+                        <p className="text-xs text-[#0F3D24]/70 max-w-md mx-auto">
+                          Generate branded promotional posters for Christmas specials or single
+                          order verification graphics to post on WhatsApp and social media.
+                        </p>
+                        <button
+                          onClick={() => {
+                            setSelectedFlyerOrder(null);
+                            setShowFlyerModal(true);
+                          }}
+                          className="rounded-full bg-[#0F3D24] px-6 py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition"
+                        >
+                          Open Digital Flyer Generator
+                        </button>
+                      </div>
 
-                    <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10">
-                      <h4 className="text-lg font-bold text-[#0F3D24] mb-4">Verified Customer Orders</h4>
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {allOrders.filter(o => o.status !== "cancelled").slice(0, 12).map((order) => (
-                          <div key={order.id} className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5 flex flex-col justify-between gap-4">
-                            <div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-mono text-xs font-bold text-[#3F8F3F]">{order.orderCode}</span>
-                                <span className="text-[10px] font-semibold text-[#0F3D24]/60">{new Date(order.createdAt).toLocaleDateString()}</span>
+                      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10">
+                        <h4 className="text-lg font-bold text-[#0F3D24] mb-4">
+                          Verified Customer Orders
+                        </h4>
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                          {allOrders
+                            .filter((o) => o.status !== "cancelled")
+                            .slice(0, 12)
+                            .map((order) => (
+                              <div
+                                key={order.id}
+                                className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5 flex flex-col justify-between gap-4"
+                              >
+                                <div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-mono text-xs font-bold text-[#3F8F3F]">
+                                      {order.orderCode}
+                                    </span>
+                                    <span className="text-[10px] font-semibold text-[#0F3D24]/60">
+                                      {new Date(order.createdAt).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  <p className="mt-2 text-sm font-bold text-[#0F3D24]">
+                                    {order.customerName}
+                                  </p>
+                                  <p className="text-xs text-[#0F3D24]/70">
+                                    {order.items
+                                      .map((i: any) => `${i.product} × ${i.qty}`)
+                                      .join(", ")}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setSelectedFlyerOrder({
+                                      orderCode: order.orderCode,
+                                      customerName: order.customerName,
+                                      location:
+                                        order.address ||
+                                        (order.deliveryZone === "owerri"
+                                          ? "Owerri"
+                                          : "Outside Owerri"),
+                                      itemsText: order.items
+                                        .map((i: any) => `${i.product} × ${i.qty}`)
+                                        .join(", "),
+                                      totalAmount: order.total || 0,
+                                      paymentStatus: order.paymentStatus || "pending",
+                                      phone: order.phone,
+                                      orderDate: new Date(order.createdAt).toLocaleDateString(),
+                                    });
+                                    setShowFlyerModal(true);
+                                  }}
+                                  className="w-full flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#3F8F3F] hover:text-white hover:ring-transparent transition"
+                                >
+                                  <Sparkles size={14} /> Create Social Proof Flyer
+                                </button>
                               </div>
-                              <p className="mt-2 text-sm font-bold text-[#0F3D24]">{order.customerName}</p>
-                              <p className="text-xs text-[#0F3D24]/70">{order.items.map((i: any) => `${i.product} × ${i.qty}`).join(", ")}</p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                setSelectedFlyerOrder({
-                                  orderCode: order.orderCode,
-                                  customerName: order.customerName,
-                                  location: order.address || (order.deliveryZone === "owerri" ? "Owerri" : "Outside Owerri"),
-                                  itemsText: order.items.map((i: any) => `${i.product} × ${i.qty}`).join(", "),
-                                  totalAmount: order.total || 0,
-                                  paymentStatus: order.paymentStatus || "pending",
-                                  phone: order.phone,
-                                  orderDate: new Date(order.createdAt).toLocaleDateString(),
-                                });
-                                setShowFlyerModal(true);
-                              }}
-                              className="w-full flex items-center justify-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/15 hover:bg-[#3F8F3F] hover:text-white hover:ring-transparent transition"
-                            >
-                              <Sparkles size={14} /> Create Social Proof Flyer
-                            </button>
-                          </div>
-                        ))}
+                            ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : activeTab === "tasks" ? (
-                  <StaffTasksPanel passcode={passcode!} role={query.data.role} username={currentUsername} />
-                ) : activeTab === "complaints" ? (
-                  <ComplaintsDashboardPanel passcode={passcode!} />
-                ) : activeTab === "partners" && (role === "owner" || (role === "manager" && !hidePartnersFromManager)) ? (
-                  <PartnersManagementPanel passcode={passcode!} role={role} />
-                ) : null}
-              </>
-            );
-          })()
-        ) : null}
-      </div>
+                  ) : activeTab === "tasks" ? (
+                    <StaffTasksPanel
+                      passcode={passcode!}
+                      role={query.data.role}
+                      username={currentUsername}
+                    />
+                  ) : activeTab === "complaints" ? (
+                    <ComplaintsDashboardPanel passcode={passcode!} />
+                  ) : activeTab === "partners" &&
+                    (role === "owner" || (role === "manager" && !hidePartnersFromManager)) ? (
+                    <PartnersManagementPanel passcode={passcode!} role={role} />
+                  ) : null}
+                </>
+              );
+            })()
+          ) : null}
+        </div>
 
-      {showFlyerModal && (
-        <FlyerGeneratorModal
-          isOpen={showFlyerModal}
-          onClose={() => { setShowFlyerModal(false); setSelectedFlyerOrder(null); }}
-          initialOrderData={selectedFlyerOrder}
+        {showFlyerModal && (
+          <FlyerGeneratorModal
+            isOpen={showFlyerModal}
+            onClose={() => {
+              setShowFlyerModal(false);
+              setSelectedFlyerOrder(null);
+            }}
+            initialOrderData={selectedFlyerOrder}
+          />
+        )}
+
+        {/* Quick Order Modal for Owner, Manager & Staff */}
+        <AdminQuickOrderModal
+          open={showQuickOrderModal}
+          onClose={() => setShowQuickOrderModal(false)}
+          role={role}
+          username={currentUsername}
+          onOrderCreated={() => query.refetch()}
         />
-      )}
 
-      {/* Quick Order Modal for Owner, Manager & Staff */}
-      <AdminQuickOrderModal
-        open={showQuickOrderModal}
-        onClose={() => setShowQuickOrderModal(false)}
-        role={role}
-        username={currentUsername}
-        onOrderCreated={() => query.refetch()}
-      />
+        {/* Orders Tab SMS & WhatsApp Reminder Modal */}
+        {orderSmsTarget && (
+          <ReminderModal
+            isOpen={Boolean(orderSmsTarget)}
+            onClose={() => setOrderSmsTarget(null)}
+            targetType="order"
+            recipientName={orderSmsTarget.customerName}
+            recipientPhone={orderSmsTarget.phone}
+            orderCode={orderSmsTarget.orderCode}
+            totalAmount={orderSmsTarget.total}
+            amountPaid={orderSmsTarget.paymentStatus === "approved" ? orderSmsTarget.total : 0}
+            balance={orderSmsTarget.paymentStatus === "approved" ? 0 : orderSmsTarget.total}
+          />
+        )}
 
-      {/* Orders Tab SMS & WhatsApp Reminder Modal */}
-      {orderSmsTarget && (
-        <ReminderModal
-          isOpen={Boolean(orderSmsTarget)}
-          onClose={() => setOrderSmsTarget(null)}
-          targetType="order"
-          recipientName={orderSmsTarget.customerName}
-          recipientPhone={orderSmsTarget.phone}
-          orderCode={orderSmsTarget.orderCode}
-          totalAmount={orderSmsTarget.total}
-          amountPaid={orderSmsTarget.paymentStatus === "approved" ? orderSmsTarget.total : 0}
-          balance={orderSmsTarget.paymentStatus === "approved" ? 0 : orderSmsTarget.total}
-        />
-      )}
-
-      {/* Real-time Incoming Order Glowing Pop-Up Modal */}
-      {newOrderPopupAlert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl ring-4 ring-emerald-500/80">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-[#0F3D24] to-[#1a5d38] p-6 text-white text-center relative">
-              <button
-                onClick={() => setNewOrderPopupAlert(null)}
-                className="absolute top-4 right-4 text-white/70 hover:text-white"
-              >
-                <X size={20} />
-              </button>
-              <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-300 animate-pulse">
-                <Bell size={28} />
-              </div>
-              <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-emerald-300">
-                JUST IN · NEW ORDER RECEIVED
-              </span>
-              <h3 className="mt-2 text-2xl font-black tracking-tight text-white">
-                Order #{newOrderPopupAlert.orderCode}
-              </h3>
-              <p className="text-xs text-white/80">
-                Placed by <span className="font-bold text-emerald-300">{newOrderPopupAlert.customerName}</span>
-              </p>
-            </div>
-
-            {/* Body Details */}
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#F7F5F0] p-4 text-xs">
-                <div>
-                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Customer Phone</span>
-                  <p className="font-mono font-bold text-[#0F3D24] text-sm">{newOrderPopupAlert.phone}</p>
-                </div>
-                <div>
-                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">
-                    {role === "owner" ? "Total Order Amount" : "Order Quantity"}
-                  </span>
-                  <p className="font-black text-emerald-700 text-base">
-                    {role === "owner"
-                      ? `₦${newOrderPopupAlert.total.toLocaleString()}`
-                      : `${newOrderPopupAlert.items.reduce((s, i) => s + i.qty, 0)} unit(s)`}
-                  </p>
-                </div>
-                <div>
-                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Delivery Zone</span>
-                  <p className="font-semibold text-gray-800">{newOrderPopupAlert.deliveryZone || "Standard Delivery"}</p>
-                </div>
-                <div>
-                  <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">Payment Status</span>
-                  <p className="font-bold uppercase text-amber-700">{newOrderPopupAlert.paymentStatus}</p>
-                </div>
-              </div>
-
-              {/* Item list */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70 mb-2">Ordered Items ({newOrderPopupAlert.items.length})</h4>
-                <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 rounded-xl border border-gray-200 bg-gray-50/50 p-2 text-xs">
-                  {newOrderPopupAlert.items.map((it, idx) => (
-                    <div key={idx} className="flex justify-between py-1.5 font-medium">
-                      <span>{it.product} × {it.qty}</span>
-                      <span className="font-bold text-[#0F3D24]">₦{(it.unitPrice * it.qty).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    setNewOrderPopupAlert(null);
-                    setActiveTab("orders");
-                    setApplied((prev) => ({ ...prev, search: newOrderPopupAlert.orderCode }));
-                  }}
-                  className="flex-1 rounded-full bg-[#0F3D24] py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition text-center"
-                >
-                  Review Order Details
-                </button>
+        {/* Real-time Incoming Order Glowing Pop-Up Modal */}
+        {newOrderPopupAlert && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md animate-in fade-in duration-300">
+            <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl ring-4 ring-emerald-500/80">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-[#0F3D24] to-[#1a5d38] p-6 text-white text-center relative">
                 <button
                   onClick={() => setNewOrderPopupAlert(null)}
-                  className="rounded-full bg-gray-100 px-5 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition"
+                  className="absolute top-4 right-4 text-white/70 hover:text-white"
                 >
-                  Dismiss
+                  <X size={20} />
                 </button>
+                <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg ring-4 ring-emerald-300 animate-pulse">
+                  <Bell size={28} />
+                </div>
+                <span className="rounded-full bg-emerald-400/20 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-emerald-300">
+                  JUST IN · NEW ORDER RECEIVED
+                </span>
+                <h3 className="mt-2 text-2xl font-black tracking-tight text-white">
+                  Order #{newOrderPopupAlert.orderCode}
+                </h3>
+                <p className="text-xs text-white/80">
+                  Placed by{" "}
+                  <span className="font-bold text-emerald-300">
+                    {newOrderPopupAlert.customerName}
+                  </span>
+                </p>
+              </div>
+
+              {/* Body Details */}
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-3 rounded-2xl bg-[#F7F5F0] p-4 text-xs">
+                  <div>
+                    <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">
+                      Customer Phone
+                    </span>
+                    <p className="font-mono font-bold text-[#0F3D24] text-sm">
+                      {newOrderPopupAlert.phone}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">
+                      {role === "owner" ? "Total Order Amount" : "Order Quantity"}
+                    </span>
+                    <p className="font-black text-emerald-700 text-base">
+                      {role === "owner"
+                        ? `₦${newOrderPopupAlert.total.toLocaleString()}`
+                        : `${newOrderPopupAlert.items.reduce((s, i) => s + i.qty, 0)} unit(s)`}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">
+                      Delivery Zone
+                    </span>
+                    <p className="font-semibold text-gray-800">
+                      {newOrderPopupAlert.deliveryZone || "Standard Delivery"}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="font-bold uppercase tracking-wider text-gray-500 text-[10px]">
+                      Payment Status
+                    </span>
+                    <p className="font-bold uppercase text-amber-700">
+                      {newOrderPopupAlert.paymentStatus}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Item list */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70 mb-2">
+                    Ordered Items ({newOrderPopupAlert.items.length})
+                  </h4>
+                  <div className="max-h-36 overflow-y-auto divide-y divide-gray-100 rounded-xl border border-gray-200 bg-gray-50/50 p-2 text-xs">
+                    {newOrderPopupAlert.items.map((it, idx) => (
+                      <div key={idx} className="flex justify-between py-1.5 font-medium">
+                        <span>
+                          {it.product} × {it.qty}
+                        </span>
+                        <span className="font-bold text-[#0F3D24]">
+                          ₦{(it.unitPrice * it.qty).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      setNewOrderPopupAlert(null);
+                      setActiveTab("orders");
+                      setApplied((prev) => ({ ...prev, search: newOrderPopupAlert.orderCode }));
+                    }}
+                    className="flex-1 rounded-full bg-[#0F3D24] py-3 text-xs font-bold text-white shadow-md hover:bg-[#134a2c] transition text-center"
+                  >
+                    Review Order Details
+                  </button>
+                  <button
+                    onClick={() => setNewOrderPopupAlert(null)}
+                    className="rounded-full bg-gray-100 px-5 py-3 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition"
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Staff Pending Tasks Notification on load */}
-      {query.data?.role !== "owner" && currentUsername && passcode && (
-        <PendingTasksModal passcode={passcode} username={currentUsername} />
-      )}
-        </div>
+        {/* Owner Pending Approvals Arrival Notification Modal */}
+        {role === "owner" && showOwnerArrivalModal && totalOwnerNotificationsCount > 0 && (
+          <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden border border-amber-200 animate-in zoom-in-95 duration-200">
+              <div className="bg-[#0F3D24] px-6 py-4 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-400 text-[#0F3D24]">
+                    <Bell size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold">
+                      Pending Entries Awaiting Your Approval
+                    </h3>
+                    <p className="text-[11px] text-white/75">
+                      {pendingApprovalsSummary?.managerCount ?? 0} from Managers ·{" "}
+                      {pendingApprovalsSummary?.staffCount ?? 0} from Staff
+                      {partnerPendingCount > 0 ? ` · ${partnerPendingCount} Partner entries` : ""}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowOwnerArrivalModal(false)}
+                  className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                {pendingApprovalsSummary && pendingApprovalsSummary.submitters.length > 0 && (
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">
+                      Submitted By:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pendingApprovalsSummary.submitters.map((s) => (
+                        <span
+                          key={`${s.role}:${s.username}`}
+                          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                            s.role === "manager"
+                              ? "bg-indigo-100 text-indigo-900"
+                              : "bg-amber-100 text-amber-900"
+                          }`}
+                        >
+                          <span>{s.fullName}</span>
+                          <span className="rounded-full bg-white/70 px-1.5 py-0.2 text-[10px] uppercase">
+                            {s.role === "manager" ? "Manager" : "Staff"} · {s.count}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {pendingApprovalsSummary && pendingApprovalsSummary.recentItems.length > 0 && (
+                  <div className="max-h-56 overflow-y-auto divide-y divide-gray-100 rounded-2xl border border-slate-200 bg-[#F7F5F0]/50">
+                    {pendingApprovalsSummary.recentItems.slice(0, 6).map((item) => (
+                      <div
+                        key={`${item.targetType}-${item.id}`}
+                        className="p-3 flex items-start justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0">
+                          <div className="font-bold text-[#0F3D24] truncate">{item.title}</div>
+                          <div className="text-[11px] text-slate-600 truncate">{item.subtitle}</div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase ${
+                              item.submitterRole === "manager"
+                                ? "bg-indigo-100 text-indigo-800"
+                                : "bg-amber-100 text-amber-900"
+                            }`}
+                          >
+                            {item.submitterRole === "manager" ? "Manager" : "Staff"}:{" "}
+                            {item.submitterName}
+                          </span>
+                          <div className="text-[10px] text-slate-400 mt-0.5">{item.date}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {pendingApprovalsCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowOwnerArrivalModal(false);
+                        setActiveTab("approvals");
+                      }}
+                      className="flex-1 rounded-full bg-[#0F3D24] py-2.5 px-4 text-xs font-bold text-white hover:bg-[#165232] transition"
+                    >
+                      Review &amp; Approve Entries ({pendingApprovalsCount})
+                    </button>
+                  )}
+                  {partnerPendingCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowOwnerArrivalModal(false);
+                        setActiveTab("partners");
+                      }}
+                      className="rounded-full bg-indigo-700 py-2.5 px-4 text-xs font-bold text-white hover:bg-indigo-800 transition"
+                    >
+                      Partner Queue ({partnerPendingCount})
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnerArrivalModal(false)}
+                    className="rounded-full bg-gray-100 py-2.5 px-4 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition"
+                  >
+                    Later
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manager / Staff Arrival Alert: Flagged Entries Requiring Typo Fix */}
+        {showStaffArrivalModal && role !== "owner" && myFlaggedItems.length > 0 && (
+          <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+            <div className="w-full max-w-lg overflow-hidden rounded-3xl bg-white shadow-2xl border border-orange-200">
+              <div className="bg-orange-600 px-6 py-4 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Flag size={20} className="text-white" />
+                  <div>
+                    <h3 className="text-sm font-extrabold uppercase tracking-wider">
+                      Owner Action Request
+                    </h3>
+                    <p className="text-xs text-white/85">
+                      {myFlaggedItems.length} submission(s) flagged for review &amp; typo correction
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowStaffArrivalModal(false)}
+                  className="rounded-full p-1 text-white/75 hover:bg-white/15 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="max-h-60 overflow-y-auto divide-y divide-orange-100 rounded-2xl border border-orange-200 bg-orange-50/40">
+                  {myFlaggedItems.slice(0, 6).map((item) => (
+                    <div
+                      key={`${item.targetType}-${item.id}`}
+                      className="p-3 flex items-start justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold text-[#0F3D24]">
+                          {item.title}
+                          {item.amount !== null ? ` · ₦${item.amount.toLocaleString()}` : ""}
+                        </div>
+                        <div className="text-[11px] text-slate-600">
+                          {item.subtitle} · {item.date}
+                        </div>
+                        {item.rejectionReason && (
+                          <div className="mt-1 rounded-lg bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-950">
+                            Owner Note: {item.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openQuickEditSubmission(item)}
+                        className="shrink-0 inline-flex items-center gap-1 rounded-full bg-orange-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-orange-700 transition"
+                      >
+                        <Pencil size={11} /> Edit &amp; Fix
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowStaffArrivalModal(false);
+                      setActiveTab("approvals");
+                    }}
+                    className="flex-1 rounded-full bg-[#0F3D24] py-2.5 px-4 text-xs font-bold text-white hover:bg-[#165232] transition"
+                  >
+                    Open My Submissions ({myPendingOrRejectedCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaffArrivalModal(false)}
+                    className="rounded-full bg-gray-100 py-2.5 px-4 text-xs font-semibold text-gray-700 hover:bg-gray-200 transition"
+                  >
+                    Later
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {quickEditFin && passcode && (
+          <FinancialEditModal
+            passcode={passcode}
+            role={role}
+            record={quickEditFin}
+            batches={batchesQuery.data || []}
+            onClose={() => setQuickEditFin(null)}
+          />
+        )}
+
+        {quickEditAct && passcode && (
+          <ActivityEditModal
+            passcode={passcode}
+            role={role}
+            activity={quickEditAct}
+            batches={batchesQuery.data || []}
+            onClose={() => setQuickEditAct(null)}
+          />
+        )}
+
+        {quickEditDailyLog && passcode && (
+          <DailyLogModal
+            passcode={passcode}
+            role={role}
+            username={currentUsername}
+            batches={batchesQuery.data || []}
+            defaultBatchId={quickEditDailyLog.batchId}
+            initialDate={quickEditDailyLog.date}
+            onClose={() => setQuickEditDailyLog(null)}
+            onSaved={() => setQuickEditDailyLog(null)}
+          />
+        )}
+
+        {/* Staff Pending Tasks Notification on load */}
+        {query.data?.role !== "owner" && currentUsername && passcode && (
+          <PendingTasksModal passcode={passcode} username={currentUsername} />
+        )}
       </div>
+    </div>
   );
 }
 
-function AdminTab({ active, onClick, icon, children }: { active: boolean; onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
+function AdminTab({
+  active,
+  onClick,
+  icon,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-center text-xs font-semibold transition shrink-0 whitespace-nowrap snap-start ${active
-        ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
-        : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
-        }`}
+      className={`flex items-center justify-center gap-1.5 rounded-2xl px-4 py-2.5 text-center text-xs font-semibold transition shrink-0 whitespace-nowrap snap-start ${
+        active
+          ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
+          : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
+      }`}
     >
       <span className="shrink-0">{icon}</span>
       <span className="truncate">{children}</span>
@@ -1198,12 +2382,20 @@ function ClientCrmPanel({ passcode }: { passcode: string }) {
     <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-[#3F8F3F]"><Users size={18} /><span className="text-xs font-semibold uppercase tracking-widest">Client CRM</span></div>
+          <div className="flex items-center gap-2 text-[#3F8F3F]">
+            <Users size={18} />
+            <span className="text-xs font-semibold uppercase tracking-widest">Client CRM</span>
+          </div>
           <h2 className="mt-2 text-2xl font-semibold text-[#0F3D24]">Clients and order history</h2>
-          <p className="mt-1 max-w-2xl text-sm text-[#0F3D24]/65">Review repeat customers, approved payments, order value, and the latest delivery status in one place.</p>
+          <p className="mt-1 max-w-2xl text-sm text-[#0F3D24]/65">
+            Review repeat customers, approved payments, order value, and the latest delivery status
+            in one place.
+          </p>
         </div>
         <div className="rounded-2xl bg-[#F7F5F0] px-4 py-3 text-right ring-1 ring-[#0F3D24]/5">
-          <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Clients found</div>
+          <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">
+            Clients found
+          </div>
           <div className="mt-1 text-xl font-semibold text-[#0F3D24]">{clients.length}</div>
         </div>
       </div>
@@ -1222,15 +2414,24 @@ function ClientCrmPanel({ passcode }: { passcode: string }) {
           placeholder="Search client name, phone or address"
           className="min-w-0 flex-1 rounded-xl border border-[#0F3D24]/15 px-4 py-3 text-sm outline-none focus:border-[#3F8F3F]"
         />
-        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]"><Search size={15} /> Search clients</button>
+        <button
+          type="submit"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[#0F3D24] px-5 py-3 text-sm font-semibold text-white hover:bg-[#134a2c]"
+        >
+          <Search size={15} /> Search clients
+        </button>
       </form>
 
       {query.isLoading ? (
         <p className="py-10 text-center text-sm text-[#0F3D24]/60">Loading client records...</p>
       ) : query.error ? (
-        <p className="py-10 text-center text-sm text-red-600">{query.error instanceof Error ? query.error.message : "Could not load client records."}</p>
+        <p className="py-10 text-center text-sm text-red-600">
+          {query.error instanceof Error ? query.error.message : "Could not load client records."}
+        </p>
       ) : clients.length === 0 ? (
-        <p className="py-10 text-center text-sm text-[#0F3D24]/60">No client records match this search.</p>
+        <p className="py-10 text-center text-sm text-[#0F3D24]/60">
+          No client records match this search.
+        </p>
       ) : (
         <div className="mt-6 overflow-x-auto rounded-2xl ring-1 ring-[#0F3D24]/10">
           <table className="w-full min-w-[820px] border-collapse text-left text-sm">
@@ -1257,14 +2458,36 @@ function ClientCrmPanel({ passcode }: { passcode: string }) {
                         aria-expanded={expanded}
                       >
                         <span className="px-4 py-4">
-                          <span className="block font-semibold text-[#0F3D24]">{client.customerName}</span>
-                          <span className="mt-1 block text-xs text-[#0F3D24]/60">{client.phone}</span>
+                          <span className="block font-semibold text-[#0F3D24]">
+                            {client.customerName}
+                          </span>
+                          <span className="mt-1 block text-xs text-[#0F3D24]/60">
+                            {client.phone}
+                          </span>
                         </span>
-                        <span className="px-4 py-4 text-[#0F3D24]">{client.totalOrders}<span className="block text-[10px] text-[#0F3D24]/55">{client.approvedOrders} paid</span></span>
-                        <span className="px-4 py-4 font-semibold text-[#0F3D24]">{naira(client.amountPaid)}</span>
-                        <span className="px-4 py-4 text-[#0F3D24]">{naira(client.amountOrdered)}</span>
-                        <span className="px-4 py-4 text-xs text-[#0F3D24]/70"><span className="font-mono font-semibold text-[#3F8F3F]">{client.lastOrderCode}</span><span className="mt-1 block">{new Date(client.lastOrderAt).toLocaleDateString()}</span></span>
-                        <span className="px-4 py-4 text-xs font-semibold text-[#0F3D24]">{STATUS_LABEL[client.lastStatus]}</span>
+                        <span className="px-4 py-4 text-[#0F3D24]">
+                          {client.totalOrders}
+                          <span className="block text-[10px] text-[#0F3D24]/55">
+                            {client.approvedOrders} paid
+                          </span>
+                        </span>
+                        <span className="px-4 py-4 font-semibold text-[#0F3D24]">
+                          {naira(client.amountPaid)}
+                        </span>
+                        <span className="px-4 py-4 text-[#0F3D24]">
+                          {naira(client.amountOrdered)}
+                        </span>
+                        <span className="px-4 py-4 text-xs text-[#0F3D24]/70">
+                          <span className="font-mono font-semibold text-[#3F8F3F]">
+                            {client.lastOrderCode}
+                          </span>
+                          <span className="mt-1 block">
+                            {new Date(client.lastOrderAt).toLocaleDateString()}
+                          </span>
+                        </span>
+                        <span className="px-4 py-4 text-xs font-semibold text-[#0F3D24]">
+                          {STATUS_LABEL[client.lastStatus]}
+                        </span>
                       </button>
                       {expanded && <ClientDetails client={client} passcode={passcode} />}
                     </td>
@@ -1286,8 +2509,20 @@ function ClientDetails({ client, passcode }: { client: ClientRecord; passcode: s
     <div className="border-t border-[#0F3D24]/10 bg-[#F7F5F0]/65 px-4 py-5 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
         <div className="grid gap-3 sm:grid-cols-3 flex-1">
-          <div><div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Phone</div><a href={`tel:${client.phone}`} className="mt-1 block font-semibold text-[#3F8F3F]">{client.phone}</a></div>
-          <div className="sm:col-span-2"><div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">Latest address</div><div className="mt-1 font-semibold text-[#0F3D24]">{client.address}</div></div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">
+              Phone
+            </div>
+            <a href={`tel:${client.phone}`} className="mt-1 block font-semibold text-[#3F8F3F]">
+              {client.phone}
+            </a>
+          </div>
+          <div className="sm:col-span-2">
+            <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/55">
+              Latest address
+            </div>
+            <div className="mt-1 font-semibold text-[#0F3D24]">{client.address}</div>
+          </div>
         </div>
         <button
           type="button"
@@ -1300,16 +2535,35 @@ function ClientDetails({ client, passcode }: { client: ClientRecord; passcode: s
 
       <div className="overflow-x-auto rounded-xl bg-white ring-1 ring-[#0F3D24]/10">
         <table className="w-full min-w-[700px] text-left text-xs">
-          <thead className="border-b border-[#0F3D24]/10 text-[10px] uppercase tracking-widest text-[#0F3D24]/55"><tr><th className="px-3 py-2">Order</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Total</th><th className="px-3 py-2">Discount</th><th className="px-3 py-2">Payment</th><th className="px-3 py-2">Status</th></tr></thead>
+          <thead className="border-b border-[#0F3D24]/10 text-[10px] uppercase tracking-widest text-[#0F3D24]/55">
+            <tr>
+              <th className="px-3 py-2">Order</th>
+              <th className="px-3 py-2">Date</th>
+              <th className="px-3 py-2">Total</th>
+              <th className="px-3 py-2">Discount</th>
+              <th className="px-3 py-2">Payment</th>
+              <th className="px-3 py-2">Status</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-[#0F3D24]/10">
             {client.orders.map((order) => (
               <tr key={order.orderCode}>
-                <td className="px-3 py-3 font-mono font-semibold text-[#3F8F3F]">{order.orderCode}</td>
-                <td className="px-3 py-3 text-[#0F3D24]/70">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="px-3 py-3 font-mono font-semibold text-[#3F8F3F]">
+                  {order.orderCode}
+                </td>
+                <td className="px-3 py-3 text-[#0F3D24]/70">
+                  {new Date(order.createdAt).toLocaleDateString()}
+                </td>
                 <td className="px-3 py-3 font-semibold text-[#0F3D24]">{naira(order.total)}</td>
-                <td className="px-3 py-3 text-[#0F3D24]/70">{order.discountAmount ? `${naira(order.discountAmount)}${order.voucherCode ? ` · ${order.voucherCode}` : ""}` : "None"}</td>
+                <td className="px-3 py-3 text-[#0F3D24]/70">
+                  {order.discountAmount
+                    ? `${naira(order.discountAmount)}${order.voucherCode ? ` · ${order.voucherCode}` : ""}`
+                    : "None"}
+                </td>
                 <td className="px-3 py-3 capitalize text-[#0F3D24]/70">{order.paymentStatus}</td>
-                <td className="px-3 py-3 font-semibold text-[#0F3D24]">{STATUS_LABEL[order.status]}</td>
+                <td className="px-3 py-3 font-semibold text-[#0F3D24]">
+                  {STATUS_LABEL[order.status]}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1346,15 +2600,15 @@ function ClientFollowUpModal({
     const totalBal = client.amountOrdered - client.amountPaid;
     if (templateKey === "balance_reminder") {
       setMessageText(
-        `Hi ${first}, friendly update from Dignity Agro Farms regarding your order/reservation (${client.lastOrderCode}).\nTotal Amount: ₦${client.amountOrdered.toLocaleString()}\nAmount Paid: ₦${client.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${totalBal.toLocaleString()}\n\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for choosing Dignity Agro Farms!`
+        `Hi ${first}, friendly update from Dignity Agro Farms regarding your order/reservation (${client.lastOrderCode}).\nTotal Amount: ₦${client.amountOrdered.toLocaleString()}\nAmount Paid: ₦${client.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${totalBal.toLocaleString()}\n\nOrder Policy: https://dignityagrofarms.com/order-policy\n\nThank you for choosing Dignity Agro Farms!`,
       );
     } else if (templateKey === "delivery_check") {
       setMessageText(
-        `Hi ${first}, update regarding your order (${client.lastOrderCode}) with Dignity Agro Farms: we are preparing your farm-fresh produce! Please let us know if you have specific delivery time preferences.`
+        `Hi ${first}, update regarding your order (${client.lastOrderCode}) with Dignity Agro Farms: we are preparing your farm-fresh produce! Please let us know if you have specific delivery time preferences.`,
       );
     } else if (templateKey === "holiday_promo") {
       setMessageText(
-        `Hi ${first}, Christmas & Holiday poultry pre-orders are currently active at Dignity Agro Farms! Reserve farm-fresh broilers and eggs early: https://dignityagrofarms.com/december-preorder`
+        `Hi ${first}, Christmas & Holiday poultry pre-orders are currently active at Dignity Agro Farms! Reserve farm-fresh broilers and eggs early: https://dignityagrofarms.com/december-preorder`,
       );
     }
   }, [templateKey, client]);
@@ -1376,7 +2630,11 @@ function ClientFollowUpModal({
 
       const cleanP = client.phone.replace(/\D+/g, "");
       const waPhone = cleanP.startsWith("0") ? "234" + cleanP.slice(1) : cleanP;
-      window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(messageText)}`, "_blank", "noopener,noreferrer");
+      window.open(
+        `https://wa.me/${waPhone}?text=${encodeURIComponent(messageText)}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
       onClose();
     } catch (err: any) {
       alert("Error logging communication: " + (err?.message || String(err)));
@@ -1394,7 +2652,10 @@ function ClientFollowUpModal({
             <MessageCircle size={18} className="text-[#25D366]" />
             <h3 className="font-bold text-sm">Send WhatsApp Follow-Up</h3>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white">
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-white/70 hover:bg-white/10 hover:text-white"
+          >
             <X size={18} />
           </button>
         </div>
@@ -1406,7 +2667,9 @@ function ClientFollowUpModal({
           </div>
 
           <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Select Follow-Up Message Template</label>
+            <label className="block font-bold text-[#0F3D24] mb-1">
+              Select Follow-Up Message Template
+            </label>
             <select
               value={templateKey}
               onChange={(e) => setTemplateKey(e.target.value)}
@@ -1420,7 +2683,9 @@ function ClientFollowUpModal({
           </div>
 
           <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Message Content (Editable)</label>
+            <label className="block font-bold text-[#0F3D24] mb-1">
+              Message Content (Editable)
+            </label>
             <textarea
               rows={5}
               value={messageText}
@@ -1431,7 +2696,12 @@ function ClientFollowUpModal({
         </div>
 
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
-          <button onClick={onClose} className="rounded-full bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-700">Cancel</button>
+          <button
+            onClick={onClose}
+            className="rounded-full bg-slate-200 px-4 py-2 text-xs font-semibold text-slate-700"
+          >
+            Cancel
+          </button>
           <button
             onClick={handleSendAndLog}
             disabled={sending || !messageText.trim()}
@@ -1447,7 +2717,17 @@ function ClientFollowUpModal({
 }
 
 function VoucherPanel({ passcode }: { passcode: string }) {
-  const [form, setForm] = useState({ code: "", displayName: "", discountType: "percent" as AdminVoucher["discountType"], discountValue: "", recipientName: "", recipientPhone: "", note: "", expiresAt: "", maxUses: "" });
+  const [form, setForm] = useState({
+    code: "",
+    displayName: "",
+    discountType: "percent" as AdminVoucher["discountType"],
+    discountValue: "",
+    recipientName: "",
+    recipientPhone: "",
+    note: "",
+    expiresAt: "",
+    maxUses: "",
+  });
   const [editingVoucher, setEditingVoucher] = useState<AdminVoucher | null>(null);
   const [expandedVoucher, setExpandedVoucher] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -1466,44 +2746,56 @@ function VoucherPanel({ passcode }: { passcode: string }) {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => createFn({
-      data: {
-        passcode,
-        code: form.code.trim() || null,
-        displayName: form.displayName.trim() || null,
-        discountType: form.discountType,
-        discountValue: Number(form.discountValue),
-        recipientName: form.recipientName.trim() || null,
-        recipientPhone: form.recipientPhone.trim() || null,
-        note: form.note.trim() || null,
-        expiresAt: form.expiresAt || null,
-        maxUses: form.maxUses ? Number(form.maxUses) : null,
-      },
-    }),
+    mutationFn: () =>
+      createFn({
+        data: {
+          passcode,
+          code: form.code.trim() || null,
+          displayName: form.displayName.trim() || null,
+          discountType: form.discountType,
+          discountValue: Number(form.discountValue),
+          recipientName: form.recipientName.trim() || null,
+          recipientPhone: form.recipientPhone.trim() || null,
+          note: form.note.trim() || null,
+          expiresAt: form.expiresAt || null,
+          maxUses: form.maxUses ? Number(form.maxUses) : null,
+        },
+      }),
     onSuccess: (result) => {
       setMessage(`Voucher ${result.voucher.code} created.`);
-      setForm({ code: "", displayName: "", discountType: "percent", discountValue: "", recipientName: "", recipientPhone: "", note: "", expiresAt: "", maxUses: "" });
+      setForm({
+        code: "",
+        displayName: "",
+        discountType: "percent",
+        discountValue: "",
+        recipientName: "",
+        recipientPhone: "",
+        note: "",
+        expiresAt: "",
+        maxUses: "",
+      });
       void queryClient.invalidateQueries({ queryKey: ["admin-vouchers", passcode] });
     },
     onError: (error: Error) => setMessage(error.message),
   });
 
   const updateMutation = useMutation({
-    mutationFn: (v: AdminVoucher) => updateFn({
-      data: {
-        passcode,
-        id: v.id,
-        displayName: v.displayName || null,
-        discountType: v.discountType,
-        discountValue: v.discountValue,
-        recipientName: v.recipientName || null,
-        recipientPhone: v.recipientPhone || null,
-        note: v.note || null,
-        expiresAt: v.expiresAt || null,
-        maxUses: v.maxUses || null,
-        active: v.active,
-      },
-    }),
+    mutationFn: (v: AdminVoucher) =>
+      updateFn({
+        data: {
+          passcode,
+          id: v.id,
+          displayName: v.displayName || null,
+          discountType: v.discountType,
+          discountValue: v.discountValue,
+          recipientName: v.recipientName || null,
+          recipientPhone: v.recipientPhone || null,
+          note: v.note || null,
+          expiresAt: v.expiresAt || null,
+          maxUses: v.maxUses || null,
+          active: v.active,
+        },
+      }),
     onSuccess: (result) => {
       setMessage(`Voucher ${result.voucher.code} updated.`);
       setEditingVoucher(null);
@@ -1522,14 +2814,19 @@ function VoucherPanel({ passcode }: { passcode: string }) {
   });
 
   const toggleMutation = useMutation({
-    mutationFn: (voucher: AdminVoucher) => toggleFn({ data: { passcode, id: voucher.id, active: !voucher.active } }),
+    mutationFn: (voucher: AdminVoucher) =>
+      toggleFn({ data: { passcode, id: voucher.id, active: !voucher.active } }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["admin-vouchers", passcode] }),
     onError: (error: Error) => setMessage(error.message),
   });
 
   const vouchers = query.data?.vouchers ?? [];
-  const inputClass = "mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3F8F3F]";
-  const canCreate = Number(form.discountValue) > 0 && (form.discountType !== "percent" || Number(form.discountValue) <= 100) && !createMutation.isPending;
+  const inputClass =
+    "mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2.5 text-sm outline-none focus:border-[#3F8F3F]";
+  const canCreate =
+    Number(form.discountValue) > 0 &&
+    (form.discountType !== "percent" || Number(form.discountValue) <= 100) &&
+    !createMutation.isPending;
 
   return (
     <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8">
@@ -1538,27 +2835,123 @@ function VoucherPanel({ passcode }: { passcode: string }) {
           <TicketPercent size={20} />
         </div>
         <div>
-          <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">Discount vouchers</div>
+          <div className="text-xs font-semibold uppercase tracking-widest text-[#3F8F3F]">
+            Discount vouchers
+          </div>
           <h2 className="mt-1 text-2xl font-semibold text-[#0F3D24]">Create and manage offers</h2>
-          <p className="mt-1 text-sm text-[#0F3D24]/65">Generate a code for a customer, set its limits, edit existing ones, or delete outdated vouchers.</p>
+          <p className="mt-1 text-sm text-[#0F3D24]/65">
+            Generate a code for a customer, set its limits, edit existing ones, or delete outdated
+            vouchers.
+          </p>
         </div>
       </div>
 
       <div className="mt-6 rounded-2xl bg-[#F7F5F0] p-5 ring-1 ring-[#0F3D24]/10">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Voucher name (optional)<input value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} placeholder="e.g. New customer offer" className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Code (optional)<input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} placeholder="Auto generate if blank" className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Discount type<select value={form.discountType} onChange={(event) => setForm({ ...form, discountType: event.target.value as AdminVoucher["discountType"] })} className={inputClass}><option value="percent">Percentage</option><option value="fixed">Fixed amount</option></select></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Value<NumberField required allowDecimal min={1} max={form.discountType === "percent" ? 100 : undefined} value={form.discountValue} onValueChange={(_, raw) => setForm({ ...form, discountValue: raw })} placeholder={form.discountType === "percent" ? "e.g. 10" : "e.g. 1000"} className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Expires on<input type="date" value={form.expiresAt} onChange={(event) => setForm({ ...form, expiresAt: event.target.value })} className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Recipient name<input value={form.recipientName} onChange={(event) => setForm({ ...form, recipientName: event.target.value })} placeholder="Optional" className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Recipient phone<input type="tel" value={form.recipientPhone} onChange={(event) => setForm({ ...form, recipientPhone: event.target.value })} placeholder="Optional" className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Maximum uses<NumberField min={1} value={form.maxUses} onValueChange={(_, raw) => setForm({ ...form, maxUses: raw })} placeholder="Unlimited" className={inputClass} /></label>
-          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Internal note<input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Optional" className={inputClass} /></label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Voucher name (optional)
+            <input
+              value={form.displayName}
+              onChange={(event) => setForm({ ...form, displayName: event.target.value })}
+              placeholder="e.g. New customer offer"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Code (optional)
+            <input
+              value={form.code}
+              onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })}
+              placeholder="Auto generate if blank"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Discount type
+            <select
+              value={form.discountType}
+              onChange={(event) =>
+                setForm({
+                  ...form,
+                  discountType: event.target.value as AdminVoucher["discountType"],
+                })
+              }
+              className={inputClass}
+            >
+              <option value="percent">Percentage</option>
+              <option value="fixed">Fixed amount</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Value
+            <NumberField
+              required
+              allowDecimal
+              min={1}
+              max={form.discountType === "percent" ? 100 : undefined}
+              value={form.discountValue}
+              onValueChange={(_, raw) => setForm({ ...form, discountValue: raw })}
+              placeholder={form.discountType === "percent" ? "e.g. 10" : "e.g. 1000"}
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Expires on
+            <input
+              type="date"
+              value={form.expiresAt}
+              onChange={(event) => setForm({ ...form, expiresAt: event.target.value })}
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Recipient name
+            <input
+              value={form.recipientName}
+              onChange={(event) => setForm({ ...form, recipientName: event.target.value })}
+              placeholder="Optional"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Recipient phone
+            <input
+              type="tel"
+              value={form.recipientPhone}
+              onChange={(event) => setForm({ ...form, recipientPhone: event.target.value })}
+              placeholder="Optional"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Maximum uses
+            <NumberField
+              min={1}
+              value={form.maxUses}
+              onValueChange={(_, raw) => setForm({ ...form, maxUses: raw })}
+              placeholder="Unlimited"
+              className={inputClass}
+            />
+          </label>
+          <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+            Internal note
+            <input
+              value={form.note}
+              onChange={(event) => setForm({ ...form, note: event.target.value })}
+              placeholder="Optional"
+              className={inputClass}
+            />
+          </label>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={!canCreate} onClick={() => createMutation.mutate()} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50">
-            <TicketPercent size={15} /> {createMutation.isPending ? "Creating..." : "Create voucher"}
+          <button
+            type="button"
+            disabled={!canCreate}
+            onClick={() => createMutation.mutate()}
+            className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50"
+          >
+            <TicketPercent size={15} />{" "}
+            {createMutation.isPending ? "Creating..." : "Create voucher"}
           </button>
           {message && <span className="text-sm font-semibold text-[#0F3D24]/75">{message}</span>}
         </div>
@@ -1567,7 +2960,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
       {query.isLoading ? (
         <p className="py-10 text-center text-sm text-[#0F3D24]/60">Loading vouchers...</p>
       ) : query.error ? (
-        <p className="py-10 text-center text-sm text-red-600">{query.error instanceof Error ? query.error.message : "Could not load vouchers."}</p>
+        <p className="py-10 text-center text-sm text-red-600">
+          {query.error instanceof Error ? query.error.message : "Could not load vouchers."}
+        </p>
       ) : vouchers.length === 0 ? (
         <p className="py-10 text-center text-sm text-[#0F3D24]/60">No vouchers created yet.</p>
       ) : (
@@ -1587,120 +2982,172 @@ function VoucherPanel({ passcode }: { passcode: string }) {
             <tbody className="divide-y divide-[#0F3D24]/10">
               {vouchers.map((voucher) => (
                 <React.Fragment key={voucher.id}>
-                <tr>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-2 font-mono font-semibold text-[#3F8F3F]">
-                      {voucher.code}
-                      <button type="button" title="Copy voucher code" aria-label={`Copy ${voucher.code}`} onClick={() => void navigator.clipboard.writeText(voucher.code)} className="text-[#0F3D24]/50 hover:text-[#3F8F3F]">
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                    {voucher.displayName && <div className="text-xs font-semibold text-[#0F3D24]">{voucher.displayName}</div>}
-                    {voucher.note && <div className="mt-1 text-xs text-[#0F3D24]/55">{voucher.note}</div>}
-                  </td>
-                  <td className="px-4 py-4 font-semibold text-[#0F3D24]">
-                    {voucher.discountType === "percent" ? `${voucher.discountValue}% off` : `${naira(voucher.discountValue)} off`}
-                  </td>
-                  <td className="px-4 py-4 text-[#0F3D24]/70">
-                    {voucher.recipientName || "Any customer"}
-                    {voucher.recipientPhone && <span className="block text-xs">{voucher.recipientPhone}</span>}
-                  </td>
-                  <td className="px-4 py-4 text-[#0F3D24]/70">
-                    <div className="flex items-center gap-2">
-                      <span>{voucher.usesCount}{voucher.maxUses ? ` / ${voucher.maxUses}` : " / unlimited"}</span>
-                      {voucher.usedByOrders && voucher.usedByOrders.length > 0 && (
+                  <tr>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-2 font-mono font-semibold text-[#3F8F3F]">
+                        {voucher.code}
                         <button
-                          onClick={() => setExpandedVoucher(expandedVoucher === voucher.id ? null : voucher.id)}
-                          className="p-1 rounded-full text-[#3F8F3F] hover:bg-[#3F8F3F]/10 transition"
-                          title="View orders"
+                          type="button"
+                          title="Copy voucher code"
+                          aria-label={`Copy ${voucher.code}`}
+                          onClick={() => void navigator.clipboard.writeText(voucher.code)}
+                          className="text-[#0F3D24]/50 hover:text-[#3F8F3F]"
                         >
-                          {expandedVoucher === voucher.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          <Copy size={14} />
                         </button>
+                      </div>
+                      {voucher.displayName && (
+                        <div className="text-xs font-semibold text-[#0F3D24]">
+                          {voucher.displayName}
+                        </div>
                       )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-4 text-[#0F3D24]/70">
-                    {voucher.expiresAt ? new Date(voucher.expiresAt).toLocaleDateString() : "No expiry"}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${voucher.active ? "bg-[#3F8F3F]/10 text-[#0F3D24]" : "bg-[#F7F5F0] text-[#0F3D24]/55"}`}>
-                      {voucher.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        disabled={toggleMutation.isPending}
-                        onClick={() => toggleMutation.mutate(voucher)}
-                        className="rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
+                      {voucher.note && (
+                        <div className="mt-1 text-xs text-[#0F3D24]/55">{voucher.note}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 font-semibold text-[#0F3D24]">
+                      {voucher.discountType === "percent"
+                        ? `${voucher.discountValue}% off`
+                        : `${naira(voucher.discountValue)} off`}
+                    </td>
+                    <td className="px-4 py-4 text-[#0F3D24]/70">
+                      {voucher.recipientName || "Any customer"}
+                      {voucher.recipientPhone && (
+                        <span className="block text-xs">{voucher.recipientPhone}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-[#0F3D24]/70">
+                      <div className="flex items-center gap-2">
+                        <span>
+                          {voucher.usesCount}
+                          {voucher.maxUses ? ` / ${voucher.maxUses}` : " / unlimited"}
+                        </span>
+                        {voucher.usedByOrders && voucher.usedByOrders.length > 0 && (
+                          <button
+                            onClick={() =>
+                              setExpandedVoucher(expandedVoucher === voucher.id ? null : voucher.id)
+                            }
+                            className="p-1 rounded-full text-[#3F8F3F] hover:bg-[#3F8F3F]/10 transition"
+                            title="View orders"
+                          >
+                            {expandedVoucher === voucher.id ? (
+                              <ChevronUp size={14} />
+                            ) : (
+                              <ChevronDown size={14} />
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-[#0F3D24]/70">
+                      {voucher.expiresAt
+                        ? new Date(voucher.expiresAt).toLocaleDateString()
+                        : "No expiry"}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${voucher.active ? "bg-[#3F8F3F]/10 text-[#0F3D24]" : "bg-[#F7F5F0] text-[#0F3D24]/55"}`}
                       >
-                        {voucher.active ? "Deactivate" : "Activate"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingVoucher(voucher)}
-                        className="p-1.5 rounded-full text-[#3F8F3F] hover:bg-[#3F8F3F]/10 transition"
-                        title="Edit voucher"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm(`Delete voucher ${voucher.code}?`)) deleteMutation.mutate(voucher.id);
-                        }}
-                        className="p-1.5 rounded-full text-rose-600 hover:bg-rose-50 transition"
-                        title="Delete voucher"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                {expandedVoucher === voucher.id && voucher.usedByOrders && voucher.usedByOrders.length > 0 && (
-                  <tr key={`${voucher.id}-orders`} className="bg-[#F7F5F0]/50 border-t border-[#0F3D24]/5">
-                    <td colSpan={7} className="px-8 py-4">
-                      <div className="rounded-xl border border-[#0F3D24]/10 bg-white overflow-hidden shadow-sm">
-                        <table className="w-full text-left text-xs">
-                          <thead className="bg-[#0F3D24]/5 text-[#0F3D24]/60 uppercase tracking-widest font-semibold">
-                            <tr>
-                              <th className="px-4 py-2">Order Code</th>
-                              <th className="px-4 py-2">Customer</th>
-                              <th className="px-4 py-2">Date</th>
-                              <th className="px-4 py-2">Status</th>
-                              <th className="px-4 py-2 text-right">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#0F3D24]/5">
-                            {voucher.usedByOrders.map((order) => (
-                              <tr key={order.orderCode} className="hover:bg-[#F7F5F0]/50 transition">
-                                <td className="px-4 py-2.5 font-mono font-bold text-[#3F8F3F]">{order.orderCode}</td>
-                                <td className="px-4 py-2.5 font-semibold text-[#0F3D24]">{order.customerName}</td>
-                                <td className="px-4 py-2.5 text-[#0F3D24]/70">{new Date(order.createdAt).toLocaleDateString()}</td>
-                                <td className="px-4 py-2.5">
-                                  <span className={`px-2 py-0.5 rounded-full font-bold ${
-                                    order.status === 'received' ? 'bg-amber-100 text-amber-800' :
-                                    order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                                    order.status === 'dispatched' ? 'bg-purple-100 text-purple-800' :
-                                    order.status === 'delivered' ? 'bg-[#3F8F3F]/10 text-[#0F3D24]' :
-                                    'bg-rose-100 text-rose-800'
-                                  }`}>
-                                    {order.status}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-bold text-[#0F3D24]">{naira(order.total)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        {voucher.active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          disabled={toggleMutation.isPending}
+                          onClick={() => toggleMutation.mutate(voucher)}
+                          className="rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
+                        >
+                          {voucher.active ? "Deactivate" : "Activate"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingVoucher(voucher)}
+                          className="p-1.5 rounded-full text-[#3F8F3F] hover:bg-[#3F8F3F]/10 transition"
+                          title="Edit voucher"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`Delete voucher ${voucher.code}?`))
+                              deleteMutation.mutate(voucher.id);
+                          }}
+                          className="p-1.5 rounded-full text-rose-600 hover:bg-rose-50 transition"
+                          title="Delete voucher"
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
+                  {expandedVoucher === voucher.id &&
+                    voucher.usedByOrders &&
+                    voucher.usedByOrders.length > 0 && (
+                      <tr
+                        key={`${voucher.id}-orders`}
+                        className="bg-[#F7F5F0]/50 border-t border-[#0F3D24]/5"
+                      >
+                        <td colSpan={7} className="px-8 py-4">
+                          <div className="rounded-xl border border-[#0F3D24]/10 bg-white overflow-hidden shadow-sm">
+                            <table className="w-full text-left text-xs">
+                              <thead className="bg-[#0F3D24]/5 text-[#0F3D24]/60 uppercase tracking-widest font-semibold">
+                                <tr>
+                                  <th className="px-4 py-2">Order Code</th>
+                                  <th className="px-4 py-2">Customer</th>
+                                  <th className="px-4 py-2">Date</th>
+                                  <th className="px-4 py-2">Status</th>
+                                  <th className="px-4 py-2 text-right">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#0F3D24]/5">
+                                {voucher.usedByOrders.map((order) => (
+                                  <tr
+                                    key={order.orderCode}
+                                    className="hover:bg-[#F7F5F0]/50 transition"
+                                  >
+                                    <td className="px-4 py-2.5 font-mono font-bold text-[#3F8F3F]">
+                                      {order.orderCode}
+                                    </td>
+                                    <td className="px-4 py-2.5 font-semibold text-[#0F3D24]">
+                                      {order.customerName}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-[#0F3D24]/70">
+                                      {new Date(order.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-4 py-2.5">
+                                      <span
+                                        className={`px-2 py-0.5 rounded-full font-bold ${
+                                          order.status === "received"
+                                            ? "bg-amber-100 text-amber-800"
+                                            : order.status === "processing"
+                                              ? "bg-blue-100 text-blue-800"
+                                              : order.status === "dispatched"
+                                                ? "bg-purple-100 text-purple-800"
+                                                : order.status === "delivered"
+                                                  ? "bg-[#3F8F3F]/10 text-[#0F3D24]"
+                                                  : "bg-rose-100 text-rose-800"
+                                        }`}
+                                      >
+                                        {order.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-bold text-[#0F3D24]">
+                                      {naira(order.total)}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                </React.Fragment>
+              ))}
+            </tbody>
           </table>
         </div>
       )}
@@ -1710,8 +3157,13 @@ function VoucherPanel({ passcode }: { passcode: string }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-lg font-bold text-[#0F3D24]">Edit Voucher: {editingVoucher.code}</h3>
-              <button onClick={() => setEditingVoucher(null)} className="text-gray-400 hover:text-gray-600">
+              <h3 className="text-lg font-bold text-[#0F3D24]">
+                Edit Voucher: {editingVoucher.code}
+              </h3>
+              <button
+                onClick={() => setEditingVoucher(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -1721,7 +3173,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 Voucher Name
                 <input
                   value={editingVoucher.displayName || ""}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, displayName: e.target.value })}
+                  onChange={(e) =>
+                    setEditingVoucher({ ...editingVoucher, displayName: e.target.value })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -1730,7 +3184,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 Discount Type
                 <select
                   value={editingVoucher.discountType}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, discountType: e.target.value as any })}
+                  onChange={(e) =>
+                    setEditingVoucher({ ...editingVoucher, discountType: e.target.value as any })
+                  }
                   className={inputClass}
                 >
                   <option value="percent">Percentage (%)</option>
@@ -1744,7 +3200,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                   allowDecimal
                   min={1}
                   value={editingVoucher.discountValue}
-                  onValueChange={(n) => setEditingVoucher({ ...editingVoucher, discountValue: n ?? 0 })}
+                  onValueChange={(n) =>
+                    setEditingVoucher({ ...editingVoucher, discountValue: n ?? 0 })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -1754,7 +3212,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 <input
                   type="date"
                   value={editingVoucher.expiresAt || ""}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, expiresAt: e.target.value })}
+                  onChange={(e) =>
+                    setEditingVoucher({ ...editingVoucher, expiresAt: e.target.value })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -1763,7 +3223,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 Recipient Name
                 <input
                   value={editingVoucher.recipientName || ""}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, recipientName: e.target.value })}
+                  onChange={(e) =>
+                    setEditingVoucher({ ...editingVoucher, recipientName: e.target.value })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -1772,7 +3234,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 Recipient Phone
                 <input
                   value={editingVoucher.recipientPhone || ""}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, recipientPhone: e.target.value })}
+                  onChange={(e) =>
+                    setEditingVoucher({ ...editingVoucher, recipientPhone: e.target.value })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -1782,7 +3246,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 <NumberField
                   min={1}
                   value={editingVoucher.maxUses ?? ""}
-                  onValueChange={(n) => setEditingVoucher({ ...editingVoucher, maxUses: n ?? null })}
+                  onValueChange={(n) =>
+                    setEditingVoucher({ ...editingVoucher, maxUses: n ?? null })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -1791,7 +3257,9 @@ function VoucherPanel({ passcode }: { passcode: string }) {
                 Status
                 <select
                   value={editingVoucher.active ? "true" : "false"}
-                  onChange={(e) => setEditingVoucher({ ...editingVoucher, active: e.target.value === "true" })}
+                  onChange={(e) =>
+                    setEditingVoucher({ ...editingVoucher, active: e.target.value === "true" })
+                  }
                   className={inputClass}
                 >
                   <option value="true">Active</option>
@@ -1854,7 +3322,6 @@ function flyerCaption(order: AdminOrder, stage: FlyerStage): string {
     : `Thank you for choosing Dignity Agro Farms. Order ${order.orderCode} has been received and is being prepared.`;
 }
 
-
 function FilterBtn({
   active,
   onClick,
@@ -1876,8 +3343,8 @@ function FilterBtn({
         active
           ? "bg-[#0F3D24] text-white shadow-sm ring-1 ring-[#0F3D24]"
           : showAlert
-          ? "bg-red-50 text-red-700 ring-1 ring-red-300 hover:bg-red-100 shadow-xs"
-          : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
+            ? "bg-red-50 text-red-700 ring-1 ring-red-300 hover:bg-red-100 shadow-xs"
+            : "bg-white text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-[#F7F5F0]"
       }`}
     >
       {showAlert && (
@@ -1892,8 +3359,8 @@ function FilterBtn({
           showAlert
             ? "bg-red-600 text-white animate-pulse"
             : active
-            ? "bg-white/20 text-white"
-            : "bg-[#0F3D24]/10 text-[#0F3D24]"
+              ? "bg-white/20 text-white"
+              : "bg-[#0F3D24]/10 text-[#0F3D24]"
         }`}
       >
         {count}
@@ -1903,21 +3370,49 @@ function FilterBtn({
 }
 
 function ReportsPanel({
-  orders, batches, role, from, setFrom, to, setTo, statusFilter, setStatusFilter, payFilter, setPayFilter,
-  zoneFilter, setZoneFilter, search, setSearch, reasonFilter, setReasonFilter, reasonOptions,
-  onApply, onReset, onQuickRange,
+  orders,
+  batches,
+  role,
+  from,
+  setFrom,
+  to,
+  setTo,
+  statusFilter,
+  setStatusFilter,
+  payFilter,
+  setPayFilter,
+  zoneFilter,
+  setZoneFilter,
+  search,
+  setSearch,
+  reasonFilter,
+  setReasonFilter,
+  reasonOptions,
+  onApply,
+  onReset,
+  onQuickRange,
 }: {
   orders: AdminOrder[];
   batches: FarmBatch[];
   role: AdminRole;
-  from: string; setFrom: (v: string) => void;
-  to: string; setTo: (v: string) => void;
-  statusFilter: string; setStatusFilter: (v: string) => void;
-  payFilter: string; setPayFilter: (v: string) => void;
-  zoneFilter: string; setZoneFilter: (v: string) => void;
-  search: string; setSearch: (v: string) => void;
-  reasonFilter: string; setReasonFilter: (v: string) => void; reasonOptions: string[];
-  onApply: () => void; onReset: () => void; onQuickRange: (d: number | "month") => void;
+  from: string;
+  setFrom: (v: string) => void;
+  to: string;
+  setTo: (v: string) => void;
+  statusFilter: string;
+  setStatusFilter: (v: string) => void;
+  payFilter: string;
+  setPayFilter: (v: string) => void;
+  zoneFilter: string;
+  setZoneFilter: (v: string) => void;
+  search: string;
+  setSearch: (v: string) => void;
+  reasonFilter: string;
+  setReasonFilter: (v: string) => void;
+  reasonOptions: string[];
+  onApply: () => void;
+  onReset: () => void;
+  onQuickRange: (d: number | "month") => void;
 }) {
   const [zipping, setZipping] = useState(false);
   const [batchFilter, setBatchFilter] = useState<string>("");
@@ -1961,7 +3456,12 @@ function ReportsPanel({
       .map(([id, v]) => ({ id, ...v }))
       .filter((x) => x.count > 0);
     if (unassignedCount > 0) {
-      list.push({ id: "__unassigned__", name: "Unassigned / Storefront", count: unassignedCount, revenue: unassignedRev });
+      list.push({
+        id: "__unassigned__",
+        name: "Unassigned / Storefront",
+        count: unassignedCount,
+        revenue: unassignedRev,
+      });
     }
     return list;
   })();
@@ -2030,10 +3530,22 @@ function ReportsPanel({
       baseCols.push(
         esc(STATUS_LABEL[o.status] || o.status),
         esc(o.paymentStatus ? o.paymentStatus.toUpperCase() : ""),
-        esc(o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19) : ""),
-        esc(o.status === "cancelled" ? (o.cancelledBy === "customer" ? "Customer" : "Farm Admin") : ""),
+        esc(
+          o.paymentApprovedAt
+            ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19)
+            : "",
+        ),
+        esc(
+          o.status === "cancelled"
+            ? o.cancelledBy === "customer"
+              ? "Customer"
+              : "Farm Admin"
+            : "",
+        ),
         esc(o.cancelReason ?? ""),
-        esc(o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : ""),
+        esc(
+          o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : "",
+        ),
         esc(isNotCompleted(o) ? "Yes" : "No"),
       );
       return baseCols.join(",");
@@ -2150,7 +3662,9 @@ function ReportsPanel({
       baseRow.push(
         STATUS_LABEL[o.status] || o.status,
         o.paymentStatus ? o.paymentStatus.toUpperCase() : "",
-        o.paymentApprovedAt ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19) : "",
+        o.paymentApprovedAt
+          ? new Date(o.paymentApprovedAt).toISOString().replace("T", " ").slice(0, 19)
+          : "",
         o.status === "cancelled" ? (o.cancelledBy === "customer" ? "Customer" : "Farm Admin") : "",
         o.cancelReason ?? "",
         o.cancelledAt ? new Date(o.cancelledAt).toISOString().replace("T", " ").slice(0, 19) : "",
@@ -2162,12 +3676,19 @@ function ReportsPanel({
     const totalRows: (string | number)[][] = isOwner
       ? [
           [],
-          ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`, sumSub, sumFee, sumTot],
+          [
+            "SUMMARY TOTALS",
+            "",
+            "",
+            "",
+            "",
+            `${orders.length} Total Orders`,
+            sumSub,
+            sumFee,
+            sumTot,
+          ],
         ]
-      : [
-          [],
-          ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`],
-        ];
+      : [[], ["SUMMARY TOTALS", "", "", "", "", `${orders.length} Total Orders`]];
 
     const allData = [finHeader, ...rows, ...totalRows];
     const sheet = XLSX.utils.aoa_to_sheet(allData);
@@ -2197,7 +3718,10 @@ function ReportsPanel({
     XLSX.writeFile(wb, `dignity-orders-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
-  const byStatus = STATUS_OPTIONS.map((s) => ({ label: s.label, count: orders.filter((o) => o.status === s.value).length }));
+  const byStatus = STATUS_OPTIONS.map((s) => ({
+    label: s.label,
+    count: orders.filter((o) => o.status === s.value).length,
+  }));
 
   // Bundle a printable receipt/invoice for every order in the current range into one ZIP.
   const downloadZip = async () => {
@@ -2216,7 +3740,10 @@ function ReportsPanel({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const range = from || to ? `${from || "start"}_to_${to || "today"}` : new Date().toISOString().slice(0, 10);
+      const range =
+        from || to
+          ? `${from || "start"}_to_${to || "today"}`
+          : new Date().toISOString().slice(0, 10);
       a.download = `dignity-receipts-${range}.zip`;
       a.click();
       URL.revokeObjectURL(url);
@@ -2225,7 +3752,8 @@ function ReportsPanel({
     }
   };
 
-  const inputCls = "mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-[#0F3D24] outline-none focus:border-[#3F8F3F]";
+  const inputCls =
+    "mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal text-[#0F3D24] outline-none focus:border-[#3F8F3F]";
   const labelCls = "text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]";
 
   return (
@@ -2236,10 +3764,16 @@ function ReportsPanel({
           <QuickBtn onClick={() => onQuickRange(1)}>Today</QuickBtn>
           <QuickBtn onClick={() => onQuickRange(7)}>Last 7 days</QuickBtn>
           <QuickBtn onClick={() => onQuickRange("month")}>This month</QuickBtn>
-          <button onClick={exportCsv} className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F] px-4 py-2 text-xs font-semibold text-white hover:bg-[#4ea94e]">
+          <button
+            onClick={exportCsv}
+            className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F] px-4 py-2 text-xs font-semibold text-white hover:bg-[#4ea94e]"
+          >
             <Download size={14} /> Export CSV
           </button>
-          <button onClick={exportExcel} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]">
+          <button
+            onClick={exportExcel}
+            className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c]"
+          >
             <FileSpreadsheet size={14} /> Export Excel (.xlsx)
           </button>
           {isOwner && (
@@ -2248,25 +3782,54 @@ function ReportsPanel({
               disabled={zipping || orders.length === 0}
               className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-4 py-2 text-xs font-semibold text-white hover:bg-[#134a2c] disabled:opacity-50"
             >
-              <FileArchive size={14} /> {zipping ? "Zipping…" : `Download all receipts (${orders.length}) ZIP`}
+              <FileArchive size={14} />{" "}
+              {zipping ? "Zipping…" : `Download all receipts (${orders.length}) ZIP`}
             </button>
           )}
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <label className={labelCls}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} /></label>
-        <label className={labelCls}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inputCls} /></label>
+        <label className={labelCls}>
+          From
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className={inputCls}
+          />
+        </label>
+        <label className={labelCls}>
+          To
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className={inputCls}
+          />
+        </label>
         <label className={labelCls}>
           Order status
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={inputCls}>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className={inputCls}
+          >
             <option value="">All</option>
-            {STATUS_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
           </select>
         </label>
         <label className={labelCls}>
           Payment status
-          <select value={payFilter} onChange={(e) => setPayFilter(e.target.value)} className={inputCls}>
+          <select
+            value={payFilter}
+            onChange={(e) => setPayFilter(e.target.value)}
+            className={inputCls}
+          >
             <option value="">All</option>
             <option value="pending">Pending</option>
             <option value="submitted">Submitted</option>
@@ -2276,7 +3839,11 @@ function ReportsPanel({
         </label>
         <label className={labelCls}>
           Delivery zone
-          <select value={zoneFilter} onChange={(e) => setZoneFilter(e.target.value)} className={inputCls}>
+          <select
+            value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value)}
+            className={inputCls}
+          >
             <option value="">All</option>
             <option value="owerri">Owerri town</option>
             <option value="outside">Outside Owerri</option>
@@ -2284,34 +3851,62 @@ function ReportsPanel({
         </label>
         <label className={labelCls}>
           Cancellation reason
-          <select value={reasonFilter} onChange={(e) => setReasonFilter(e.target.value)} className={inputCls}>
+          <select
+            value={reasonFilter}
+            onChange={(e) => setReasonFilter(e.target.value)}
+            className={inputCls}
+          >
             <option value="">All</option>
-            {reasonOptions.map((r) => <option key={r} value={r}>{r}</option>)}
+            {reasonOptions.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
         </label>
         <label className={labelCls}>
           Batch filter
-          <select value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)} className={inputCls}>
+          <select
+            value={batchFilter}
+            onChange={(e) => setBatchFilter(e.target.value)}
+            className={inputCls}
+          >
             <option value="">All batches combined</option>
             <option value="__unassigned__">Unassigned / Storefront</option>
             {batches.map((b) => (
               <option key={b.id} value={b.id}>
-                {b.batchName}{b.status !== "active" ? " (Closed)" : ""}
+                {b.batchName}
+                {b.status !== "active" ? " (Closed)" : ""}
               </option>
             ))}
           </select>
         </label>
         <label className={labelCls}>
           Search
-          <input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && onApply()} placeholder="Order code, name or phone" className={inputCls} />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && onApply()}
+            placeholder="Order code, name or phone"
+            className={inputCls}
+          />
         </label>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <button onClick={onApply} className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2 text-sm font-semibold text-white hover:bg-[#134a2c]">
+        <button
+          onClick={onApply}
+          className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-5 py-2 text-sm font-semibold text-white hover:bg-[#134a2c]"
+        >
           <Search size={14} /> Apply filters
         </button>
-        <button onClick={() => { setBatchFilter(""); onReset(); }} className="rounded-full bg-[#F7F5F0] px-5 py-2 text-sm font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white">
+        <button
+          onClick={() => {
+            setBatchFilter("");
+            onReset();
+          }}
+          className="rounded-full bg-[#F7F5F0] px-5 py-2 text-sm font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+        >
           Reset
         </button>
       </div>
@@ -2349,7 +3944,8 @@ function ReportsPanel({
                       : "bg-white/10 text-white/90 hover:bg-white/20"
                   }`}
                 >
-                  {bt.name}: <strong className="tabular-nums">{naira(bt.revenue)}</strong> ({bt.count})
+                  {bt.name}: <strong className="tabular-nums">{naira(bt.revenue)}</strong> (
+                  {bt.count})
                 </button>
               ))}
             </div>
@@ -2361,20 +3957,31 @@ function ReportsPanel({
         <Stat label="Orders" value={String(visibleOrders.length)} />
         {isOwner ? (
           <>
-            <Stat label={batchFilter ? "Filtered Batch Revenue" : "Revenue (approved)"} value={naira(revenue)} />
+            <Stat
+              label={batchFilter ? "Filtered Batch Revenue" : "Revenue (approved)"}
+              value={naira(revenue)}
+            />
             <Stat label="Delivery fees" value={naira(fees)} />
             <Stat label="Avg order value" value={naira(avg)} />
           </>
         ) : (
           <Stat label="Approved / Paid Orders" value={String(paidOrders.length)} />
         )}
-        <Stat label="Cancelled" value={String(visibleOrders.filter((o) => o.status === "cancelled").length)} />
+        <Stat
+          label="Cancelled"
+          value={String(visibleOrders.filter((o) => o.status === "cancelled").length)}
+        />
         <Stat label="Not completed" value={String(visibleOrders.filter(isNotCompleted).length)} />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#0F3D24]/70">
         {byStatus.map((s) => (
-          <span key={s.label} className="rounded-full bg-[#F7F5F0] px-3 py-1 ring-1 ring-[#0F3D24]/10">{s.label}: <strong>{s.count}</strong></span>
+          <span
+            key={s.label}
+            className="rounded-full bg-[#F7F5F0] px-3 py-1 ring-1 ring-[#0F3D24]/10"
+          >
+            {s.label}: <strong>{s.count}</strong>
+          </span>
         ))}
       </div>
     </div>
@@ -2383,7 +3990,10 @@ function ReportsPanel({
 
 function QuickBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
   return (
-    <button onClick={onClick} className="rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white">
+    <button
+      onClick={onClick}
+      className="rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+    >
       {children}
     </button>
   );
@@ -2392,13 +4002,31 @@ function QuickBtn({ onClick, children }: { onClick: () => void; children: React.
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5">
-      <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/60">{label}</div>
+      <div className="text-[10px] font-semibold uppercase tracking-widest text-[#0F3D24]/60">
+        {label}
+      </div>
       <div className="mt-1 text-lg font-semibold text-[#0F3D24]">{value}</div>
     </div>
   );
 }
 
-export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerModal, onOpenSmsModal }: { order: AdminOrder; passcode: string; role: AdminRole; batches?: FarmBatch[]; onSaved: () => void; onOpenFlyerModal?: (data: FlyerOrderData) => void; onOpenSmsModal?: (order: AdminOrder) => void }) {
+export function OrderRow({
+  order,
+  passcode,
+  role,
+  batches,
+  onSaved,
+  onOpenFlyerModal,
+  onOpenSmsModal,
+}: {
+  order: AdminOrder;
+  passcode: string;
+  role: AdminRole;
+  batches?: FarmBatch[];
+  onSaved: () => void;
+  onOpenFlyerModal?: (data: FlyerOrderData) => void;
+  onOpenSmsModal?: (order: AdminOrder) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [status, setStatus] = useState(order.status);
   const [note, setNote] = useState(order.statusNote ?? "");
@@ -2417,7 +4045,8 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
   const assignOrderBatchFn = useServerFn(adminAssignOrderBatch);
 
   const assignBatchMut = useMutation({
-    mutationFn: (batchId: string | null) => assignOrderBatchFn({ data: { passcode, id: order.id, batchId } }),
+    mutationFn: (batchId: string | null) =>
+      assignOrderBatchFn({ data: { passcode, id: order.id, batchId } }),
     onSuccess: () => onSaved(),
   });
 
@@ -2430,12 +4059,24 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
   });
   const paymentMutation = useMutation({
     mutationFn: (vars: { decision: "approved" | "rejected"; reason?: string }) =>
-      decideFn({ data: { passcode, id: order.id, decision: vars.decision, reason: vars.reason ?? null } }),
-    onSuccess: () => { setShowReject(false); setRejectReason(""); onSaved(); },
+      decideFn({
+        data: { passcode, id: order.id, decision: vars.decision, reason: vars.reason ?? null },
+      }),
+    onSuccess: () => {
+      setShowReject(false);
+      setRejectReason("");
+      onSaved();
+    },
   });
   const correctionMutation = useMutation({
-    mutationFn: () => correctFn({ data: { passcode, id: order.id, customerName, phone, address, notes: notes || null } }),
-    onSuccess: () => { setEditing(false); onSaved(); },
+    mutationFn: () =>
+      correctFn({
+        data: { passcode, id: order.id, customerName, phone, address, notes: notes || null },
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      onSaved();
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: () => deleteFn({ data: { passcode, id: order.id } }),
@@ -2448,7 +4089,10 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
     paymentMutation.mutate({ decision, reason });
   };
 
-  const dirty = status !== order.status || (note ?? "") !== (order.statusNote ?? "") || (eta ?? "") !== (order.eta ?? "");
+  const dirty =
+    status !== order.status ||
+    (note ?? "") !== (order.statusNote ?? "") ||
+    (eta ?? "") !== (order.eta ?? "");
 
   // Save the pending edits and immediately open WhatsApp with the NEW status message.
   const saveAndNotify = () => {
@@ -2469,12 +4113,15 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className={`w-full text-left p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 transition-colors ${expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
-          }`}
+        className={`w-full text-left p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 transition-colors ${
+          expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
+        }`}
       >
         <div className="min-w-0 space-y-1.5 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-base sm:text-lg font-extrabold text-[#0F3D24]">{order.orderCode}</span>
+            <span className="font-mono text-base sm:text-lg font-extrabold text-[#0F3D24]">
+              {order.orderCode}
+            </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-[#0F3D24]/10 px-2.5 py-0.5 text-xs font-bold text-[#0F3D24]">
               🛒 Store Order
             </span>
@@ -2496,11 +4143,17 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
               </span>
             )}
             {/* Status Pill Badge */}
-            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${order.status === "delivered" ? "bg-emerald-100 text-emerald-800" :
-              order.status === "cancelled" ? "bg-red-100 text-red-800" :
-                order.status === "preparing" ? "bg-blue-100 text-blue-800" :
-                  "bg-amber-100 text-amber-800"
-              }`}>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
+                order.status === "delivered"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : order.status === "cancelled"
+                    ? "bg-red-100 text-red-800"
+                    : order.status === "preparing"
+                      ? "bg-blue-100 text-blue-800"
+                      : "bg-amber-100 text-amber-800"
+              }`}
+            >
               {order.status.replace("_", " ")}
             </span>
           </div>
@@ -2530,7 +4183,9 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                 ? naira(order.total)
                 : `${order.items.reduce((s, i) => s + i.qty, 0)} unit(s)`}
             </div>
-            <div className="text-[11px] text-[#0F3D24]/60">{new Date(order.createdAt).toLocaleDateString()}</div>
+            <div className="text-[11px] text-[#0F3D24]/60">
+              {new Date(order.createdAt).toLocaleDateString()}
+            </div>
           </div>
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0F3D24]/70 ring-1 ring-[#0F3D24]/10">
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -2560,7 +4215,9 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                     </option>
                   ))}
               </select>
-              {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
+              {assignBatchMut.isPending && (
+                <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />
+              )}
             </div>
           )}
 
@@ -2598,24 +4255,34 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
           />
 
           <div className="rounded-2xl bg-[#F7F5F0] p-4 text-sm space-y-2">
-            <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">Items Breakdown</h4>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">
+              Items Breakdown
+            </h4>
             {order.items.map((it, i) => (
               <div key={i} className="flex justify-between items-center text-xs sm:text-sm">
-                <span className="font-semibold text-[#0F3D24]">{it.product} · {it.option} × {it.qty}</span>
+                <span className="font-semibold text-[#0F3D24]">
+                  {it.product} · {it.option} × {it.qty}
+                </span>
                 {role === "owner" && (
-                  <span className="text-[#0F3D24]/80 font-mono">{naira(it.unitPrice * it.qty)}</span>
+                  <span className="text-[#0F3D24]/80 font-mono">
+                    {naira(it.unitPrice * it.qty)}
+                  </span>
                 )}
               </div>
             ))}
             {role === "owner" ? (
               <div className="pt-2 border-t border-[#0F3D24]/10 flex justify-between text-xs text-[#0F3D24]/70">
                 <span>Delivery Fee</span>
-                <span className="font-semibold">{order.deliveryFee === 0 ? "FREE" : naira(order.deliveryFee)}</span>
+                <span className="font-semibold">
+                  {order.deliveryFee === 0 ? "FREE" : naira(order.deliveryFee)}
+                </span>
               </div>
             ) : (
               <div className="pt-2 border-t border-[#0F3D24]/10 flex justify-between text-xs text-[#0F3D24]/70">
                 <span>Total Items</span>
-                <span className="font-semibold">{order.items.reduce((s, i) => s + i.qty, 0)} unit(s)</span>
+                <span className="font-semibold">
+                  {order.items.reduce((s, i) => s + i.qty, 0)} unit(s)
+                </span>
               </div>
             )}
           </div>
@@ -2630,7 +4297,11 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                 onChange={(e) => setStatus(e.target.value as AdminOrder["status"])}
                 className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
               >
-                {STATUS_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
@@ -2662,7 +4333,9 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
             </label>
           </div>
 
-          {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
+          {mutation.isError && (
+            <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>
+          )}
           {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
 
           <div className="flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
@@ -2671,7 +4344,8 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
               disabled={mutation.isPending}
               className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
             >
-              <MessageCircle size={15} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
+              <MessageCircle size={15} />{" "}
+              {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
             </button>
             {role === "owner" && (
               <>
@@ -2679,10 +4353,12 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                   type="button"
                   onClick={async () => {
                     const cleanPhone = order.phone.replace(/\D+/g, "");
-                    const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+                    const waPhone = cleanPhone.startsWith("0")
+                      ? "234" + cleanPhone.slice(1)
+                      : cleanPhone;
                     const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
                     const text = `🧾 *Dignity Agro Farms Official Receipt*\n\nCustomer: ${order.customerName}\nOrder Reference: ${order.orderCode}\nTotal Amount: ₦${order.total.toLocaleString()}\nPayment Status: ${(order.paymentStatus || "").toUpperCase()}\n\nView PDF Receipt: ${receiptUrl}\n\nThank you for choosing Dignity Agro Farms!`;
-                    
+
                     if (typeof navigator !== "undefined" && navigator.share) {
                       try {
                         await navigator.share({
@@ -2695,7 +4371,11 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                         // Fallback to direct WhatsApp API link if share dismissed
                       }
                     }
-                    window.open(`https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                    window.open(
+                      `https://api.whatsapp.com/send?phone=${waPhone}&text=${encodeURIComponent(text)}`,
+                      "_blank",
+                      "noopener,noreferrer",
+                    );
                   }}
                   className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 transition"
                 >
@@ -2706,7 +4386,9 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                   onClick={() => {
                     const receiptUrl = `${window.location.origin}/receipt/${order.orderCode}?code=${order.trackCode}`;
                     navigator.clipboard.writeText(receiptUrl);
-                    alert(`✅ Receipt Link for order #${order.orderCode} copied to clipboard!\n\n${receiptUrl}`);
+                    alert(
+                      `✅ Receipt Link for order #${order.orderCode} copied to clipboard!\n\n${receiptUrl}`,
+                    );
                   }}
                   className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white transition"
                   title="Copy receipt link"
@@ -2757,22 +4439,78 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
                   target="_blank"
                   className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
                 >
-                  <FileText size={14} /> {order.paymentStatus === "approved" ? "Receipt" : "Invoice"}
+                  <FileText size={14} />{" "}
+                  {order.paymentStatus === "approved" ? "Receipt" : "Invoice"}
                 </Link>
-                <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
-                <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete order ${order.orderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete order</button>
+                <button
+                  type="button"
+                  onClick={() => setEditing((value) => !value)}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+                >
+                  <Pencil size={14} /> {editing ? "Close correction" : "Correct details"}
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Delete order ${order.orderCode}? This cannot be undone.`))
+                      deleteMutation.mutate();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"
+                >
+                  <Trash2 size={14} /> Delete order
+                </button>
               </>
             )}
           </div>
 
           {role === "owner" && editing && (
             <div className="grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
-              {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Customer name
+                <input
+                  value={customerName}
+                  onChange={(event) => setCustomerName(event.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Phone
+                <input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">
+                Address
+                <input
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">
+                Notes
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={correctionMutation.isPending}
+                onClick={() => correctionMutation.mutate()}
+                className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2"
+              >
+                {correctionMutation.isPending ? "Saving correction…" : "Save correction"}
+              </button>
+              {correctionMutation.isError && (
+                <p className="text-sm text-red-600 sm:col-span-2">
+                  {(correctionMutation.error as Error).message}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -2782,7 +4520,15 @@ export function OrderRow({ order, passcode, role, batches, onSaved, onOpenFlyerM
 }
 
 function PaymentSection({
-  order, onApprove, onReject, showReject, setShowReject, rejectReason, setRejectReason, pending, error,
+  order,
+  onApprove,
+  onReject,
+  showReject,
+  setShowReject,
+  rejectReason,
+  setRejectReason,
+  pending,
+  error,
 }: {
   order: AdminOrder;
   onApprove: () => void;
@@ -2795,12 +4541,42 @@ function PaymentSection({
   error: string | null;
 }) {
   const badge =
-    order.paymentStatus === "approved" ? { bg: "bg-[#3F8F3F]/10", ring: "ring-[#3F8F3F]/30", text: "text-[#0F3D24]", label: "Payment approved", icon: <CheckCircle2 size={14} className="text-[#3F8F3F]" /> }
-      : order.paymentStatus === "submitted" ? { bg: "bg-amber-100", ring: "ring-amber-200", text: "text-amber-800", label: "Payment submitted, awaiting approval", icon: <Clock size={14} /> }
-        : order.paymentStatus === "rejected" ? { bg: "bg-red-50", ring: "ring-red-200", text: "text-red-700", label: `Rejected${order.paymentRejectionReason ? ": " + order.paymentRejectionReason : ""}`, icon: <XCircle size={14} /> }
-          : { bg: "bg-[#F7F5F0]", ring: "ring-[#0F3D24]/10", text: "text-[#0F3D24]/70", label: "Payment pending", icon: <Clock size={14} /> };
+    order.paymentStatus === "approved"
+      ? {
+          bg: "bg-[#3F8F3F]/10",
+          ring: "ring-[#3F8F3F]/30",
+          text: "text-[#0F3D24]",
+          label: "Payment approved",
+          icon: <CheckCircle2 size={14} className="text-[#3F8F3F]" />,
+        }
+      : order.paymentStatus === "submitted"
+        ? {
+            bg: "bg-amber-100",
+            ring: "ring-amber-200",
+            text: "text-amber-800",
+            label: "Payment submitted, awaiting approval",
+            icon: <Clock size={14} />,
+          }
+        : order.paymentStatus === "rejected"
+          ? {
+              bg: "bg-red-50",
+              ring: "ring-red-200",
+              text: "text-red-700",
+              label: `Rejected${order.paymentRejectionReason ? ": " + order.paymentRejectionReason : ""}`,
+              icon: <XCircle size={14} />,
+            }
+          : {
+              bg: "bg-[#F7F5F0]",
+              ring: "ring-[#0F3D24]/10",
+              text: "text-[#0F3D24]/70",
+              label: "Payment pending",
+              icon: <Clock size={14} />,
+            };
 
-  const canDecide = order.paymentStatus === "submitted" || order.paymentStatus === "pending" || order.paymentStatus === "rejected";
+  const canDecide =
+    order.paymentStatus === "submitted" ||
+    order.paymentStatus === "pending" ||
+    order.paymentStatus === "rejected";
 
   return (
     <div className={`mt-4 rounded-2xl px-4 py-3 ring-1 ${badge.bg} ${badge.ring}`}>
@@ -2959,7 +4735,10 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
     placeholderData: (previousData) => previousData,
   });
 
-  const [selectedPendingPayment, setSelectedPendingPayment] = useState<{ payment: any; preorder: any } | null>(null);
+  const [selectedPendingPayment, setSelectedPendingPayment] = useState<{
+    payment: any;
+    preorder: any;
+  } | null>(null);
 
   const allPreorders = query.data?.preorders || [];
   const role = query.data?.role || "owner";
@@ -2981,18 +4760,30 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
     );
   }, 0);
 
-  const totalExpectedValue = allPreorders.reduce((acc: number, o: any) => acc + (Number(o.totalAmount) || 0), 0);
+  const totalExpectedValue = allPreorders.reduce(
+    (acc: number, o: any) => acc + (Number(o.totalAmount) || 0),
+    0,
+  );
   const totalOwed = Math.max(0, totalExpectedValue - totalReceived);
-  const totalBirds = allPreorders.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
+  const totalBirds = allPreorders.reduce(
+    (acc: number, o: any) => acc + (Number(o.quantity) || 0),
+    0,
+  );
   const totalCount = allPreorders.length;
 
   const slotReservedList = allPreorders.filter((o: any) => o.reservationType === "slot_reserved");
   const slotReservedCount = slotReservedList.length;
-  const slotReservedBirds = slotReservedList.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
+  const slotReservedBirds = slotReservedList.reduce(
+    (acc: number, o: any) => acc + (Number(o.quantity) || 0),
+    0,
+  );
 
   const outrightList = allPreorders.filter((o: any) => o.reservationType === "outright");
   const outrightCount = outrightList.length;
-  const outrightBirds = outrightList.reduce((acc: number, o: any) => acc + (Number(o.quantity) || 0), 0);
+  const outrightBirds = outrightList.reduce(
+    (acc: number, o: any) => acc + (Number(o.quantity) || 0),
+    0,
+  );
 
   const freeList = allPreorders.filter((o: any) => o.reservationType === "free_reservation");
   const freeCount = freeList.length;
@@ -3005,7 +4796,11 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
     try {
       const dObj = new Date(raw);
       if (!isNaN(dObj.getTime())) {
-        return dObj.toLocaleDateString("en-NG", { month: "short", day: "numeric", year: "numeric" });
+        return dObj.toLocaleDateString("en-NG", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
       }
       return String(raw);
     } catch {
@@ -3028,10 +4823,20 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5 sm:p-8 space-y-6">
-        <div className="flex items-center gap-2 text-[#3F8F3F]"><Gift size={18} /><span className="text-xs font-semibold uppercase tracking-widest">December Pre-Orders Overview</span></div>
+        <div className="flex items-center gap-2 text-[#3F8F3F]">
+          <Gift size={18} />
+          <span className="text-xs font-semibold uppercase tracking-widest">
+            December Pre-Orders Overview
+          </span>
+        </div>
         <div>
-          <h2 className="text-2xl font-extrabold text-[#0F3D24]">December Holiday Pre-Orders Dashboard</h2>
-          <p className="mt-1 max-w-2xl text-xs text-[#0F3D24]/65">Track total reservations, amounts received, balance owed, and filter by customer chosen delivery dates.</p>
+          <h2 className="text-2xl font-extrabold text-[#0F3D24]">
+            December Holiday Pre-Orders Dashboard
+          </h2>
+          <p className="mt-1 max-w-2xl text-xs text-[#0F3D24]/65">
+            Track total reservations, amounts received, balance owed, and filter by customer chosen
+            delivery dates.
+          </p>
         </div>
 
         {/* Owner Campaign Settings Card */}
@@ -3056,7 +4861,9 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-[#0F3D24]/70">
-                  Control when December Pre-Orders close. When deactivated or once the end date & time passes, the public site banner and pre-order options are hidden automatically while all existing records remain intact here.
+                  Control when December Pre-Orders close. When deactivated or once the end date &
+                  time passes, the public site banner and pre-order options are hidden automatically
+                  while all existing records remain intact here.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -3122,13 +4929,17 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         {/* Financial & Operational Summary Cards */}
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10">
-            <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">Total Pre-Orders</span>
+            <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">
+              Total Pre-Orders
+            </span>
             <p className="mt-1 text-2xl font-black text-[#0F3D24]">{totalCount}</p>
             <span className="text-[10px] text-[#0F3D24]/60 font-semibold">Active Reservations</span>
           </div>
 
           <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10">
-            <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">Total Birds Reserved</span>
+            <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">
+              Total Birds Reserved
+            </span>
             <p className="mt-1 text-2xl font-black text-[#3F8F3F]">{totalBirds.toLocaleString()}</p>
             <span className="text-[10px] text-[#3F8F3F] font-bold">Broilers & Poultry</span>
           </div>
@@ -3136,22 +4947,38 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           {role === "owner" ? (
             <>
               <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200/60">
-                <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider block">Total Received</span>
-                <p className="mt-1 text-2xl font-black text-emerald-900">₦{totalReceived.toLocaleString()}</p>
-                <span className="text-[10px] text-emerald-700 font-semibold">Deposits & Payments</span>
+                <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider block">
+                  Total Received
+                </span>
+                <p className="mt-1 text-2xl font-black text-emerald-900">
+                  ₦{totalReceived.toLocaleString()}
+                </p>
+                <span className="text-[10px] text-emerald-700 font-semibold">
+                  Deposits & Payments
+                </span>
               </div>
 
               <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200/60">
-                <span className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wider block">Total Balance Owed</span>
-                <p className="mt-1 text-2xl font-black text-amber-900">₦{totalOwed.toLocaleString()}</p>
-                <span className="text-[10px] text-amber-700 font-semibold">Pending Fulfillment</span>
+                <span className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wider block">
+                  Total Balance Owed
+                </span>
+                <p className="mt-1 text-2xl font-black text-amber-900">
+                  ₦{totalOwed.toLocaleString()}
+                </p>
+                <span className="text-[10px] text-amber-700 font-semibold">
+                  Pending Fulfillment
+                </span>
               </div>
             </>
           ) : (
             <div className="col-span-2 rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10 flex items-center justify-between">
               <div>
-                <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">Financial Summary</span>
-                <p className="text-xs font-semibold text-[#0F3D24]/70 mt-1">Operational view active — ₦ amounts restricted for your account role.</p>
+                <span className="text-[11px] font-extrabold text-[#0F3D24]/60 uppercase tracking-wider block">
+                  Financial Summary
+                </span>
+                <p className="text-xs font-semibold text-[#0F3D24]/70 mt-1">
+                  Operational view active — ₦ amounts restricted for your account role.
+                </p>
               </div>
               <Shield size={24} className="text-[#3F8F3F]" />
             </div>
@@ -3213,7 +5040,9 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                 }`}
               >
                 <span>📅 {chip.date}</span>
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${selectedDate === chip.date ? "bg-white text-[#3F8F3F]" : "bg-[#0F3D24]/10 text-[#0F3D24]"}`}>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${selectedDate === chip.date ? "bg-white text-[#3F8F3F]" : "bg-[#0F3D24]/10 text-[#0F3D24]"}`}
+                >
                   {chip.count} orders · {chip.birds} birds
                 </span>
               </button>
@@ -3224,16 +5053,29 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         {/* Pending Payments Alert */}
         {pendingQuery.data && pendingQuery.data.length > 0 && (
           <div className="mt-4 rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200">
-            <h3 className="font-semibold text-amber-800 mb-2">Payment Approvals Needed ({pendingQuery.data.length})</h3>
+            <h3 className="font-semibold text-amber-800 mb-2">
+              Payment Approvals Needed ({pendingQuery.data.length})
+            </h3>
             <div className="space-y-2">
               {pendingQuery.data.map(({ payment, preorder }) => (
-                <div key={payment.id} className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100">
+                <div
+                  key={payment.id}
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between rounded-xl bg-white p-3 text-sm ring-1 ring-amber-100"
+                >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-extrabold text-[#3F8F3F] text-base">{preorder.preorderCode}</span>
-                      {role === "owner" && <span className="font-bold text-[#0F3D24]">· ₦{payment.amount.toLocaleString()}</span>}
+                      <span className="font-mono font-extrabold text-[#3F8F3F] text-base">
+                        {preorder.preorderCode}
+                      </span>
+                      {role === "owner" && (
+                        <span className="font-bold text-[#0F3D24]">
+                          · ₦{payment.amount.toLocaleString()}
+                        </span>
+                      )}
                     </div>
-                    <span className="block text-xs text-slate-600 font-semibold">{preorder.customerName} · {preorder.product} × {preorder.quantity}</span>
+                    <span className="block text-xs text-slate-600 font-semibold">
+                      {preorder.customerName} · {preorder.product} × {preorder.quantity}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -3243,8 +5085,28 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                     >
                       <Eye size={13} /> View Details
                     </button>
-                    <button onClick={async () => { await confirmPaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); }} className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition">Approve</button>
-                    <button onClick={async () => { if (confirm("Reject this payment?")) { await deletePaymentFn({ data: { passcode, paymentId: payment.id } }); pendingQuery.refetch(); query.refetch(); } }} className="rounded-full bg-red-50 px-3.5 py-1.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition">Reject</button>
+                    <button
+                      onClick={async () => {
+                        await confirmPaymentFn({ data: { passcode, paymentId: payment.id } });
+                        pendingQuery.refetch();
+                        query.refetch();
+                      }}
+                      className="rounded-full bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (confirm("Reject this payment?")) {
+                          await deletePaymentFn({ data: { passcode, paymentId: payment.id } });
+                          pendingQuery.refetch();
+                          query.refetch();
+                        }
+                      }}
+                      className="rounded-full bg-red-50 px-3.5 py-1.5 text-xs font-bold text-red-700 ring-1 ring-red-200 hover:bg-red-100 transition"
+                    >
+                      Reject
+                    </button>
                   </div>
                 </div>
               ))}
@@ -3258,15 +5120,37 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
           item={selectedPendingPayment}
           passcode={passcode}
           onClose={() => setSelectedPendingPayment(null)}
-          onApproved={() => { pendingQuery.refetch(); query.refetch(); }}
-          onRejected={() => { pendingQuery.refetch(); query.refetch(); }}
+          onApproved={() => {
+            pendingQuery.refetch();
+            query.refetch();
+          }}
+          onRejected={() => {
+            pendingQuery.refetch();
+            query.refetch();
+          }}
         />
       )}
 
       <div className="flex flex-col gap-4">
-        <form onSubmit={(e) => { e.preventDefault(); setAppliedSearch(search.trim()); }} className="flex gap-2 w-full sm:max-w-md">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, phone or code" className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] shadow-sm" />
-          <button type="submit" className="rounded-xl bg-[#0F3D24] px-6 py-3 text-sm font-semibold text-white hover:bg-[#134a2c] transition shadow-sm">Search</button>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setAppliedSearch(search.trim());
+          }}
+          className="flex gap-2 w-full sm:max-w-md"
+        >
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name, phone or code"
+            className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#3F8F3F] shadow-sm"
+          />
+          <button
+            type="submit"
+            className="rounded-xl bg-[#0F3D24] px-6 py-3 text-sm font-semibold text-white hover:bg-[#134a2c] transition shadow-sm"
+          >
+            Search
+          </button>
         </form>
 
         <div className="flex flex-wrap gap-2">
@@ -3276,7 +5160,9 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
               id: "awaiting_approval",
               label: "Awaiting Payment Approval",
               count: allPreorders.filter(
-                (o: any) => o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted"
+                (o: any) =>
+                  o.payments?.some((p: any) => !p.confirmedByAdmin) ||
+                  o.paymentStatus === "submitted",
               ).length,
             },
             { id: "slot_reserved", label: "Slot Reserved", count: slotReservedCount },
@@ -3312,12 +5198,20 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
-                className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${filter === f.id
-                  ? "bg-[#0F3D24] text-white shadow-md ring-2 ring-[#3F8F3F]"
-                  : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
-                  }`}
+                className={`rounded-full px-4 py-2 text-[11px] font-bold uppercase tracking-widest transition-all ${
+                  filter === f.id
+                    ? "bg-[#0F3D24] text-white shadow-md ring-2 ring-[#3F8F3F]"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
               >
-                {f.label} {f.count > 0 && <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f.id ? "bg-white/20 text-white" : "bg-[#0F3D24]/10 text-[#0F3D24]"}`}>({f.count})</span>}
+                {f.label}{" "}
+                {f.count > 0 && (
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${filter === f.id ? "bg-white/20 text-white" : "bg-[#0F3D24]/10 text-[#0F3D24]"}`}
+                  >
+                    ({f.count})
+                  </span>
+                )}
               </button>
             );
           })}
@@ -3331,7 +5225,9 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
         </div>
       )}
 
-      {query.isLoading && <p className="text-center text-sm text-[#0F3D24]/60 py-10">Loading pre-orders...</p>}
+      {query.isLoading && (
+        <p className="text-center text-sm text-[#0F3D24]/60 py-10">Loading pre-orders...</p>
+      )}
 
       {query.data && (
         <div className="space-y-4">
@@ -3342,7 +5238,10 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
                 if (dateVal !== selectedDate) return false;
               }
               if (filter === "awaiting_approval") {
-                return o.payments?.some((p: any) => !p.confirmedByAdmin) || o.paymentStatus === "submitted";
+                return (
+                  o.payments?.some((p: any) => !p.confirmedByAdmin) ||
+                  o.paymentStatus === "submitted"
+                );
               }
               return true;
             });
@@ -3350,8 +5249,17 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
               <>
                 {selectedDate !== "all" && (
                   <div className="rounded-2xl bg-[#3F8F3F]/10 p-4 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 flex items-center justify-between">
-                    <span>Showing {list.length} pre-orders scheduled for delivery on 📅 {selectedDate} ({list.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0)} total birds)</span>
-                    <button onClick={() => setSelectedDate("all")} className="text-[#3F8F3F] underline text-[11px]">Show All Dates</button>
+                    <span>
+                      Showing {list.length} pre-orders scheduled for delivery on 📅 {selectedDate} (
+                      {list.reduce((acc: number, item: any) => acc + (item.quantity || 0), 0)} total
+                      birds)
+                    </span>
+                    <button
+                      onClick={() => setSelectedDate("all")}
+                      className="text-[#3F8F3F] underline text-[11px]"
+                    >
+                      Show All Dates
+                    </button>
                   </div>
                 )}
                 {list.map((o: any) => (
@@ -3378,7 +5286,19 @@ function DecemberPreorderPanel({ passcode }: { passcode: string }) {
   );
 }
 
-function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder: any; passcode: string; role: string; batches?: FarmBatch[]; onSaved: () => void }) {
+function PreorderRow({
+  preorder,
+  passcode,
+  role,
+  batches,
+  onSaved,
+}: {
+  preorder: any;
+  passcode: string;
+  role: string;
+  batches?: FarmBatch[];
+  onSaved: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [deliveryStatus, setDeliveryStatus] = useState(preorder.deliveryStatus);
@@ -3399,18 +5319,33 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
   const assignPreorderBatchFn = useServerFn(adminAssignPreorderBatch);
 
   const assignBatchMut = useMutation({
-    mutationFn: (batchId: string | null) => assignPreorderBatchFn({ data: { passcode, id: preorder.id, batchId } }),
+    mutationFn: (batchId: string | null) =>
+      assignPreorderBatchFn({ data: { passcode, id: preorder.id, batchId } }),
     onSuccess: () => onSaved(),
   });
 
   const mutation = useMutation({
-    mutationFn: () => updateDeliveryFn({ data: { passcode, preorderId: preorder.id, deliveryStatus } }),
+    mutationFn: () =>
+      updateDeliveryFn({ data: { passcode, preorderId: preorder.id, deliveryStatus } }),
     onSuccess: () => onSaved(),
   });
 
   const correctionMutation = useMutation({
-    mutationFn: () => correctFn({ data: { passcode, preorderId: preorder.id, customerName, phone, address, notes: notes || null } }),
-    onSuccess: () => { setEditing(false); onSaved(); },
+    mutationFn: () =>
+      correctFn({
+        data: {
+          passcode,
+          preorderId: preorder.id,
+          customerName,
+          phone,
+          address,
+          notes: notes || null,
+        },
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      onSaved();
+    },
   });
 
   const deleteMutation = useMutation({
@@ -3426,7 +5361,8 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
     const first = preorder.customerName.split(" ")[0];
     let msg = `Hi ${first}, your December pre-order ${preorder.preorderCode} status update:\n`;
     if (status === "delivered") {
-      msg += "Your order has been delivered! Thank you for choosing Dignity Agro Farms. Happy Holidays!";
+      msg +=
+        "Your order has been delivered! Thank you for choosing Dignity Agro Farms. Happy Holidays!";
     } else {
       msg += "Your order is pending delivery. We will reach out when it is ready.";
     }
@@ -3445,13 +5381,16 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className={`w-full text-left p-4 sm:p-5 flex flex-col gap-3 transition-colors ${expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
-          }`}
+        className={`w-full text-left p-4 sm:p-5 flex flex-col gap-3 transition-colors ${
+          expanded ? "bg-[#F7F5F0]/60 border-b border-[#0F3D24]/10" : "hover:bg-[#F7F5F0]/30"
+        }`}
       >
         {/* Top Row: Code, Badges & Chevron */}
         <div className="flex flex-wrap items-center justify-between gap-2 w-full">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-base sm:text-lg font-extrabold text-[#3F8F3F]">{preorder.preorderCode}</span>
+            <span className="font-mono text-base sm:text-lg font-extrabold text-[#3F8F3F]">
+              {preorder.preorderCode}
+            </span>
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-900 ring-1 ring-amber-300">
               🎄 December Pre-Order
             </span>
@@ -3483,7 +5422,9 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             </a>
           </div>
           <div className="text-xs text-[#0F3D24]/70 truncate max-w-md">{preorder.address}</div>
-          {preorder.notes && <div className="text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>}
+          {preorder.notes && (
+            <div className="text-xs italic text-[#0F3D24]/60">"{preorder.notes}"</div>
+          )}
         </div>
 
         {/* Third Row: Financial & Reservation Summary Strip */}
@@ -3492,18 +5433,29 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
               {preorder.reservationType.replace("_", " ")}
             </span>
-            <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${preorder.paymentStatus === "fully_paid" ? "bg-emerald-100 text-emerald-800" :
-              preorder.paymentStatus === "partially_paid" ? "bg-amber-100 text-amber-800" :
-                "bg-slate-100 text-slate-600"
-              }`}>
+            <span
+              className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                preorder.paymentStatus === "fully_paid"
+                  ? "bg-emerald-100 text-emerald-800"
+                  : preorder.paymentStatus === "partially_paid"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-slate-100 text-slate-600"
+              }`}
+            >
               {preorder.paymentStatus.replace("_", " ")}
             </span>
           </div>
 
           <div className="text-xs flex items-center gap-3 font-medium">
-            <span className="text-[#0F3D24]">Total: <strong>₦{preorder.totalAmount.toLocaleString()}</strong></span>
-            <span className="text-[#3F8F3F]">Paid: <strong>₦{preorder.amountPaid.toLocaleString()}</strong></span>
-            <span className="text-red-600">Bal: <strong>₦{preorder.balance.toLocaleString()}</strong></span>
+            <span className="text-[#0F3D24]">
+              Total: <strong>₦{preorder.totalAmount.toLocaleString()}</strong>
+            </span>
+            <span className="text-[#3F8F3F]">
+              Paid: <strong>₦{preorder.amountPaid.toLocaleString()}</strong>
+            </span>
+            <span className="text-red-600">
+              Bal: <strong>₦{preorder.balance.toLocaleString()}</strong>
+            </span>
           </div>
         </div>
       </button>
@@ -3530,31 +5482,49 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                     </option>
                   ))}
               </select>
-              {assignBatchMut.isPending && <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />}
+              {assignBatchMut.isPending && (
+                <Loader2 size={12} className="animate-spin text-[#3F8F3F]" />
+              )}
             </div>
           )}
 
           <div className="rounded-2xl bg-[#F7F5F0] p-4 text-sm space-y-1">
             <div className="flex justify-between items-center">
-              <span className="font-bold text-[#0F3D24]">{preorder.product} × {preorder.quantity}</span>
+              <span className="font-bold text-[#0F3D24]">
+                {preorder.product} × {preorder.quantity}
+              </span>
             </div>
             {preorder.preferredDeliveryDate && (
               <div className="flex justify-between text-xs text-[#0F3D24]/70 pt-1 border-t border-[#0F3D24]/5">
                 <span>Preferred Delivery Date</span>
-                <span className="font-semibold text-[#0F3D24]">{new Date(preorder.preferredDeliveryDate).toLocaleDateString()}</span>
+                <span className="font-semibold text-[#0F3D24]">
+                  {new Date(preorder.preferredDeliveryDate).toLocaleDateString()}
+                </span>
               </div>
             )}
           </div>
 
           {preorder.payments && preorder.payments.length > 0 && (
             <div className="rounded-2xl bg-white p-4 ring-1 ring-[#0F3D24]/10 space-y-3">
-              <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">Payment Installments</h4>
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-[#0F3D24]/60">
+                Payment Installments
+              </h4>
               <div className="space-y-2">
                 {preorder.payments.map((p: any, i: number) => (
-                  <div key={p.id} className={`flex flex-col gap-2 sm:flex-row sm:items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0 ${p.confirmedByAdmin ? "border-[#0F3D24]/5" : "border-amber-200 bg-amber-50 rounded-xl p-3"}`}>
+                  <div
+                    key={p.id}
+                    className={`flex flex-col gap-2 sm:flex-row sm:items-center justify-between text-sm border-b pb-2 last:border-0 last:pb-0 ${p.confirmedByAdmin ? "border-[#0F3D24]/5" : "border-amber-200 bg-amber-50 rounded-xl p-3"}`}
+                  >
                     <div>
-                      <div className={`font-semibold ${p.confirmedByAdmin ? "text-[#0F3D24]" : "text-amber-800"}`}>₦{p.amount.toLocaleString()} {p.confirmedByAdmin ? "" : "(Pending Approval)"}</div>
-                      <div className="text-[10px] text-[#0F3D24]/60">{new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}</div>
+                      <div
+                        className={`font-semibold ${p.confirmedByAdmin ? "text-[#0F3D24]" : "text-amber-800"}`}
+                      >
+                        ₦{p.amount.toLocaleString()}{" "}
+                        {p.confirmedByAdmin ? "" : "(Pending Approval)"}
+                      </div>
+                      <div className="text-[10px] text-[#0F3D24]/60">
+                        {new Date(p.paymentDate).toLocaleDateString()} · Ref: {p.paymentReference}
+                      </div>
                     </div>
                     {p.confirmedByAdmin ? (
                       <button
@@ -3562,8 +5532,14 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                           setDownloadingPdf(p.id);
                           try {
                             // find the visual index of this confirmed payment among other confirmed payments
-                            const visualIndex = preorder.payments.filter((x: any) => x.confirmedByAdmin).findIndex((x: any) => x.id === p.id) + 1;
-                            await downloadPdf(preorderPaymentReceiptHtml(preorder, p, visualIndex), `receipt_${preorder.preorderCode}_${p.amount}.pdf`);
+                            const visualIndex =
+                              preorder.payments
+                                .filter((x: any) => x.confirmedByAdmin)
+                                .findIndex((x: any) => x.id === p.id) + 1;
+                            await downloadPdf(
+                              preorderPaymentReceiptHtml(preorder, p, visualIndex),
+                              `receipt_${preorder.preorderCode}_${p.amount}.pdf`,
+                            );
                           } catch (e: any) {
                             alert("PDF Error: " + (e.message || String(e)));
                           } finally {
@@ -3573,7 +5549,11 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                         disabled={downloadingPdf === p.id}
                         className="flex items-center gap-1 rounded bg-[#F7F5F0] px-3 py-1.5 text-xs font-semibold text-[#3F8F3F] hover:bg-[#3F8F3F]/10 disabled:opacity-50 transition-all"
                       >
-                        {downloadingPdf === p.id ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                        {downloadingPdf === p.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <Download size={12} />
+                        )}
                         {downloadingPdf === p.id ? "Preparing PDF..." : "Receipt PDF"}
                       </button>
                     ) : (
@@ -3638,7 +5618,9 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             </div>
           </div>
 
-          {mutation.isError && <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>}
+          {mutation.isError && (
+            <p className="mt-2 text-sm text-red-600">{(mutation.error as Error).message}</p>
+          )}
           {mutation.isSuccess && !dirty && <p className="mt-2 text-sm text-[#3F8F3F]">Saved.</p>}
 
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#0F3D24]/10 pt-4">
@@ -3647,7 +5629,8 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
               disabled={mutation.isPending}
               className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1eb856] disabled:opacity-50"
             >
-              <MessageCircle size={16} /> {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
+              <MessageCircle size={16} />{" "}
+              {dirty ? "Save & notify on WhatsApp" : "Notify customer on WhatsApp"}
             </button>
             <button
               type="button"
@@ -3661,15 +5644,25 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
               onClick={async () => {
                 try {
                   setDownloadingPdf("complete");
-                  const confirmedPayments = preorder.payments?.filter((p: any) => p.confirmedByAdmin) || [];
-                  await downloadPdf(preorderCompleteReceiptHtml(preorder, confirmedPayments), `receipt_${preorder.preorderCode}.pdf`);
+                  const confirmedPayments =
+                    preorder.payments?.filter((p: any) => p.confirmedByAdmin) || [];
+                  await downloadPdf(
+                    preorderCompleteReceiptHtml(preorder, confirmedPayments),
+                    `receipt_${preorder.preorderCode}.pdf`,
+                  );
 
                   const cleanPhone = preorder.phone.replace(/\D+/g, "");
-                  const waPhone = cleanPhone.startsWith("0") ? "234" + cleanPhone.slice(1) : cleanPhone;
+                  const waPhone = cleanPhone.startsWith("0")
+                    ? "234" + cleanPhone.slice(1)
+                    : cleanPhone;
                   const receiptUrl = `${window.location.origin}/receipt/${preorder.preorderCode}?code=${preorder.preorderCode}`;
                   const text = `🧾 *Dignity Agro Farms Official Pre-Order Receipt*\n\nCustomer: ${preorder.customerName}\nPre-Order Code: ${preorder.preorderCode}\nProduct: ${preorder.product} × ${preorder.quantity}\nTotal Amount: ₦${preorder.totalAmount.toLocaleString()}\nAmount Paid: ₦${preorder.amountPaid.toLocaleString()}\nBalance Outstanding: ₦${preorder.balance.toLocaleString()}\n\n📄 *View & Print Web PDF Receipt:* ${receiptUrl}\n\nThank you for pre-ordering with Dignity Agro Farms! Happy Holidays! 🎄`;
 
-                  window.open(`https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+                  window.open(
+                    `https://wa.me/${waPhone}?text=${encodeURIComponent(text)}`,
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
                 } catch (err: any) {
                   alert("Failed to generate PDF receipt: " + (err?.message || String(err)));
                 } finally {
@@ -3679,8 +5672,14 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
               disabled={downloadingPdf === "complete"}
               className="inline-flex items-center gap-2 rounded-full bg-[#25D366]/15 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#25D366]/30 hover:bg-[#25D366]/25 disabled:opacity-50 transition"
             >
-              {downloadingPdf === "complete" ? <Loader2 size={14} className="animate-spin text-[#25D366]" /> : <Share2 size={14} className="text-[#25D366]" />}
-              {downloadingPdf === "complete" ? "Generating PDF Receipt..." : "Share Receipt to WhatsApp"}
+              {downloadingPdf === "complete" ? (
+                <Loader2 size={14} className="animate-spin text-[#25D366]" />
+              ) : (
+                <Share2 size={14} className="text-[#25D366]" />
+              )}
+              {downloadingPdf === "complete"
+                ? "Generating PDF Receipt..."
+                : "Share Receipt to WhatsApp"}
             </button>
             <a
               href={getWaLink()}
@@ -3696,7 +5695,14 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                 if (!amt) return;
                 const ref = prompt("Enter payment reference (optional):");
                 try {
-                  await addPaymentFn({ data: { passcode, preorderId: preorder.id, amount: parseInt(amt, 10), paymentReference: ref || `MANUAL_ADD_${Date.now()}` } });
+                  await addPaymentFn({
+                    data: {
+                      passcode,
+                      preorderId: preorder.id,
+                      amount: parseInt(amt, 10),
+                      paymentReference: ref || `MANUAL_ADD_${Date.now()}`,
+                    },
+                  });
                   onSaved();
                 } catch (err) {
                   alert(err instanceof Error ? err.message : "Failed to add manual payment");
@@ -3708,8 +5714,28 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
             </button>
             {role === "owner" && (
               <>
-                <button type="button" onClick={() => setEditing((value) => !value)} className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"><Pencil size={14} /> {editing ? "Close correction" : "Correct details"}</button>
-                <button type="button" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete pre-order ${preorder.preorderCode}? This cannot be undone.`)) deleteMutation.mutate(); }} className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"><Trash2 size={14} /> Delete pre-order</button>
+                <button
+                  type="button"
+                  onClick={() => setEditing((value) => !value)}
+                  className="inline-flex items-center gap-2 rounded-full bg-[#F7F5F0] px-4 py-2 text-xs font-semibold text-[#0F3D24] ring-1 ring-[#0F3D24]/10 hover:bg-white"
+                >
+                  <Pencil size={14} /> {editing ? "Close correction" : "Correct details"}
+                </button>
+                <button
+                  type="button"
+                  disabled={deleteMutation.isPending}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Delete pre-order ${preorder.preorderCode}? This cannot be undone.`,
+                      )
+                    )
+                      deleteMutation.mutate();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-xs font-semibold text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-50"
+                >
+                  <Trash2 size={14} /> Delete pre-order
+                </button>
               </>
             )}
             <div className="w-full mt-2">
@@ -3717,7 +5743,13 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                 onClick={async () => {
                   setDownloadingPdf("complete");
                   try {
-                    await downloadPdf(preorderCompleteReceiptHtml(preorder, preorder.payments?.filter((p: any) => p.confirmedByAdmin) || []), `complete_receipt_${preorder.preorderCode}.pdf`);
+                    await downloadPdf(
+                      preorderCompleteReceiptHtml(
+                        preorder,
+                        preorder.payments?.filter((p: any) => p.confirmedByAdmin) || [],
+                      ),
+                      `complete_receipt_${preorder.preorderCode}.pdf`,
+                    );
                   } catch (e: any) {
                     alert("PDF Error: " + (e.message || String(e)));
                   } finally {
@@ -3727,20 +5759,65 @@ function PreorderRow({ preorder, passcode, role, batches, onSaved }: { preorder:
                 disabled={downloadingPdf === "complete"}
                 className="inline-flex items-center gap-2 rounded-full bg-[#3F8F3F]/10 px-4 py-2 text-xs font-bold text-[#0F3D24] ring-1 ring-[#3F8F3F]/30 hover:bg-[#3F8F3F]/20 disabled:opacity-50 transition-all"
               >
-                {downloadingPdf === "complete" ? <Loader2 size={14} className="text-[#3F8F3F] animate-spin" /> : <FileText size={14} className="text-[#3F8F3F]" />}
-                {downloadingPdf === "complete" ? "Generating Master PDF..." : "Download Complete Receipt PDF"}
+                {downloadingPdf === "complete" ? (
+                  <Loader2 size={14} className="text-[#3F8F3F] animate-spin" />
+                ) : (
+                  <FileText size={14} className="text-[#3F8F3F]" />
+                )}
+                {downloadingPdf === "complete"
+                  ? "Generating Master PDF..."
+                  : "Download Complete Receipt PDF"}
               </button>
             </div>
           </div>
 
           {role === "owner" && editing && (
             <div className="mt-4 grid gap-3 rounded-2xl bg-[#F7F5F0] p-4 sm:grid-cols-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Customer name<input value={customerName} onChange={(event) => setCustomerName(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Address<input value={address} onChange={(event) => setAddress(event.target.value)} className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">Notes<textarea value={notes} onChange={(event) => setNotes(event.target.value)} className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]" /></label>
-              <button type="button" disabled={correctionMutation.isPending} onClick={() => correctionMutation.mutate()} className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2">{correctionMutation.isPending ? "Saving correction…" : "Save correction"}</button>
-              {correctionMutation.isError && <p className="text-sm text-red-600 sm:col-span-2">{(correctionMutation.error as Error).message}</p>}
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Customer name
+                <input
+                  value={customerName}
+                  onChange={(event) => setCustomerName(event.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F]">
+                Phone
+                <input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">
+                Address
+                <input
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  className="mt-1 block w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <label className="text-xs font-semibold uppercase tracking-wider text-[#3F8F3F] sm:col-span-2">
+                Notes
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  className="mt-1 block min-h-20 w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-sm font-normal normal-case tracking-normal outline-none focus:border-[#3F8F3F]"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={correctionMutation.isPending}
+                onClick={() => correctionMutation.mutate()}
+                className="rounded-full bg-[#3F8F3F] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2"
+              >
+                {correctionMutation.isPending ? "Saving correction…" : "Save correction"}
+              </button>
+              {correctionMutation.isError && (
+                <p className="text-sm text-red-600 sm:col-span-2">
+                  {(correctionMutation.error as Error).message}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -3795,7 +5872,12 @@ function PendingPaymentDetailsModal({
   };
 
   const handleReject = async () => {
-    if (!confirm(`Reject payment of ₦${payment.amount.toLocaleString()} for order ${preorder.preorderCode}?`)) return;
+    if (
+      !confirm(
+        `Reject payment of ₦${payment.amount.toLocaleString()} for order ${preorder.preorderCode}?`,
+      )
+    )
+      return;
     setLoading(true);
     try {
       await deletePaymentFn({ data: { passcode, paymentId: payment.id } });
@@ -3818,7 +5900,9 @@ function PendingPaymentDetailsModal({
         <div className="bg-[#0F3D24] px-6 py-4 text-white flex items-center justify-between shrink-0">
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-lg font-bold text-amber-300">{preorder.preorderCode}</span>
+              <span className="font-mono text-lg font-bold text-amber-300">
+                {preorder.preorderCode}
+              </span>
               <span className="rounded-full bg-amber-400/20 px-2.5 py-0.5 text-[11px] font-bold text-amber-200 ring-1 ring-amber-300/30">
                 Awaiting Payment Approval
               </span>
@@ -3838,8 +5922,12 @@ function PendingPaymentDetailsModal({
           {/* Pending Payment Card Banner */}
           <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-200 border-l-4 border-amber-500 flex items-center justify-between">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block">Payment Submitted</span>
-              <span className="text-xl font-extrabold text-[#0F3D24]">₦{payment.amount?.toLocaleString()}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-800 block">
+                Payment Submitted
+              </span>
+              <span className="text-xl font-extrabold text-[#0F3D24]">
+                ₦{payment.amount?.toLocaleString()}
+              </span>
               <span className="block text-xs text-amber-900/70 mt-0.5">
                 Submitted on {new Date(payment.paymentDate || Date.now()).toLocaleDateString()}
               </span>
@@ -3851,39 +5939,60 @@ function PendingPaymentDetailsModal({
 
           {/* Customer Details */}
           <div className="rounded-2xl bg-[#F7F5F0] p-4 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-[#0F3D24]/60">Customer Information</h4>
+            <h4 className="text-xs font-bold uppercase tracking-widest text-[#0F3D24]/60">
+              Customer Information
+            </h4>
             <div className="font-bold text-[#0F3D24] text-base">{preorder.customerName}</div>
             <div className="flex flex-wrap items-center gap-3 text-xs">
-              <a href={`tel:${preorder.phone}`} className="inline-flex items-center gap-1 font-mono font-bold text-[#3F8F3F] hover:underline">
+              <a
+                href={`tel:${preorder.phone}`}
+                className="inline-flex items-center gap-1 font-mono font-bold text-[#3F8F3F] hover:underline"
+              >
                 <Phone size={13} /> {preorder.phone}
               </a>
               {waPhone && (
-                <a href={`https://wa.me/${waPhone}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-bold text-[#25D366] hover:underline">
+                <a
+                  href={`https://wa.me/${waPhone}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-bold text-[#25D366] hover:underline"
+                >
                   <MessageCircle size={13} /> Chat on WhatsApp
                 </a>
               )}
             </div>
             <div className="text-xs text-slate-600 pt-1 border-t border-[#0F3D24]/5">
-              <span className="font-semibold text-[#0F3D24]">Delivery Address:</span> {preorder.address || "Owerri, Imo State"}
+              <span className="font-semibold text-[#0F3D24]">Delivery Address:</span>{" "}
+              {preorder.address || "Owerri, Imo State"}
             </div>
             {preorder.notes && (
-              <div className="text-xs italic text-slate-500">
-                "{preorder.notes}"
-              </div>
+              <div className="text-xs italic text-slate-500">"{preorder.notes}"</div>
             )}
           </div>
 
           {/* Order Summary */}
           <div className="rounded-2xl bg-white p-4 ring-1 ring-[#0F3D24]/10 space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-widest text-[#0F3D24]/60">Order Summary</h4>
+            <h4 className="text-xs font-bold uppercase tracking-widest text-[#0F3D24]/60">
+              Order Summary
+            </h4>
             <div className="flex justify-between items-center font-bold text-[#0F3D24]">
-              <span>{preorder.product} × {preorder.quantity}</span>
-              <span>₦{(preorder.unitPrice ? preorder.unitPrice * preorder.quantity : preorder.totalAmount).toLocaleString()}</span>
+              <span>
+                {preorder.product} × {preorder.quantity}
+              </span>
+              <span>
+                ₦
+                {(preorder.unitPrice
+                  ? preorder.unitPrice * preorder.quantity
+                  : preorder.totalAmount
+                ).toLocaleString()}
+              </span>
             </div>
             <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-xs text-center font-medium">
               <div className="p-2 rounded-xl bg-slate-50">
                 <span className="block text-[10px] text-slate-500 uppercase">Total Order</span>
-                <span className="font-bold text-[#0F3D24]">₦{preorder.totalAmount?.toLocaleString()}</span>
+                <span className="font-bold text-[#0F3D24]">
+                  ₦{preorder.totalAmount?.toLocaleString()}
+                </span>
               </div>
               <div className="p-2 rounded-xl bg-emerald-50 text-emerald-800">
                 <span className="block text-[10px] text-emerald-600 uppercase">Paid So Far</span>
@@ -3897,7 +6006,9 @@ function PendingPaymentDetailsModal({
             {preorder.preferredDeliveryDate && (
               <div className="text-xs text-slate-500 pt-2 flex justify-between border-t border-slate-100 mt-2">
                 <span>Preferred Delivery Date:</span>
-                <span className="font-semibold text-[#0F3D24]">{new Date(preorder.preferredDeliveryDate).toLocaleDateString()}</span>
+                <span className="font-semibold text-[#0F3D24]">
+                  {new Date(preorder.preferredDeliveryDate).toLocaleDateString()}
+                </span>
               </div>
             )}
           </div>

@@ -52,7 +52,10 @@ function makePreorderCode(): string {
 
 function makePaymentRef(): string {
   const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.floor(Math.random() * 0xfffff).toString(16).toUpperCase().padStart(5, "0");
+  const rand = Math.floor(Math.random() * 0xfffff)
+    .toString(16)
+    .toUpperCase()
+    .padStart(5, "0");
   return `DAF-${ts}-${rand}`;
 }
 
@@ -76,7 +79,7 @@ function mapPreorder(r: Record<string, unknown>, batchMap?: Map<string, string>)
       ? "fully_paid"
       : amountPaid > 0
         ? "partially_paid"
-        : ((r.payment_status as PreorderPaymentStatus) || "pending");
+        : (r.payment_status as PreorderPaymentStatus) || "pending";
 
   return {
     id: r.id as string,
@@ -99,46 +102,9 @@ function mapPreorder(r: Record<string, unknown>, batchMap?: Map<string, string>)
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
     batchId: bId,
-    batchName: bId && batchMap ? batchMap.get(bId) ?? null : null,
+    batchName: bId && batchMap ? (batchMap.get(bId) ?? null) : null,
     payments: rawPayments,
   };
-}
-
-async function syncPreorderTotals(preorderId: string): Promise<void> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: pData } = await supabaseAdmin
-    .from("preorders")
-    .select("id, total_amount")
-    .eq("id", preorderId)
-    .single();
-  if (!pData) return;
-
-  const { data: payments } = await supabaseAdmin
-    .from("preorder_payments")
-    .select("amount, confirmed_by_admin")
-    .eq("preorder_id", preorderId);
-
-  const confirmedTotal = (payments || [])
-    .filter((p: any) => p.confirmed_by_admin)
-    .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
-  const totalAmount = Number(pData.total_amount) || 0;
-  const balance = Math.max(0, totalAmount - confirmedTotal);
-  const paymentStatus =
-    confirmedTotal >= totalAmount && totalAmount > 0
-      ? "fully_paid"
-      : confirmedTotal > 0
-        ? "partially_paid"
-        : "pending";
-
-  await supabaseAdmin
-    .from("preorders")
-    .update({
-      amount_paid: confirmedTotal,
-      balance,
-      payment_status: paymentStatus,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", preorderId);
 }
 
 function mapPayment(r: Record<string, unknown>): PreorderPayment {
@@ -241,16 +207,14 @@ export const adminUpdatePreorderSettings = createServerFn({ method: "POST" })
       updatedAt,
     };
 
-    const { error } = await supabaseAdmin
-      .from("app_settings")
-      .upsert(
-        {
-          key: PREORDER_SETTINGS_KEY,
-          value: JSON.stringify(payload),
-          updated_at: updatedAt,
-        },
-        { onConflict: "key" },
-      );
+    const { error } = await supabaseAdmin.from("app_settings").upsert(
+      {
+        key: PREORDER_SETTINGS_KEY,
+        value: JSON.stringify(payload),
+        updated_at: updatedAt,
+      },
+      { onConflict: "key" },
+    );
 
     if (error) throw new Error(error.message);
 
@@ -290,11 +254,9 @@ export const createPreorder = createServerFn({ method: "POST" })
 
     // RECALCULATE PRICE ON BACKEND TO PREVENT SPOOFING
     // Hardcode the December Products list here to ensure absolute truth
-    const DECEMBER_PRODUCTS = [
-      { label: "Live Broiler Chicken (3kg and above)", price: 12250 },
-    ];
-    
-    const productDef = DECEMBER_PRODUCTS.find(p => p.label === data.product);
+    const DECEMBER_PRODUCTS = [{ label: "Live Broiler Chicken (3kg and above)", price: 12250 }];
+
+    const productDef = DECEMBER_PRODUCTS.find((p) => p.label === data.product);
     if (!productDef) {
       throw new Error(`Invalid product selected: ${data.product}`);
     }
@@ -329,47 +291,51 @@ export const createPreorder = createServerFn({ method: "POST" })
 // ─── Get preorder by code (public) ───────────────────────────────────────────
 
 export const getPreorderByCode = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ preorderCode: z.string().trim().min(1) }).parse(data))
-  .handler(async ({ data }): Promise<{ preorder: Preorder; payments: PreorderPayment[] } | null> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await supabaseAdmin
-      .from("preorders")
-      .select("*")
-      .eq("preorder_code", data.preorderCode.toUpperCase().trim())
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!row) return null;
-    const { data: payments, error: pe } = await supabaseAdmin
-      .from("preorder_payments")
-      .select("*")
-      .eq("preorder_id", row.id)
-      .order("payment_date", { ascending: true });
-    if (pe) throw new Error(pe.message);
-    return {
-      preorder: mapPreorder(row as Record<string, unknown>),
-      payments: (payments ?? []).map((p) => mapPayment(p as Record<string, unknown>)),
-    };
-  });
+  .inputValidator((data: unknown) =>
+    z
+      .object({ preorderCode: z.string().trim().min(1), phone: z.string().max(30).optional() })
+      .parse(data),
+  )
+  .handler(
+    async ({ data }): Promise<{ preorder: Preorder; payments: PreorderPayment[] } | null> => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await (
+        await import("./customer-access.server")
+      ).requireCustomerAccess(supabaseAdmin, data.preorderCode, data.phone);
+      const { data: row, error } = await supabaseAdmin
+        .from("preorders")
+        .select("*")
+        .eq("preorder_code", data.preorderCode.toUpperCase().trim())
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!row) return null;
+      const { data: payments, error: pe } = await supabaseAdmin
+        .from("preorder_payments")
+        .select("*")
+        .eq("preorder_id", row.id)
+        .order("payment_date", { ascending: true });
+      if (pe) throw new Error(pe.message);
+      return {
+        preorder: mapPreorder(row as Record<string, unknown>),
+        payments: (payments ?? []).map((p) => mapPayment(p as Record<string, unknown>)),
+      };
+    },
+  );
 
 // ─── Get preorders by phone (customer dashboard) ──────────────────────────────
 
 export const getPreordersByPhone = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ phone: z.string().trim().min(7).max(30) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ phone: z.string().trim().min(7).max(30) }).parse(data),
+  )
   .handler(async ({ data }): Promise<Preorder[]> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const normalizedPhone = data.phone.replace(/\D+/g, "");
-    const { data: rows, error } = await supabaseAdmin
-      .from("preorders")
-      .select("*")
-      .or(`phone.ilike.%${normalizedPhone}%`)
-      .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
-    return (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>));
+    throw new Error("Use your order reference and phone number to view your preorder.");
   });
 
 // ─── Submit payment claim (customer side, manual transfer) ────────────────────
 
 const submitPaymentSchema = z.object({
+  phone: z.string().max(30).optional(),
   preorderCode: z.string().trim().min(1),
   amount: z.number().int().min(1),
   paymentReference: z.string().trim().min(1).max(100).optional(),
@@ -379,6 +345,9 @@ export const submitPreorderPayment = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => submitPaymentSchema.parse(data))
   .handler(async ({ data }): Promise<{ paymentReference: string }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (
+      await import("./customer-access.server")
+    ).requireCustomerAccess(supabaseAdmin, data.preorderCode, data.phone);
 
     // Fetch preorder
     const { data: preorder, error: pe } = await supabaseAdmin
@@ -389,7 +358,8 @@ export const submitPreorderPayment = createServerFn({ method: "POST" })
     if (pe || !preorder) throw new Error("Pre-order not found.");
 
     // Prevent re-submitting if already fully paid
-    if (preorder.payment_status === "fully_paid") throw new Error("This order is already fully paid.");
+    if (preorder.payment_status === "fully_paid")
+      throw new Error("This order is already fully paid.");
 
     const ref = data.paymentReference?.trim() || makePaymentRef();
 
@@ -446,7 +416,10 @@ export const adminListPreorders = createServerFn({ method: "POST" })
     const batchMap = new Map<string, string>();
     (batchRows ?? []).forEach((b) => batchMap.set(b.id, b.batch_name));
 
-    return { preorders: (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>, batchMap)), role };
+    return {
+      preorders: (rows ?? []).map((r) => mapPreorder(r as Record<string, unknown>, batchMap)),
+      role,
+    };
   });
 
 const adminAssignPreorderBatchSchema = z.object({
@@ -475,7 +448,9 @@ export const adminAssignPreorderBatch = createServerFn({ method: "POST" })
 // ─── Admin: get single pre-order with payments ────────────────────────────────
 
 export const adminGetPreorderDetail = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1), preorderCode: z.string().min(1) }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), preorderCode: z.string().min(1) }).parse(data),
+  )
   .handler(async ({ data }): Promise<{ preorder: Preorder; payments: PreorderPayment[] }> => {
     await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -519,15 +494,14 @@ export const adminConfirmPreorderPayment = createServerFn({ method: "POST" })
       .select("preorder_id")
       .single();
     if (error) throw new Error(error.message);
-    if (updated?.preorder_id) {
-      await syncPreorderTotals(updated.preorder_id);
-    }
   });
 
 // ─── Admin: reject/remove a payment ──────────────────────────────────────────
 
 export const adminDeletePreorderPayment = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1), paymentId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), paymentId: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<void> => {
     await checkAdminPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -537,22 +511,24 @@ export const adminDeletePreorderPayment = createServerFn({ method: "POST" })
       .eq("id", data.paymentId)
       .maybeSingle();
 
-    const { error } = await supabaseAdmin.from("preorder_payments").delete().eq("id", data.paymentId);
+    const { error } = await supabaseAdmin
+      .from("preorder_payments")
+      .delete()
+      .eq("id", data.paymentId);
     if (error) throw new Error(error.message);
-    if (existing?.preorder_id) {
-      await syncPreorderTotals(existing.preorder_id);
-    }
   });
 
 // ─── Admin: update delivery status ───────────────────────────────────────────
 
 export const adminUpdatePreorderDelivery = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string().min(1),
-      preorderId: z.string().uuid(),
-      deliveryStatus: z.enum(["pending", "delivered"]),
-    }).parse(data)
+    z
+      .object({
+        passcode: z.string().min(1),
+        preorderId: z.string().uuid(),
+        deliveryStatus: z.enum(["pending", "delivered"]),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<void> => {
     await checkAdminPasscode(data.passcode);
@@ -588,7 +564,6 @@ export const adminAddPreorderPayment = createServerFn({ method: "POST" })
       confirmed_by_admin: true,
     });
     if (error) throw new Error(error.message);
-    await syncPreorderTotals(data.preorderId);
   });
 
 // ─── Admin: list all pending (unconfirmed) payments ───────────────────────────
@@ -616,7 +591,7 @@ export const adminListPendingPayments = createServerFn({ method: "POST" })
 
 export const adminDeletePreorder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ passcode: z.string().min(1), preorderId: z.string().uuid() }).parse(data)
+    z.object({ passcode: z.string().min(1), preorderId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data }): Promise<void> => {
     await checkAdminOwner(data.passcode);
@@ -629,14 +604,16 @@ export const adminDeletePreorder = createServerFn({ method: "POST" })
 
 export const adminCorrectPreorder = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string().min(1),
-      preorderId: z.string().uuid(),
-      customerName: z.string().min(1),
-      phone: z.string().min(1),
-      address: z.string().min(1),
-      notes: z.string().nullable(),
-    }).parse(data)
+    z
+      .object({
+        passcode: z.string().min(1),
+        preorderId: z.string().uuid(),
+        customerName: z.string().min(1),
+        phone: z.string().min(1),
+        address: z.string().min(1),
+        notes: z.string().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<void> => {
     await checkAdminOwner(data.passcode);

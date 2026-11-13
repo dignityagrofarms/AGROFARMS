@@ -10,11 +10,14 @@ export type FarmBatch = {
   batchType: string;
   initialHeadcount: number;
   currentHeadcount: number;
+  totalMortality?: number;
+  totalBirdsSold?: number;
   startDate: string;
   targetHarvestDate: string | null;
   status: "active" | "completed" | "archived";
   closedAt?: string | null;
   closedBy?: string | null;
+  showFinancialsToStaff: boolean;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -39,8 +42,11 @@ export type FarmFinancial = {
   feedBags?: number | null;
   feedKgPerBag?: number | null;
   feedBrand?: string | null;
+  birdsSold?: number | null;
   recordedBy: string | null;
-  approvalStatus?: "approved" | "pending_approval" | "rejected";
+  recordedByName?: string | null;
+  recordedByRole?: "owner" | "manager" | "staff" | null;
+  approvalStatus?: "approved" | "pending_approval" | "flagged" | "rejected";
   rejectionReason?: string | null;
   createdAt: string;
 };
@@ -53,9 +59,11 @@ export type FarmFinancialPayment = {
   paymentMethod: string;
   referenceNo: string | null;
   notes: string | null;
-  approvalStatus: "pending" | "approved" | "rejected";
+  approvalStatus: "pending" | "approved" | "flagged" | "rejected";
   rejectionReason?: string | null;
   recordedBy: string | null;
+  recordedByName?: string | null;
+  recordedByRole?: "owner" | "manager" | "staff" | null;
   createdAt: string;
 };
 
@@ -129,7 +137,12 @@ export type CrmLead = {
   location: string | null;
   leadSource: string;
   interestedIn: string | null;
-  status: "New Lead" | "Contacted" | "Interested / Negotiating" | "Converted to Customer" | "Lost / Inactive";
+  status:
+    | "New Lead"
+    | "Contacted"
+    | "Interested / Negotiating"
+    | "Converted to Customer"
+    | "Lost / Inactive";
   estimatedValue: number;
   notes: string | null;
   followUpDate: string | null;
@@ -162,7 +175,9 @@ export type FarmActivity = {
   medicationGiven: string | null;
   notes: string | null;
   recordedBy: string | null;
-  approvalStatus?: "approved" | "pending_approval" | "rejected";
+  recordedByName?: string | null;
+  recordedByRole?: "owner" | "manager" | "staff" | null;
+  approvalStatus?: "approved" | "pending_approval" | "flagged" | "rejected";
   rejectionReason?: string | null;
   createdAt: string;
   // Daily Log & Feed Bag tracking fields
@@ -201,6 +216,7 @@ export type BatchFeedLedger = {
     bagsBought: number;
     spend: number;
   }>;
+  unspecifiedFeedCount?: number;
 };
 
 export type PendingContactTransaction = {
@@ -215,26 +231,31 @@ export type PendingContactTransaction = {
   totalAmount: number;
   amountPaid: number;
   recordedBy: string | null;
-  approvalStatus: "approved" | "pending_approval" | "rejected";
+  recordedByName?: string | null;
+  recordedByRole?: "owner" | "manager" | "staff" | null;
+  approvalStatus: "approved" | "pending_approval" | "flagged" | "rejected";
   rejectionReason?: string | null;
   createdAt: string;
 };
 
 export type MySubmissionItem = {
   id: string;
-  targetType: "financial" | "activity" | "contact_tx";
+  targetType: "financial" | "activity" | "contact_tx" | "fin_payment";
   title: string;
   subtitle: string;
   date: string;
   batchName: string | null;
   amount: number | null;
-  approvalStatus: "approved" | "pending_approval" | "rejected";
+  approvalStatus: "approved" | "pending_approval" | "pending" | "flagged" | "rejected";
   rejectionReason: string | null;
   createdAt: string;
+  financialRecord?: FarmFinancial | null;
+  activityRecord?: FarmActivity | null;
 };
 
 export type BatchReport = {
   batch: FarmBatch;
+  financialsRestricted?: boolean;
   totalIncome: number;
   totalExpense: number;
   netProfit: number;
@@ -264,6 +285,7 @@ const createBatchSchema = baseAuthSchema.extend({
   startDate: z.string().trim().min(1),
   targetHarvestDate: z.string().trim().optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
+  showFinancialsToStaff: z.boolean().optional().default(false),
 });
 
 const updateBatchSchema = baseAuthSchema.extend({
@@ -276,6 +298,7 @@ const updateBatchSchema = baseAuthSchema.extend({
   startDate: z.string().trim().min(1),
   targetHarvestDate: z.string().trim().optional().nullable(),
   notes: z.string().trim().max(1000).optional().nullable(),
+  showFinancialsToStaff: z.boolean().optional(),
 });
 
 const createFinancialSchema = baseAuthSchema.extend({
@@ -293,6 +316,7 @@ const createFinancialSchema = baseAuthSchema.extend({
   feedBags: z.number().min(0).optional().nullable(),
   feedKgPerBag: z.number().min(1).max(500).optional().nullable(),
   feedBrand: z.string().trim().max(120).optional().nullable(),
+  birdsSold: z.number().int().min(0).max(100000).optional().nullable(),
 });
 
 const createLeadSchema = baseAuthSchema.extend({
@@ -302,7 +326,15 @@ const createLeadSchema = baseAuthSchema.extend({
   location: z.string().trim().max(250).optional().nullable(),
   leadSource: z.string().trim().min(1).max(100).default("WhatsApp"),
   interestedIn: z.string().trim().max(200).optional().nullable(),
-  status: z.enum(["New Lead", "Contacted", "Interested / Negotiating", "Converted to Customer", "Lost / Inactive"]).default("New Lead"),
+  status: z
+    .enum([
+      "New Lead",
+      "Contacted",
+      "Interested / Negotiating",
+      "Converted to Customer",
+      "Lost / Inactive",
+    ])
+    .default("New Lead"),
   estimatedValue: z.number().min(0).default(0),
   notes: z.string().trim().max(1000).optional().nullable(),
   followUpDate: z.string().trim().optional().nullable(),
@@ -334,6 +366,20 @@ const createActivitySchema = baseAuthSchema.extend({
   notes: z.string().trim().max(1000).optional().nullable(),
 });
 
+export async function assertFinancialRead(passcode: string, batchId?: string | null) {
+  const role = await checkPasscode(passcode);
+  if (role !== "staff") return;
+  if (!batchId) throw new Error("Financial reports require Owner or Manager access.");
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await (supabaseAdmin as any)
+    .from("farm_batches")
+    .select("show_financials_to_staff")
+    .eq("id", batchId)
+    .single();
+  if (error || !data?.show_financials_to_staff)
+    throw new Error("Financial reports are restricted for this batch.");
+}
+
 // ─── Batch Guard Helper ──────────────────────────────────────────────────────
 
 export async function assertBatchOpen(supabaseAdmin: any, batchId: string) {
@@ -353,6 +399,171 @@ export async function assertBatchOpen(supabaseAdmin: any, batchId: string) {
   return batch;
 }
 
+const FLAG_PREFIX = "[FLAGGED FOR CORRECTION] ";
+
+const FEED_BRAND_PATTERNS: Array<[RegExp, string]> = [
+  [/\bnew\s*hope\b/i, "New Hope"],
+  [/\bultima(?:\s*plus)?\b/i, "Ultima"],
+  [/\btop\s*feed\b/i, "TopFeed"],
+  [/\bvital\s*(?:feed)?\b/i, "Vital Feed"],
+  [/\bchikun\b/i, "Chikun"],
+  [/\bolam\b/i, "Olam"],
+  [/\bhybrid\b/i, "Hybrid"],
+  [/\bpremier\b/i, "Premier"],
+  [/\bamo\s*byng\b/i, "Amo Byng"],
+  [/\bblue\s*crown\b/i, "Blue Crown"],
+  [/\banimal\s*care\b/i, "Animal Care"],
+];
+
+export function extractFeedMetadataFromText(description?: string | null): {
+  feedBags: number | null;
+  feedKgPerBag: number | null;
+  feedBrand: string | null;
+} {
+  const desc = String(description || "").trim();
+  if (!desc) return { feedBags: null, feedKgPerBag: null, feedBrand: null };
+
+  let feedBags: number | null = null;
+  const bagsMatch = desc.match(/\b(\d+(?:\.\d+)?)\s*(?:bags?|bgs?)\b/i);
+  if (bagsMatch) {
+    const parsed = parseFloat(bagsMatch[1]);
+    if (Number.isFinite(parsed) && parsed > 0 && parsed <= 5000) {
+      feedBags = parsed;
+    }
+  }
+
+  let feedKgPerBag: number | null = null;
+  const kgMatch = desc.match(/\b(\d+(?:\.\d+)?)\s*kg\b/i);
+  if (kgMatch) {
+    const parsedKg = parseFloat(kgMatch[1]);
+    if (Number.isFinite(parsedKg) && parsedKg >= 5 && parsedKg <= 100) {
+      feedKgPerBag = parsedKg;
+    }
+  }
+
+  let feedBrand: string | null = null;
+  for (const [pattern, brandName] of FEED_BRAND_PATTERNS) {
+    if (pattern.test(desc)) {
+      feedBrand = brandName;
+      break;
+    }
+  }
+
+  return { feedBags, feedKgPerBag, feedBrand };
+}
+
+export function extractBirdsSoldFromText(
+  category?: string | null,
+  description?: string | null,
+): number {
+  const cat = String(category || "").trim();
+  const desc = String(description || "").trim();
+  if (!desc) return 0;
+
+  if (/\b(?:eggs?|crates?|manure|dung|litter)\b/i.test(cat)) return 0;
+  const isBirdCategory = /bird|offload|broiler|chicken|layer|cockerel|turkey|bulk\s*sale/i.test(
+    cat,
+  );
+  const isGenericIncomeWithBirdDesc =
+    /pre-?order|other\s*income|store\s*order/i.test(cat) &&
+    /\b(?:birds?|broilers?|chickens?|hens?|cockerels?|layers?|pullets?)\b/i.test(desc) &&
+    !/\b(?:eggs?|crates?|manure|dung|litter)\b/i.test(desc);
+
+  if (!isBirdCategory && !isGenericIncomeWithBirdDesc) return 0;
+
+  const patterns = [
+    /\b(\d+(?:,\d{3})*)\s*(?:live\s+|dressed\s+|processed\s+|broiler\s+|layer\s+|old\s+layer\s+)?(?:birds?|broilers?|chickens?|hens?|cocks?|cockerels?|layers?|pullets?)\b/i,
+    /\bsold\s+(\d+(?:,\d{3})*)\b(?!\s*(?:naira|ngn|k\b|thousand|million|kg|bags?|crates?))/i,
+    /\b(\d+(?:,\d{3})*)\s*(?:pcs|pieces|heads?|units?)\b/i,
+  ];
+
+  for (const re of patterns) {
+    const m = desc.match(re);
+    if (m) {
+      const count = parseInt(m[1].replace(/,/g, ""), 10);
+      if (Number.isFinite(count) && count > 0 && count <= 100000) {
+        return count;
+      }
+    }
+  }
+  return 0;
+}
+
+function countOrderItemBirds(item: any): number {
+  const title = String(item?.product || "");
+  const option = String(item?.option || "");
+  if (/egg|consult/i.test(title) || !/broiler|chicken|bird|dressed|live|layer|hen/i.test(title)) {
+    return 0;
+  }
+  const qty = Math.max(0, Number(item?.qty || 0));
+  if (!qty) return 0;
+  const optMatch = option.match(/\b(\d+)\s*(?:birds?|chickens?|pcs)\b/i);
+  const mult = optMatch ? Math.max(1, parseInt(optMatch[1], 10)) : 1;
+  return Math.round(qty * mult);
+}
+
+function isBirdPreorderProduct(product?: string | null): boolean {
+  const title = String(product || "");
+  return (
+    Boolean(title) &&
+    !/egg|consult/i.test(title) &&
+    /broiler|chicken|bird|dressed|live|layer|hen/i.test(title)
+  );
+}
+
+async function computeBatchLivestockStats(
+  supabaseAdmin: any,
+  batchIds: string[],
+): Promise<
+  Map<string, { totalMortality: number; totalBirdsSold: number; totalAdjustments: number }>
+> {
+  if (!batchIds.length) return new Map();
+  const { data, error } = await supabaseAdmin.rpc("batch_stock_summary", { batch_ids: batchIds });
+  if (error) throw new Error(`Stock calculation unavailable: ${error.message}`);
+  return new Map(
+    (data || []).map((r: any) => [
+      r.batch_id,
+      {
+        totalMortality: Number(r.total_mortality),
+        totalBirdsSold: Number(r.total_birds_sold),
+        totalAdjustments: Number(r.total_adjustments),
+      },
+    ]),
+  );
+}
+
+function resolveEffectiveApprovalState(
+  rawStatus?: string | null,
+  rawReason?: string | null,
+): {
+  approvalStatus: "approved" | "pending_approval" | "pending" | "flagged" | "rejected";
+  rejectionReason: string | null;
+} {
+  const status = rawStatus || "approved";
+  const reason = rawReason || null;
+  if (status === "flagged") {
+    return {
+      approvalStatus: "flagged",
+      rejectionReason:
+        reason && reason.startsWith(FLAG_PREFIX) ? reason.slice(FLAG_PREFIX.length) : reason,
+    };
+  }
+  if (
+    (status === "pending_approval" || status === "pending") &&
+    reason &&
+    reason.startsWith(FLAG_PREFIX)
+  ) {
+    return {
+      approvalStatus: "flagged",
+      rejectionReason: reason.slice(FLAG_PREFIX.length),
+    };
+  }
+  return {
+    approvalStatus: status as any,
+    rejectionReason: reason,
+  };
+}
+
 function mapFinancialRow(r: any): FarmFinancial {
   const amount = Number(r.amount || 0);
   const rawPaid = r.amount_paid;
@@ -360,6 +571,10 @@ function mapFinancialRow(r: any): FarmFinancial {
   const balanceDue = Math.max(0, Math.round((amount - amountPaid) * 100) / 100);
   const paymentStatus: "paid" | "partial" | "unpaid" =
     balanceDue <= 0.005 ? "paid" : amountPaid > 0 ? "partial" : "unpaid";
+  const resolved = resolveEffectiveApprovalState(
+    r.approval_status ?? "approved",
+    r.rejection_reason ?? null,
+  );
 
   return {
     id: r.id,
@@ -378,16 +593,24 @@ function mapFinancialRow(r: any): FarmFinancial {
     transactionDate: r.transaction_date,
     referenceNo: r.reference_no ?? null,
     feedBags: r.feed_bags !== null && r.feed_bags !== undefined ? Number(r.feed_bags) : null,
-    feedKgPerBag: r.feed_kg_per_bag !== null && r.feed_kg_per_bag !== undefined ? Number(r.feed_kg_per_bag) : null,
+    feedKgPerBag:
+      r.feed_kg_per_bag !== null && r.feed_kg_per_bag !== undefined
+        ? Number(r.feed_kg_per_bag)
+        : null,
     feedBrand: r.feed_brand ?? null,
+    birdsSold: r.birds_sold !== null && r.birds_sold !== undefined ? Number(r.birds_sold) : null,
     recordedBy: r.recorded_by ?? null,
-    approvalStatus: r.approval_status ?? "approved",
-    rejectionReason: r.rejection_reason ?? null,
+    approvalStatus: resolved.approvalStatus as any,
+    rejectionReason: resolved.rejectionReason,
     createdAt: r.created_at,
   };
 }
 
 function mapActivityRow(r: any): FarmActivity {
+  const resolved = resolveEffectiveApprovalState(
+    r.approval_status ?? "approved",
+    r.rejection_reason ?? null,
+  );
   return {
     id: r.id,
     batchId: r.batch_id ?? null,
@@ -401,25 +624,32 @@ function mapActivityRow(r: any): FarmActivity {
     medicationGiven: r.medication_given ?? null,
     notes: r.notes ?? null,
     recordedBy: r.recorded_by ?? null,
-    approvalStatus: r.approval_status ?? "approved",
-    rejectionReason: r.rejection_reason ?? null,
+    approvalStatus: resolved.approvalStatus as any,
+    rejectionReason: resolved.rejectionReason,
     createdAt: r.created_at,
     sickCount: Number(r.sick_count || 0),
     feedGiven: r.feed_given ?? null,
     feedBrand: r.feed_brand ?? null,
     feedBagNo: r.feed_bag_no !== null && r.feed_bag_no !== undefined ? Number(r.feed_bag_no) : null,
-    feedBagStatus: r.feed_bag_status === "opened" || r.feed_bag_status === "finished" ? r.feed_bag_status : null,
-    feedBagsUsed: r.feed_bags_used !== null && r.feed_bags_used !== undefined ? Number(r.feed_bags_used) : null,
+    feedBagStatus:
+      r.feed_bag_status === "opened" || r.feed_bag_status === "finished" ? r.feed_bag_status : null,
+    feedBagsUsed:
+      r.feed_bags_used !== null && r.feed_bags_used !== undefined ? Number(r.feed_bags_used) : null,
     waterGiven: r.water_given ?? null,
     temperature: r.temperature ?? null,
   };
 }
 
-function computeAging(dueDate: string | null, fallbackDate: string): { daysOverdue: number; agingBucket: AgingBucket } {
+function computeAging(
+  dueDate: string | null,
+  fallbackDate: string,
+): { daysOverdue: number; agingBucket: AgingBucket } {
   const refDate = dueDate || fallbackDate;
   if (!refDate) return { daysOverdue: 0, agingBucket: "current" };
   const today = new Date().toISOString().split("T")[0];
-  const ms = new Date(`${today}T00:00:00Z`).getTime() - new Date(`${refDate.slice(0, 10)}T00:00:00Z`).getTime();
+  const ms =
+    new Date(`${today}T00:00:00Z`).getTime() -
+    new Date(`${refDate.slice(0, 10)}T00:00:00Z`).getTime();
   const days = Math.floor(ms / 86400000);
   if (days <= 0) return { daysOverdue: 0, agingBucket: "current" };
   if (days <= 30) return { daysOverdue: days, agingBucket: "1_30" };
@@ -446,21 +676,44 @@ export const adminListBatches = createServerFn({ method: "POST" })
       return [];
     }
 
-    return (rows || []).map((r: any) => ({
-      id: r.id,
-      batchName: r.batch_name,
-      batchType: r.batch_type,
-      initialHeadcount: Number(r.initial_headcount || 0),
-      currentHeadcount: Number(r.current_headcount || 0),
-      startDate: r.start_date,
-      targetHarvestDate: r.target_harvest_date ?? null,
-      status: r.status,
-      closedAt: r.closed_at ?? null,
-      closedBy: r.closed_by ?? null,
-      notes: r.notes ?? null,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    }));
+    const batchList = rows || [];
+    const statsMap = await computeBatchLivestockStats(
+      supabaseAdmin,
+      batchList.map((r: any) => r.id),
+    );
+
+    return batchList.map((r: any) => {
+      const initial = Number(r.initial_headcount || 0);
+      const stats = statsMap.get(r.id) || {
+        totalMortality: 0,
+        totalBirdsSold: 0,
+        totalAdjustments: 0,
+      };
+      const calculatedHeadcount = Math.max(
+        0,
+        initial - stats.totalMortality - stats.totalBirdsSold + stats.totalAdjustments,
+      );
+      const effectiveHeadcount = calculatedHeadcount;
+
+      return {
+        id: r.id,
+        batchName: r.batch_name,
+        batchType: r.batch_type,
+        initialHeadcount: initial,
+        currentHeadcount: effectiveHeadcount,
+        totalMortality: stats.totalMortality,
+        totalBirdsSold: stats.totalBirdsSold,
+        startDate: r.start_date,
+        targetHarvestDate: r.target_harvest_date ?? null,
+        status: r.status,
+        closedAt: r.closed_at ?? null,
+        closedBy: r.closed_by ?? null,
+        showFinancialsToStaff: Boolean(r.show_financials_to_staff),
+        notes: r.notes ?? null,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      };
+    });
   });
 
 export const adminCreateBatch = createServerFn({ method: "POST" })
@@ -469,22 +722,39 @@ export const adminCreateBatch = createServerFn({ method: "POST" })
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: row, error } = await supabaseAdmin
+    const baseInsert = {
+      batch_name: data.batchName,
+      batch_type: data.batchType,
+      initial_headcount: data.initialHeadcount,
+      current_headcount: data.initialHeadcount,
+      start_date: data.startDate,
+      target_harvest_date: data.targetHarvestDate || null,
+      notes: data.notes || null,
+      status: "active",
+    };
+
+    const { data: row, error } = await (supabaseAdmin as any)
       .from("farm_batches")
       .insert({
-        batch_name: data.batchName,
-        batch_type: data.batchType,
-        initial_headcount: data.initialHeadcount,
-        current_headcount: data.initialHeadcount,
-        start_date: data.startDate,
-        target_harvest_date: data.targetHarvestDate || null,
-        notes: data.notes || null,
-        status: "active",
+        ...baseInsert,
+        show_financials_to_staff: Boolean(data.showFinancialsToStaff),
       })
       .select("id")
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      if (/show_financials_to_staff/i.test(error.message)) {
+        const { data: fbRow, error: fbErr } = await supabaseAdmin
+          .from("farm_batches")
+          .insert(baseInsert)
+          .select("id")
+          .single();
+        if (fbErr) throw new Error(fbErr.message);
+        if (!fbRow) throw new Error("Failed to register new farm batch in database.");
+        return { id: fbRow.id };
+      }
+      throw new Error(error.message);
+    }
     if (!row) throw new Error("Failed to register new farm batch in database.");
     return { id: row.id };
   });
@@ -496,39 +766,55 @@ export const adminUpdateBatch = createServerFn({ method: "POST" })
     const credential = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const { data: previous, error: previousError } = await supabaseAdmin
+      .from("farm_batches")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (previousError || !previous) throw new Error("Batch not found.");
+    const { data: stock, error: stockError } = await (supabaseAdmin as any).rpc(
+      "batch_stock_summary",
+      { batch_ids: [data.id] },
+    );
+    if (stockError) throw new Error(stockError.message);
+    const expectedStock =
+      Number(stock[0].live_birds) + data.initialHeadcount - Number(previous.initial_headcount);
+    if (expectedStock < 0)
+      throw new Error("Initial headcount cannot be below recorded mortality and sales.");
+    if (data.status !== "active" && expectedStock !== 0)
+      throw new Error(
+        "Use Close Batch to record a reason and reconcile remaining physical stock first.",
+      );
     const isClosed = data.status === "completed" || data.status === "archived";
-    const { error } = await supabaseAdmin
+    const baseUpdate = {
+      batch_name: data.batchName,
+      batch_type: data.batchType,
+      initial_headcount: data.initialHeadcount,
+      current_headcount: expectedStock,
+      status: data.status,
+      start_date: data.startDate,
+      target_harvest_date: data.targetHarvestDate || null,
+      notes: data.notes || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error } = await (supabaseAdmin as any)
       .from("farm_batches")
       .update({
-        batch_name: data.batchName,
-        batch_type: data.batchType,
-        initial_headcount: data.initialHeadcount,
-        current_headcount: data.currentHeadcount,
-        status: data.status,
-        closed_at: isClosed ? new Date().toISOString() : null,
-        closed_by: isClosed ? credential.username : null,
-        start_date: data.startDate,
-        target_harvest_date: data.targetHarvestDate || null,
-        notes: data.notes || null,
-        updated_at: new Date().toISOString(),
+        ...baseUpdate,
+        closed_at: isClosed ? (previous as any).closed_at || new Date().toISOString() : null,
+        closed_by: isClosed ? (previous as any).closed_by || credential.username : null,
+        ...(data.showFinancialsToStaff !== undefined
+          ? { show_financials_to_staff: data.showFinancialsToStaff }
+          : {}),
       })
       .eq("id", data.id);
 
     if (error) {
-      if (/closed_at|closed_by/i.test(error.message)) {
+      if (/closed_at|closed_by|show_financials_to_staff/i.test(error.message)) {
         const { error: fallbackErr } = await supabaseAdmin
           .from("farm_batches")
-          .update({
-            batch_name: data.batchName,
-            batch_type: data.batchType,
-            initial_headcount: data.initialHeadcount,
-            current_headcount: data.currentHeadcount,
-            status: data.status,
-            start_date: data.startDate,
-            target_harvest_date: data.targetHarvestDate || null,
-            notes: data.notes || null,
-            updated_at: new Date().toISOString(),
-          })
+          .update(baseUpdate)
           .eq("id", data.id);
         if (fallbackErr) throw new Error(fallbackErr.message);
         return;
@@ -537,40 +823,55 @@ export const adminUpdateBatch = createServerFn({ method: "POST" })
     }
   });
 
-export const adminCloseBatch = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data))
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+export const adminToggleBatchStaffFinancials = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), id: z.string().uuid(), show: z.boolean() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean; showFinancialsToStaff: boolean }> => {
     await checkOwner(data.passcode);
-    const credential = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const now = new Date().toISOString();
-    const { error } = await supabaseAdmin
+    const { error } = await (supabaseAdmin as any)
       .from("farm_batches")
-      .update({
-        status: "completed",
-        closed_at: now,
-        closed_by: credential.username,
-        updated_at: now,
-      })
+      .update({ show_financials_to_staff: data.show, updated_at: new Date().toISOString() })
       .eq("id", data.id);
 
     if (error) {
-      if (/closed_at|closed_by/i.test(error.message)) {
-        const { error: fallbackErr } = await supabaseAdmin
-          .from("farm_batches")
-          .update({ status: "completed", updated_at: now })
-          .eq("id", data.id);
-        if (fallbackErr) throw new Error(fallbackErr.message);
-        return { ok: true };
+      if (/show_financials_to_staff/i.test(error.message)) {
+        throw new Error(
+          "Please run the latest Supabase SQL migration to enable per-batch staff visibility.",
+        );
       }
       throw new Error(error.message);
     }
+    return { ok: true, showFinancialsToStaff: data.show };
+  });
+
+export const adminCloseBatch = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        id: z.string().uuid(),
+        reason: z.string().trim().min(1).max(500),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any).rpc("close_batch_reconciled", {
+      batch_id_input: data.id,
+      reason_input: data.reason,
+    });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const adminReopenBatch = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -601,7 +902,9 @@ export const adminReopenBatch = createServerFn({ method: "POST" })
   });
 
 export const adminDeleteBatch = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<void> => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -612,11 +915,44 @@ export const adminDeleteBatch = createServerFn({ method: "POST" })
 
 // ─── Financials Server Functions ─────────────────────────────────────────────
 
+async function notifyLinkedBatchPartners(
+  supabaseAdmin: any,
+  batchId: string | null | undefined,
+  actorUsername = "owner",
+) {
+  if (!batchId) return;
+  try {
+    const { syncPartnersLinkedToBatch } = await import("./partners.functions");
+    await syncPartnersLinkedToBatch(supabaseAdmin, batchId, actorUsername);
+  } catch (err: any) {
+    console.warn("[notifyLinkedBatchPartners] warning:", err?.message || err);
+  }
+}
+
 export const adminListFinancials = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable(), includePending: z.boolean().optional() }).parse(data))
+  .inputValidator((data: unknown) =>
+    baseAuthSchema
+      .extend({
+        batchId: z.string().uuid().optional().nullable(),
+        includePending: z.boolean().optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }): Promise<FarmFinancial[]> => {
-    await checkPasscode(data.passcode);
+    const role = await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    let visibleStaffBatchIds: string[] | null = null;
+    if (role === "staff") {
+      const { data: openVisRows } = await (supabaseAdmin as any)
+        .from("farm_batches")
+        .select("id")
+        .eq("show_financials_to_staff", true);
+      const ids: string[] = (openVisRows || []).map((b: any) => String(b.id));
+      visibleStaffBatchIds = ids;
+      if (ids.length === 0) return [];
+      if (data.batchId && !ids.includes(data.batchId)) return [];
+    }
 
     let query = supabaseAdmin
       .from("farm_financials")
@@ -625,9 +961,11 @@ export const adminListFinancials = createServerFn({ method: "POST" })
 
     if (data.batchId) {
       query = query.eq("batch_id", data.batchId);
+    } else if (visibleStaffBatchIds) {
+      query = query.in("batch_id", visibleStaffBatchIds);
     }
 
-    if (!data.includePending) {
+    if (!data.includePending || role === "staff") {
       query = query.or("approval_status.eq.approved,approval_status.is.null");
     }
 
@@ -637,7 +975,18 @@ export const adminListFinancials = createServerFn({ method: "POST" })
       return [];
     }
 
-    return (rows || []).map(mapFinancialRow);
+    const lookup = await loadAdminSubmitterLookup(supabaseAdmin);
+    return (rows || []).map((r: any) => {
+      const mapped = mapFinancialRow(r);
+      const meta = mapped.recordedBy
+        ? resolveSubmitterMeta(mapped.recordedBy, lookup, "staff")
+        : { fullName: "Unknown legacy submitter", role: "staff" as const };
+      return {
+        ...mapped,
+        recordedByName: r.recorded_by_name || meta.fullName,
+        recordedByRole: r.recorded_by_role || meta.role,
+      };
+    });
   });
 
 export const adminCreateFinancial = createServerFn({ method: "POST" })
@@ -649,7 +998,9 @@ export const adminCreateFinancial = createServerFn({ method: "POST" })
     const approvalStatus = isOwner ? "approved" : "pending_approval";
 
     const paid =
-      data.amountPaid !== null && data.amountPaid !== undefined ? Number(data.amountPaid) : Number(data.amount);
+      data.amountPaid !== null && data.amountPaid !== undefined
+        ? Number(data.amountPaid)
+        : Number(data.amount);
     if (paid > Number(data.amount)) {
       throw new Error("Amount paid cannot exceed total amount.");
     }
@@ -680,25 +1031,65 @@ export const adminCreateFinancial = createServerFn({ method: "POST" })
       recorded_by: credential.username,
     };
 
+    if (
+      data.type === "expense" &&
+      data.category === "Feed" &&
+      (!(data.feedBags && data.feedBags > 0) || !data.feedBrand?.trim())
+    )
+      throw new Error("Enter the number of feed bags and brand for this purchase.");
+    const parsedFeedFallback =
+      data.type === "expense" && data.category === "Feed"
+        ? extractFeedMetadataFromText(data.description)
+        : { feedBags: null, feedKgPerBag: null, feedBrand: null };
+    const finalFeedBags =
+      data.feedBags && data.feedBags > 0 ? data.feedBags : parsedFeedFallback.feedBags;
+    const finalFeedKg =
+      finalFeedBags && finalFeedBags > 0
+        ? data.feedKgPerBag || parsedFeedFallback.feedKgPerBag || 25
+        : null;
+    const finalFeedBrand = data.feedBrand?.trim() || parsedFeedFallback.feedBrand || null;
+    const finalBirdsSold =
+      data.type === "income"
+        ? data.birdsSold !== null && data.birdsSold !== undefined && data.birdsSold >= 0
+          ? data.birdsSold
+          : extractBirdsSoldFromText(data.category, data.description) || null
+        : null;
+
     const extendedPayload = {
       ...basePayload,
       party_name: data.partyName?.trim() || null,
       due_date: data.dueDate?.trim() || null,
       amount_paid: paid,
-      feed_bags: data.feedBags && data.feedBags > 0 ? data.feedBags : null,
-      feed_kg_per_bag: data.feedBags && data.feedBags > 0 ? (data.feedKgPerBag || 25) : null,
-      feed_brand: data.feedBrand?.trim() || null,
+      feed_bags: finalFeedBags,
+      feed_kg_per_bag: finalFeedKg,
+      feed_brand: finalFeedBrand,
+      birds_sold: finalBirdsSold,
     };
 
     let rowId: string | null = null;
-    const { data: row, error } = await (supabaseAdmin as any)
+    let { data: row, error } = await (supabaseAdmin as any)
       .from("farm_financials")
       .insert(extendedPayload)
       .select("id")
       .single();
 
+    if (error && /birds_sold/i.test(error.message)) {
+      const { birds_sold: _omit, ...withoutBirdsSold } = extendedPayload;
+      const retry = await (supabaseAdmin as any)
+        .from("farm_financials")
+        .insert(withoutBirdsSold)
+        .select("id")
+        .single();
+      row = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
-      if (/amount_paid|party_name|due_date|feed_bags|feed_kg_per_bag|feed_brand/i.test(error.message)) {
+      if (
+        /amount_paid|party_name|due_date|feed_bags|feed_kg_per_bag|feed_brand|birds_sold/i.test(
+          error.message,
+        )
+      ) {
         const { data: fallbackRow, error: fallbackErr } = await supabaseAdmin
           .from("farm_financials")
           .insert(basePayload)
@@ -729,17 +1120,36 @@ export const adminCreateFinancial = createServerFn({ method: "POST" })
       }
     }
 
+    if (isOwner) {
+      await notifyLinkedBatchPartners(supabaseAdmin, data.batchId, credential.username);
+    }
+
     return { id: rowId! };
   });
 
 export const adminDeleteFinancial = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<void> => {
     await checkOwner(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
+    const { data: existing } = await supabaseAdmin
+      .from("farm_financials")
+      .select("batch_id, source_contact_id")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if ((existing as any)?.source_contact_id)
+      throw new Error("Delete or correct the original contact transaction instead.");
     const { error } = await supabaseAdmin.from("farm_financials").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
+
+    if (existing?.batch_id) {
+      await notifyLinkedBatchPartners(supabaseAdmin, existing.batch_id, cred.username || "owner");
+    }
   });
 
 const updateFinancialSchema = baseAuthSchema.extend({
@@ -758,14 +1168,24 @@ const updateFinancialSchema = baseAuthSchema.extend({
   feedBags: z.number().min(0).optional().nullable(),
   feedKgPerBag: z.number().min(1).max(500).optional().nullable(),
   feedBrand: z.string().trim().max(120).optional().nullable(),
+  birdsSold: z.number().int().min(0).max(100000).optional().nullable(),
 });
 
 export const adminUpdateFinancial = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => updateFinancialSchema.parse(data))
-  .handler(async ({ data }): Promise<{ id: string }> => {
-    await checkOwner(data.passcode);
+  .handler(async ({ data }): Promise<{ id: string; approvalStatus: string }> => {
+    const role = await checkPasscode(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
+
+    if (role === "staff" && data.type !== "expense") {
+      throw new Error("Staff accounts can only edit expense entries.");
+    }
+
     const paid =
-      data.amountPaid !== null && data.amountPaid !== undefined ? Number(data.amountPaid) : Number(data.amount);
+      data.amountPaid !== null && data.amountPaid !== undefined
+        ? Number(data.amountPaid)
+        : Number(data.amount);
     if (paid > Number(data.amount)) {
       throw new Error("Amount paid cannot exceed total amount.");
     }
@@ -780,18 +1200,34 @@ export const adminUpdateFinancial = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    if (data.batchId) {
-      const { data: prev } = await supabaseAdmin
-        .from("farm_financials")
-        .select("batch_id")
-        .eq("id", data.id)
-        .maybeSingle();
-      if (!prev || prev.batch_id !== data.batchId) {
-        await assertBatchOpen(supabaseAdmin, data.batchId);
+    const { data: prev, error: prevErr } = await supabaseAdmin
+      .from("farm_financials")
+      .select("batch_id, recorded_by, approval_status, source_contact_id")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (prevErr || !prev) throw new Error("Financial record not found.");
+
+    if ((prev as any).source_contact_id)
+      throw new Error(
+        "Edit the original contact transaction or order to update its linked financial entry.",
+      );
+    if (!isOwner) {
+      if ((prev.recorded_by || "").trim().toLowerCase() !== cred.username.trim().toLowerCase()) {
+        throw new Error("You can only edit financial entries that you recorded.");
+      }
+      if ((prev.approval_status || "approved") === "approved") {
+        throw new Error(
+          "Approved financial records are locked and can only be edited by the Farm Owner.",
+        );
       }
     }
 
-    const baseUpdate = {
+    if (data.batchId && prev.batch_id !== data.batchId) {
+      await assertBatchOpen(supabaseAdmin, data.batchId);
+    }
+
+    const baseUpdate: Record<string, any> = {
       batch_id: data.batchId || null,
       type: data.type,
       category: data.category,
@@ -802,31 +1238,77 @@ export const adminUpdateFinancial = createServerFn({ method: "POST" })
       reference_no: data.referenceNo || null,
     };
 
-    const { error } = await (supabaseAdmin as any)
+    if (!isOwner) {
+      baseUpdate.approval_status = "pending_approval";
+      baseUpdate.rejection_reason = null;
+    }
+
+    const parsedFeedFallback =
+      data.type === "expense" && data.category === "Feed"
+        ? extractFeedMetadataFromText(data.description)
+        : { feedBags: null, feedKgPerBag: null, feedBrand: null };
+    const finalFeedBags =
+      data.feedBags && data.feedBags > 0 ? data.feedBags : parsedFeedFallback.feedBags;
+    const finalFeedKg =
+      finalFeedBags && finalFeedBags > 0
+        ? data.feedKgPerBag || parsedFeedFallback.feedKgPerBag || 25
+        : null;
+    const finalFeedBrand = data.feedBrand?.trim() || parsedFeedFallback.feedBrand || null;
+    const finalBirdsSold =
+      data.type === "income"
+        ? data.birdsSold !== null && data.birdsSold !== undefined && data.birdsSold >= 0
+          ? data.birdsSold
+          : extractBirdsSoldFromText(data.category, data.description) || null
+        : null;
+
+    const fullUpdatePayload = {
+      ...baseUpdate,
+      party_name: data.partyName?.trim() || null,
+      due_date: data.dueDate?.trim() || null,
+      amount_paid: paid,
+      feed_bags: finalFeedBags,
+      feed_kg_per_bag: finalFeedKg,
+      feed_brand: finalFeedBrand,
+      birds_sold: finalBirdsSold,
+    };
+
+    let { error } = await (supabaseAdmin as any)
       .from("farm_financials")
-      .update({
-        ...baseUpdate,
-        party_name: data.partyName?.trim() || null,
-        due_date: data.dueDate?.trim() || null,
-        amount_paid: paid,
-        feed_bags: data.feedBags && data.feedBags > 0 ? data.feedBags : null,
-        feed_kg_per_bag: data.feedBags && data.feedBags > 0 ? (data.feedKgPerBag || 25) : null,
-        feed_brand: data.feedBrand?.trim() || null,
-      })
+      .update(fullUpdatePayload)
       .eq("id", data.id);
 
+    if (error && /birds_sold/i.test(error.message)) {
+      const { birds_sold: _omit, ...withoutBirdsSold } = fullUpdatePayload;
+      const retry = await (supabaseAdmin as any)
+        .from("farm_financials")
+        .update(withoutBirdsSold)
+        .eq("id", data.id);
+      error = retry.error;
+    }
+
     if (error) {
-      if (/amount_paid|party_name|due_date|feed_bags|feed_kg_per_bag|feed_brand/i.test(error.message)) {
+      if (
+        /amount_paid|party_name|due_date|feed_bags|feed_kg_per_bag|feed_brand|birds_sold|rejection_reason/i.test(
+          error.message,
+        )
+      ) {
+        const cleanFallback = { ...baseUpdate };
+        if (/rejection_reason/i.test(error.message)) delete cleanFallback.rejection_reason;
         const { error: fallbackErr } = await supabaseAdmin
           .from("farm_financials")
-          .update(baseUpdate)
+          .update(cleanFallback)
           .eq("id", data.id);
         if (fallbackErr) throw new Error(fallbackErr.message);
       } else {
         throw new Error(error.message);
       }
     }
-    return { id: data.id };
+
+    const resultingStatus = isOwner ? prev.approval_status || "approved" : "pending_approval";
+    if (isOwner && data.batchId && resultingStatus === "approved") {
+      await notifyLinkedBatchPartners(supabaseAdmin, data.batchId, cred.username || "owner");
+    }
+    return { id: data.id, approvalStatus: resultingStatus };
   });
 
 export const adminRecordFinancialPayment = createServerFn({ method: "POST" })
@@ -842,72 +1324,86 @@ export const adminRecordFinancialPayment = createServerFn({ method: "POST" })
       })
       .parse(data),
   )
-  .handler(async ({ data }): Promise<{ id: string; approvalStatus: "approved" | "pending"; newAmountPaid: number }> => {
-    const role = await checkPasscode(data.passcode);
-    const credential = parseAdminCredential(data.passcode);
-    const isOwner = role === "owner";
+  .handler(
+    async ({
+      data,
+    }): Promise<{ id: string; approvalStatus: "approved" | "pending"; newAmountPaid: number }> => {
+      const role = await checkPasscode(data.passcode);
+      const credential = parseAdminCredential(data.passcode);
+      const isOwner = role === "owner";
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: fin, error: finErr } = await (supabaseAdmin as any)
-      .from("farm_financials")
-      .select("id, amount, amount_paid, approval_status")
-      .eq("id", data.financialId)
-      .single();
-
-    if (finErr || !fin) throw new Error("Financial transaction not found.");
-    if (fin.approval_status && fin.approval_status !== "approved") {
-      throw new Error("Approve the original transaction before recording follow-up payments.");
-    }
-
-    const total = Number(fin.amount || 0);
-    const currentPaid = fin.amount_paid !== null && fin.amount_paid !== undefined ? Number(fin.amount_paid) : total;
-    const balance = Math.max(0, Math.round((total - currentPaid) * 100) / 100);
-    if (balance <= 0.005) throw new Error("This transaction is already fully paid.");
-    if (data.amount > balance + 0.01) {
-      throw new Error(`Payment amount (₦${data.amount.toLocaleString()}) exceeds remaining balance (₦${balance.toLocaleString()}).`);
-    }
-
-    const nextPaid = Math.min(total, Math.round((currentPaid + data.amount) * 100) / 100);
-    const approvalStatus = isOwner ? "approved" : "pending";
-
-    const { data: pmt, error: pmtErr } = await (supabaseAdmin as any)
-      .from("farm_financial_payments")
-      .insert({
-        financial_id: data.financialId,
-        payment_date: data.paymentDate,
-        amount: data.amount,
-        payment_method: data.paymentMethod,
-        reference_no: data.referenceNo || null,
-        notes: data.notes || null,
-        approval_status: approvalStatus,
-        recorded_by: credential.username,
-      })
-      .select("id")
-      .single();
-
-    if (pmtErr) throw new Error(pmtErr.message);
-
-    if (isOwner) {
-      const { error: updErr } = await (supabaseAdmin as any)
+      const { data: fin, error: finErr } = await (supabaseAdmin as any)
         .from("farm_financials")
-        .update({ amount_paid: nextPaid })
-        .eq("id", data.financialId);
-      if (updErr) throw new Error(updErr.message);
-    }
+        .select("id, batch_id, amount, amount_paid, approval_status, source_contact_id")
+        .eq("id", data.financialId)
+        .single();
 
-    return {
-      id: pmt.id,
-      approvalStatus,
-      newAmountPaid: isOwner ? nextPaid : currentPaid,
-    };
-  });
+      if (finErr || !fin) throw new Error("Financial transaction not found.");
+      if (fin.approval_status && fin.approval_status !== "approved") {
+        throw new Error("Approve the original transaction before recording follow-up payments.");
+      }
+
+      if (fin.source_contact_id)
+        throw new Error("Record this payment in the original contact ledger.");
+      const total = Number(fin.amount || 0);
+      const currentPaid =
+        fin.amount_paid !== null && fin.amount_paid !== undefined ? Number(fin.amount_paid) : total;
+      const balance = Math.max(0, Math.round((total - currentPaid) * 100) / 100);
+      if (balance <= 0.005) throw new Error("This transaction is already fully paid.");
+      if (data.amount > balance + 0.01) {
+        throw new Error(
+          `Payment amount (₦${data.amount.toLocaleString()}) exceeds remaining balance (₦${balance.toLocaleString()}).`,
+        );
+      }
+
+      const nextPaid = Math.min(total, Math.round((currentPaid + data.amount) * 100) / 100);
+      const approvalStatus = isOwner ? "approved" : "pending";
+
+      const { data: pmt, error: pmtErr } = await (supabaseAdmin as any)
+        .from("farm_financial_payments")
+        .insert({
+          financial_id: data.financialId,
+          payment_date: data.paymentDate,
+          amount: data.amount,
+          payment_method: data.paymentMethod,
+          reference_no: data.referenceNo || null,
+          notes: data.notes || null,
+          approval_status: approvalStatus,
+          recorded_by: credential.username,
+        })
+        .select("id")
+        .single();
+
+      if (pmtErr) throw new Error(pmtErr.message);
+
+      if (isOwner)
+        await notifyLinkedBatchPartners(supabaseAdmin, fin.batch_id, credential.username);
+
+      return {
+        id: pmt.id,
+        approvalStatus,
+        newAmountPaid: isOwner ? nextPaid : currentPaid,
+      };
+    },
+  );
 
 export const adminListFinancialPayments = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => baseAuthSchema.extend({ financialId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    baseAuthSchema.extend({ financialId: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<FarmFinancialPayment[]> => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: parent, error: parentError } = await (supabaseAdmin as any)
+      .from("farm_financials")
+      .select("batch_id")
+      .eq("id", data.financialId)
+      .single();
+    if (parentError) throw new Error(parentError.message);
+    await assertFinancialRead(data.passcode, parent.batch_id);
 
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("farm_financial_payments")
@@ -941,19 +1437,20 @@ export const adminListDebtorsCreditorsReport = createServerFn({ method: "POST" }
     baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable() }).parse(data),
   )
   .handler(async ({ data }): Promise<DebtorsCreditorsReport> => {
-    await checkPasscode(data.passcode);
+    await assertFinancialRead(data.passcode, data.batchId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let finQuery = (supabaseAdmin as any)
       .from("farm_financials")
       .select("*, farm_batches(batch_name)")
       .or("approval_status.eq.approved,approval_status.is.null")
+      .is("source_contact_id", null)
       .not("amount_paid", "is", null)
       .order("transaction_date", { ascending: false });
 
     let contactQuery = (supabaseAdmin as any)
       .from("contact_transactions")
-      .select("*, special_contacts(contact_name, phone, category), farm_batches(batch_name)")
+      .select("*, special_contacts(contact_name, phone, contact_type), farm_batches(batch_name)")
       .order("transaction_date", { ascending: false });
 
     if (data.batchId) {
@@ -962,6 +1459,8 @@ export const adminListDebtorsCreditorsReport = createServerFn({ method: "POST" }
     }
 
     const [finRes, contactRes] = await Promise.all([finQuery, contactQuery]);
+    if (finRes.error) throw new Error(finRes.error.message);
+    if (contactRes.error) throw new Error(contactRes.error.message);
 
     const items: DebtorCreditorItem[] = [];
 
@@ -1001,9 +1500,14 @@ export const adminListDebtorsCreditorsReport = createServerFn({ method: "POST" }
         const paid = Number(r.amount_paid || 0);
         const balance = Math.max(0, Math.round((total - paid) * 100) / 100);
         if (balance <= 0.005) continue;
-        if (r.transaction_type !== "offload" && r.transaction_type !== "supply") continue;
+        if (
+          r.transaction_type !== "sale_to_contact" &&
+          r.transaction_type !== "purchase_from_supplier"
+        )
+          continue;
 
-        const kind: "debtor" | "creditor" = r.transaction_type === "offload" ? "debtor" : "creditor";
+        const kind: "debtor" | "creditor" =
+          r.transaction_type === "sale_to_contact" ? "debtor" : "creditor";
         const aging = computeAging(null, r.transaction_date);
         items.push({
           id: r.id,
@@ -1014,7 +1518,8 @@ export const adminListDebtorsCreditorsReport = createServerFn({ method: "POST" }
           contactId: r.contact_id,
           batchId: r.batch_id ?? null,
           batchName: r.farm_batches?.batch_name ?? null,
-          category: r.transaction_type === "offload" ? "Offload Credit Sale" : "Supplier Credit",
+          category:
+            r.transaction_type === "sale_to_contact" ? "Offload Credit Sale" : "Supplier Credit",
           description: r.item_description,
           transactionDate: r.transaction_date,
           dueDate: null,
@@ -1097,9 +1602,11 @@ export const adminListDebtorsCreditorsReport = createServerFn({ method: "POST" }
   });
 
 export const adminGetBatchReport = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), batchId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), batchId: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<BatchReport | null> => {
-    await checkPasscode(data.passcode);
+    const role = await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Fetch batch
@@ -1110,6 +1617,9 @@ export const adminGetBatchReport = createServerFn({ method: "POST" })
       .single();
 
     if (bErr || !batchRow) return null;
+
+    const showFinancialsToStaff = Boolean((batchRow as any).show_financials_to_staff);
+    const financialsRestricted = role === "staff" && !showFinancialsToStaff;
 
     const batch: FarmBatch = {
       id: batchRow.id,
@@ -1122,20 +1632,18 @@ export const adminGetBatchReport = createServerFn({ method: "POST" })
       status: batchRow.status,
       closedAt: batchRow.closed_at ?? null,
       closedBy: batchRow.closed_by ?? null,
+      showFinancialsToStaff,
       notes: batchRow.notes ?? null,
       createdAt: batchRow.created_at,
       updatedAt: batchRow.updated_at,
     };
 
-    // Fetch financials for batch (approved only)
-    const { data: finRows } = await supabaseAdmin
-      .from("farm_financials")
-      .select("*")
-      .eq("batch_id", data.batchId)
-      .or("approval_status.eq.approved,approval_status.is.null")
-      .order("transaction_date", { ascending: true });
-
-    const financials: FarmFinancial[] = (finRows || []).map(mapFinancialRow);
+    const receiptReport = financialsRestricted
+      ? { rows: [] }
+      : await (
+          await import("./report.functions")
+        ).loadReceiptReport({ passcode: data.passcode, batchId: data.batchId });
+    const financials: FarmFinancial[] = receiptReport.rows;
 
     // Fetch activities for batch (approved only)
     const { data: actRows } = await supabaseAdmin
@@ -1145,20 +1653,7 @@ export const adminGetBatchReport = createServerFn({ method: "POST" })
       .or("approval_status.eq.approved,approval_status.is.null")
       .order("activity_date", { ascending: true });
 
-    const activities: FarmActivity[] = (actRows || []).map((r: any) => ({
-      id: r.id,
-      batchId: r.batch_id,
-      activityDate: r.activity_date,
-      activityType: r.activity_type,
-      mortalityCount: Number(r.mortality_count || 0),
-      causeOfMortality: r.cause_of_mortality ?? null,
-      feedConsumedKg: Number(r.feed_consumed_kg || 0),
-      eggsCollected: Number(r.eggs_collected || 0),
-      medicationGiven: r.medication_given ?? null,
-      notes: r.notes ?? null,
-      recordedBy: r.recorded_by ?? null,
-      createdAt: r.created_at,
-    }));
+    const activities: FarmActivity[] = (actRows || []).map(mapActivityRow);
 
     let totalIncome = 0;
     let totalExpense = 0;
@@ -1192,22 +1687,34 @@ export const adminGetBatchReport = createServerFn({ method: "POST" })
 
     const mortalityRatePercentage =
       batch.initialHeadcount > 0 ? (totalMortality / batch.initialHeadcount) * 100 : 0;
-    batch.currentHeadcount = Math.max(0, batch.initialHeadcount - totalMortality);
+    const statsMap = await computeBatchLivestockStats(supabaseAdmin, [batch.id]);
+    const stats = statsMap.get(batch.id) || {
+      totalMortality,
+      totalBirdsSold: 0,
+      totalAdjustments: 0,
+    };
+    batch.totalMortality = totalMortality;
+    batch.totalBirdsSold = stats.totalBirdsSold;
+    batch.currentHeadcount = Math.max(
+      0,
+      batch.initialHeadcount - totalMortality - stats.totalBirdsSold + stats.totalAdjustments,
+    );
 
     return {
       batch,
-      totalIncome,
-      totalExpense,
-      netProfit,
-      roiPercentage,
-      costPerBird,
-      revenuePerBird,
+      financialsRestricted,
+      totalIncome: financialsRestricted ? 0 : totalIncome,
+      totalExpense: financialsRestricted ? 0 : totalExpense,
+      netProfit: financialsRestricted ? 0 : netProfit,
+      roiPercentage: financialsRestricted ? 0 : roiPercentage,
+      costPerBird: financialsRestricted ? 0 : costPerBird,
+      revenuePerBird: financialsRestricted ? 0 : revenuePerBird,
       totalMortality,
       mortalityRatePercentage,
       totalFeedConsumedKg,
       totalEggsCollected,
-      expenseByCategory,
-      incomeByCategory,
+      expenseByCategory: financialsRestricted ? {} : expenseByCategory,
+      incomeByCategory: financialsRestricted ? {} : incomeByCategory,
       financials,
       activities,
     };
@@ -1234,7 +1741,9 @@ export const adminListLeads = createServerFn({ method: "POST" })
         .limit(2000);
 
       if (preorders && preorders.length > 0) {
-        const existingPhones = new Set((rows || []).map((r: any) => r.phone?.replace(/\D/g, "")).filter(Boolean));
+        const existingPhones = new Set(
+          (rows || []).map((r: any) => r.phone?.replace(/\D/g, "")).filter(Boolean),
+        );
         const newLeads: any[] = [];
         for (const po of preorders) {
           const cleanP = po.phone ? po.phone.replace(/\D/g, "") : "";
@@ -1246,7 +1755,8 @@ export const adminListLeads = createServerFn({ method: "POST" })
             location: po.address || "Owerri, Imo State",
             lead_source: "December Pre-Order",
             interested_in: po.product || "Live Broiler Chicken",
-            status: po.payment_status === "fully_paid" ? "Customer (Converted)" : "December Pre-Order",
+            status:
+              po.payment_status === "fully_paid" ? "Customer (Converted)" : "December Pre-Order",
             estimated_value: po.total_amount || 0,
             notes: po.notes || "Pre-order reservation customer",
           });
@@ -1333,7 +1843,7 @@ export const adminLogLeadCommunication = createServerFn({ method: "POST" })
         sentBy: z.string().optional().nullable(),
         updateStatusToContacted: z.boolean().default(true),
       })
-      .parse(data)
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ success: boolean }> => {
     await checkPasscode(data.passcode);
@@ -1378,7 +1888,7 @@ export const adminEnsureLeadAndLogComm = createServerFn({ method: "POST" })
         content: z.string().optional().nullable(),
         sentBy: z.string().optional().nullable(),
       })
-      .parse(data)
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ success: boolean; leadId: string }> => {
     await checkPasscode(data.passcode);
@@ -1480,7 +1990,9 @@ export const adminUpdateLead = createServerFn({ method: "POST" })
   });
 
 export const adminDeleteLead = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<void> => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -1496,7 +2008,15 @@ const batchImportLeadItemSchema = z.object({
   location: z.string().optional().nullable(),
   leadSource: z.string().default("CSV/Excel Import"),
   interestedIn: z.string().optional().nullable(),
-  status: z.enum(["New Lead", "Contacted", "Interested / Negotiating", "Converted to Customer", "Lost / Inactive"]).default("New Lead"),
+  status: z
+    .enum([
+      "New Lead",
+      "Contacted",
+      "Interested / Negotiating",
+      "Converted to Customer",
+      "Lost / Inactive",
+    ])
+    .default("New Lead"),
   estimatedValue: z.number().default(0),
   notes: z.string().optional().nullable(),
   followUpDate: z.string().optional().nullable(),
@@ -1504,10 +2024,12 @@ const batchImportLeadItemSchema = z.object({
 
 export const adminBatchImportLeads = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      leads: z.array(batchImportLeadItemSchema),
-    }).parse(data)
+    z
+      .object({
+        passcode: z.string(),
+        leads: z.array(batchImportLeadItemSchema),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ importedCount: number }> => {
     await checkPasscode(data.passcode);
@@ -1539,22 +2061,43 @@ export const adminBatchImportLeads = createServerFn({ method: "POST" })
 // ─── Farm Activities Server Functions ────────────────────────────────────────
 
 export const adminListActivities = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid().optional().nullable(), includePending: z.boolean().optional() }).parse(data))
+  .inputValidator((data: unknown) =>
+    baseAuthSchema
+      .extend({
+        batchId: z.string().uuid().optional().nullable(),
+        includePending: z.boolean().optional(),
+        includeOwnPending: z.boolean().optional(),
+      })
+      .parse(data),
+  )
   .handler(async ({ data }): Promise<FarmActivity[]> => {
-    await checkPasscode(data.passcode);
+    const role = await checkPasscode(data.passcode);
+    const credential = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let query = supabaseAdmin
       .from("farm_activities")
       .select("*, farm_batches(batch_name)")
-      .order("activity_date", { ascending: false });
+      .order("activity_date", { ascending: false })
+      .order("created_at", { ascending: false });
 
     if (data.batchId) {
       query = query.eq("batch_id", data.batchId);
     }
 
     if (!data.includePending) {
-      query = query.or("approval_status.eq.approved,approval_status.is.null");
+      if (data.includeOwnPending && role !== "owner") {
+        const safeUser = (credential.username || "").replace(/[^a-z0-9_.@-]/gi, "");
+        if (safeUser) {
+          query = query.or(
+            `approval_status.eq.approved,approval_status.is.null,recorded_by.ilike.${safeUser}`,
+          );
+        } else {
+          query = query.or("approval_status.eq.approved,approval_status.is.null");
+        }
+      } else {
+        query = query.or("approval_status.eq.approved,approval_status.is.null");
+      }
     }
 
     const { data: rows, error } = await query;
@@ -1563,7 +2106,18 @@ export const adminListActivities = createServerFn({ method: "POST" })
       return [];
     }
 
-    return (rows || []).map(mapActivityRow);
+    const lookup = await loadAdminSubmitterLookup(supabaseAdmin);
+    return (rows || []).map((r: any) => {
+      const mapped = mapActivityRow(r);
+      const meta = mapped.recordedBy
+        ? resolveSubmitterMeta(mapped.recordedBy, lookup, "staff")
+        : { fullName: "Unknown legacy submitter", role: "staff" as const };
+      return {
+        ...mapped,
+        recordedByName: r.recorded_by_name || meta.fullName,
+        recordedByRole: r.recorded_by_role || meta.role,
+      };
+    });
   });
 
 export const adminCreateActivity = createServerFn({ method: "POST" })
@@ -1618,6 +2172,84 @@ export const adminCreateActivity = createServerFn({ method: "POST" })
     return { id: row.id };
   });
 
+export const adminUpdateActivity = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    createActivitySchema.extend({ id: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ id: string; approvalStatus: string }> => {
+    const role = await checkPasscode(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: prev, error: prevErr } = await supabaseAdmin
+      .from("farm_activities")
+      .select("batch_id, mortality_count, approval_status, recorded_by")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    if (prevErr || !prev) throw new Error("Activity log not found.");
+
+    if (!isOwner) {
+      if ((prev.recorded_by || "").trim().toLowerCase() !== cred.username.trim().toLowerCase()) {
+        throw new Error("You can only edit activity logs that you recorded.");
+      }
+      if ((prev.approval_status ?? "approved") === "approved") {
+        throw new Error(
+          "Approved activity logs are locked and can only be edited by the Farm Owner.",
+        );
+      }
+    }
+
+    if (data.batchId && prev.batch_id !== data.batchId) {
+      await assertBatchOpen(supabaseAdmin, data.batchId);
+    }
+
+    const baseUpdate: Record<string, any> = {
+      batch_id: data.batchId || null,
+      activity_date: data.activityDate,
+      activity_type: data.activityType,
+      mortality_count: data.mortalityCount,
+      cause_of_mortality: data.causeOfMortality || null,
+      feed_consumed_kg: data.feedConsumedKg,
+      eggs_collected: data.eggsCollected,
+      medication_given: data.medicationGiven || null,
+      notes: data.notes || null,
+    };
+
+    if (!isOwner) {
+      baseUpdate.approval_status = "pending_approval";
+      baseUpdate.rejection_reason = null;
+    }
+
+    const { error } = await (supabaseAdmin as any)
+      .from("farm_activities")
+      .update(baseUpdate)
+      .eq("id", data.id);
+
+    if (error) {
+      if (/rejection_reason/i.test(error.message)) {
+        const clean = { ...baseUpdate };
+        delete clean.rejection_reason;
+        const retry = await supabaseAdmin.from("farm_activities").update(clean).eq("id", data.id);
+        if (retry.error) throw new Error(retry.error.message);
+      } else {
+        throw new Error(error.message);
+      }
+    }
+
+    if (isOwner && (prev.approval_status ?? "approved") === "approved" && data.batchId) {
+      await adjustBatchHeadcount(
+        supabaseAdmin,
+        data.batchId,
+        data.mortalityCount - Number(prev.mortality_count || 0),
+      );
+    }
+
+    const resultingStatus = isOwner ? prev.approval_status || "approved" : "pending_approval";
+    return { id: data.id, approvalStatus: resultingStatus };
+  });
+
 // ─── Unified Daily Log (one record per batch per day) ────────────────────────
 
 const dailyLogSchema = baseAuthSchema.extend({
@@ -1639,19 +2271,17 @@ const dailyLogSchema = baseAuthSchema.extend({
   notes: z.string().trim().max(1000).optional().nullable(),
 });
 
-async function adjustBatchHeadcount(supabaseAdmin: any, batchId: string, delta: number) {
-  if (!delta) return;
-  const { data: b } = await supabaseAdmin
+async function adjustBatchHeadcount(supabaseAdmin: any, batchId: string, _delta: number) {
+  const { data, error } = await supabaseAdmin.rpc("batch_stock_summary", { batch_ids: [batchId] });
+  if (error) throw new Error(error.message);
+  const { error: updateError } = await supabaseAdmin
     .from("farm_batches")
-    .select("current_headcount")
-    .eq("id", batchId)
-    .single();
-  if (!b) return;
-  const nextCount = Math.max(0, Number(b.current_headcount || 0) - delta);
-  await supabaseAdmin
-    .from("farm_batches")
-    .update({ current_headcount: nextCount, updated_at: new Date().toISOString() })
+    .update({
+      current_headcount: Math.max(0, Number(data?.[0]?.live_birds || 0)),
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", batchId);
+  if (updateError) throw new Error(updateError.message);
 }
 
 function dailyLogRow(data: z.infer<typeof dailyLogSchema>, includeBagCols = true) {
@@ -1773,56 +2403,99 @@ export const adminCreateDailyLog = createServerFn({ method: "POST" })
     if (isOwner && data.mortalityCount > 0) {
       await adjustBatchHeadcount(supabaseAdmin, data.batchId, data.mortalityCount);
     }
+    if (isOwner)
+      await notifyLinkedBatchPartners(
+        supabaseAdmin,
+        data.batchId,
+        parseAdminCredential(data.passcode).username,
+      );
     return { id: row.id, approvalStatus };
   });
 
 export const adminUpdateDailyLog = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => dailyLogSchema.extend({ id: z.string().uuid() }).parse(data))
-  .handler(async ({ data }): Promise<{ ok: boolean }> => {
-    await checkOwner(data.passcode);
+  .handler(async ({ data }): Promise<{ ok: boolean; approvalStatus: string }> => {
+    const role = await checkPasscode(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const isOwner = role === "owner";
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     await assertBatchOpen(supabaseAdmin, data.batchId);
 
     const { data: prev, error: prevErr } = await supabaseAdmin
       .from("farm_activities")
-      .select("mortality_count, approval_status")
+      .select("mortality_count, approval_status, recorded_by")
       .eq("id", data.id)
       .single();
     if (prevErr || !prev) throw new Error("Daily Log not found.");
 
+    if (!isOwner) {
+      if ((prev.recorded_by || "").trim().toLowerCase() !== cred.username.trim().toLowerCase()) {
+        throw new Error("You can only edit daily logs that you submitted.");
+      }
+      if ((prev.approval_status ?? "approved") === "approved") {
+        throw new Error("Approved daily logs are locked and can only be edited by the Farm Owner.");
+      }
+    }
+
+    const rowPayload: Record<string, any> = dailyLogRow(data, true);
+    if (!isOwner) {
+      rowPayload.approval_status = "pending_approval";
+      rowPayload.rejection_reason = null;
+    }
+
     let { error } = await (supabaseAdmin as any)
       .from("farm_activities")
-      .update(dailyLogRow(data, true))
+      .update(rowPayload)
       .eq("id", data.id);
 
-    if (error && /feed_bag_no|feed_bag_status|feed_bags_used/i.test(error.message)) {
-      const retry = await supabaseAdmin
+    if (
+      error &&
+      /feed_bag_no|feed_bag_status|feed_bags_used|rejection_reason/i.test(error.message)
+    ) {
+      const fallbackPayload: Record<string, any> = dailyLogRow(
+        data,
+        !/feed_bag_no|feed_bag_status|feed_bags_used/i.test(error.message),
+      );
+      if (!isOwner) {
+        fallbackPayload.approval_status = "pending_approval";
+        if (!/rejection_reason/i.test(error.message)) fallbackPayload.rejection_reason = null;
+      }
+      const retry = await (supabaseAdmin as any)
         .from("farm_activities")
-        .update(dailyLogRow(data, false))
+        .update(fallbackPayload)
         .eq("id", data.id);
       error = retry.error;
     }
     if (error) throw new Error(error.message);
 
     // Headcount was only deducted once the log was approved; adjust by the difference.
-    if ((prev.approval_status ?? "approved") === "approved") {
+    if (isOwner && (prev.approval_status ?? "approved") === "approved") {
       await adjustBatchHeadcount(
         supabaseAdmin,
         data.batchId,
         data.mortalityCount - Number(prev.mortality_count || 0),
       );
     }
-    return { ok: true };
+    if (isOwner)
+      await notifyLinkedBatchPartners(
+        supabaseAdmin,
+        data.batchId,
+        parseAdminCredential(data.passcode).username,
+      );
+    const resultingStatus = isOwner ? prev.approval_status || "approved" : "pending_approval";
+    return { ok: true, approvalStatus: resultingStatus };
   });
 
 export const adminGetBatchFeedLedger = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => baseAuthSchema.extend({ batchId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    baseAuthSchema.extend({ batchId: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<BatchFeedLedger> => {
-    await checkPasscode(data.passcode);
+    await assertFinancialRead(data.passcode, data.batchId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [{ data: finRows }, { data: actRows }] = await Promise.all([
+    const [feedResult, activityResult] = await Promise.all([
       (supabaseAdmin as any)
         .from("farm_financials")
         .select("*")
@@ -1839,29 +2512,48 @@ export const adminGetBatchFeedLedger = createServerFn({ method: "POST" })
         .order("created_at", { ascending: false }),
     ]);
 
+    if (feedResult.error) throw new Error(feedResult.error.message);
+    if (activityResult.error) throw new Error(activityResult.error.message);
+    const finRows = feedResult.data;
+    const actRows = activityResult.data;
+    let knownFeedSpend = 0;
     let bagsBought = 0;
     let totalKgBought = 0;
     let totalFeedSpend = 0;
+    let unspecifiedFeedCount = 0;
     const brandMap = new Map<string, { brand: string; bagsBought: number; spend: number }>();
 
     for (const r of finRows || []) {
       const amt = Number(r.amount || 0);
       totalFeedSpend += amt;
-      const bags = Number(r.feed_bags || 0);
-      const kgPerBag = Number(r.feed_kg_per_bag || 25);
+      const parsedFallback = extractFeedMetadataFromText(r.description);
+      const explicitBags =
+        r.feed_bags !== null && r.feed_bags !== undefined ? Number(r.feed_bags) : 0;
+      const bags = explicitBags > 0 ? explicitBags : 0;
+      const explicitKg =
+        r.feed_kg_per_bag !== null && r.feed_kg_per_bag !== undefined
+          ? Number(r.feed_kg_per_bag)
+          : 0;
+      const kgPerBag = explicitKg > 0 ? explicitKg : parsedFallback.feedKgPerBag || 25;
       if (bags > 0) {
+        knownFeedSpend += amt;
         bagsBought += bags;
         totalKgBought += bags * kgPerBag;
+      } else {
+        unspecifiedFeedCount++;
       }
-      const brandLabel = (r.feed_brand || "Unspecified Feed").trim() || "Unspecified Feed";
+      const rawBrand = (r.feed_brand || parsedFallback.feedBrand || "").trim();
+      const brandLabel = rawBrand || (bags > 0 ? "Brand Not Specified" : "Unspecified Feed");
       const prev = brandMap.get(brandLabel) || { brand: brandLabel, bagsBought: 0, spend: 0 };
       prev.bagsBought += bags;
       prev.spend += amt;
       brandMap.set(brandLabel, prev);
     }
 
-    const defaultKgPerBag = bagsBought > 0 ? Math.round((totalKgBought / bagsBought) * 10) / 10 : 25;
-    const avgCostPerBag = bagsBought > 0 ? Math.round((totalFeedSpend / bagsBought) * 100) / 100 : 0;
+    const defaultKgPerBag =
+      bagsBought > 0 ? Math.round((totalKgBought / bagsBought) * 10) / 10 : 25;
+    const avgCostPerBag =
+      bagsBought > 0 ? Math.round((knownFeedSpend / bagsBought) * 100) / 100 : 0;
 
     let totalKgUsed = 0;
     let bagsFinished = 0;
@@ -1870,9 +2562,12 @@ export const adminGetBatchFeedLedger = createServerFn({ method: "POST" })
 
     for (const a of actRows || []) {
       totalKgUsed += Number(a.feed_consumed_kg || 0);
-      const bagNo = a.feed_bag_no !== null && a.feed_bag_no !== undefined ? Number(a.feed_bag_no) : null;
+      const bagNo =
+        a.feed_bag_no !== null && a.feed_bag_no !== undefined ? Number(a.feed_bag_no) : null;
       const bagStatus =
-        a.feed_bag_status === "opened" || a.feed_bag_status === "finished" ? a.feed_bag_status : null;
+        a.feed_bag_status === "opened" || a.feed_bag_status === "finished"
+          ? a.feed_bag_status
+          : null;
       if (bagNo && bagStatus) {
         const cumUsed =
           a.feed_bags_used !== null && a.feed_bags_used !== undefined
@@ -1918,11 +2613,14 @@ export const adminGetBatchFeedLedger = createServerFn({ method: "POST" })
       remainingStockValue,
       lastEntry,
       brandBreakdown: Array.from(brandMap.values()).sort((a, b) => b.spend - a.spend),
+      unspecifiedFeedCount,
     };
   });
 
 export const adminDeleteActivity = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string(), id: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }): Promise<void> => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -1948,10 +2646,10 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
             referenceNo: z.string().trim().optional().nullable(),
             customerName: z.string().trim().optional().nullable(),
             customerPhone: z.string().trim().optional().nullable(),
-          })
+          }),
         ),
       })
-      .parse(data)
+      .parse(data),
   )
   .handler(
     async ({
@@ -1999,7 +2697,11 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
             const ph = o.phone || o.customer_phone;
             if (!ph) return false;
             const p = String(ph).replace(/\D/g, "");
-            return p.length >= 7 && normPhone.length >= 7 && (p.endsWith(normPhone) || normPhone.endsWith(p));
+            return (
+              p.length >= 7 &&
+              normPhone.length >= 7 &&
+              (p.endsWith(normPhone) || normPhone.endsWith(p))
+            );
           });
 
           // 2. Check orders by name tokens if phone not matched
@@ -2034,12 +2736,17 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
 
           if (matchedOrderCode && matchedOrderId) {
             matchedOrdersCount++;
-            matchedDetails.push(`Matched '${item.customerName || item.customerPhone}' -> Order #${matchedOrderCode}`);
+            matchedDetails.push(
+              `Matched '${item.customerName || item.customerPhone}' -> Order #${matchedOrderCode}`,
+            );
 
             // Automatically link website order to the specified farm batch if selected and approved by owner
             if (data.batchId && isOwner) {
               const table = isPreorder ? "preorders" : "orders";
-              await supabaseAdmin.from(table).update({ batch_id: data.batchId }).eq("id", matchedOrderId);
+              await supabaseAdmin
+                .from(table)
+                .update({ batch_id: data.batchId })
+                .eq("id", matchedOrderId);
             }
           } else {
             unmatchedOfflineCount++;
@@ -2051,8 +2758,8 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
         const desc = matchedOrderCode
           ? `${item.description} (Auto-matched Order #${matchedOrderCode})`
           : item.customerName
-          ? `${item.description} (Customer: ${item.customerName})`
-          : item.description;
+            ? `${item.description} (Customer: ${item.customerName})`
+            : item.description;
 
         insertRows.push({
           batch_id: data.batchId || null,
@@ -2079,40 +2786,329 @@ export const adminImportFinancialsWithAutoMatch = createServerFn({ method: "POST
         unmatchedOfflineCount,
         matchedDetails,
       };
-    }
+    },
   );
 
-// ─── Staff Approvals Management Server Functions ─────────────────────────────
+// ─── Staff & Manager Approvals Management Server Functions ───────────────────
+
+export type PendingApprovalSubmitterSummary = {
+  username: string;
+  fullName: string;
+  role: "owner" | "manager" | "staff";
+  count: number;
+};
+
+export type PendingApprovalAlertItem = {
+  id: string;
+  targetType: "financial" | "activity" | "contact_tx" | "fin_payment";
+  title: string;
+  subtitle: string;
+  date: string;
+  submitterUsername: string;
+  submitterName: string;
+  submitterRole: "owner" | "manager" | "staff";
+  createdAt: string;
+};
+
+export type PendingApprovalsSummary = {
+  count: number;
+  managerCount: number;
+  staffCount: number;
+  partnerPendingCount: number;
+  submitters: PendingApprovalSubmitterSummary[];
+  recentItems: PendingApprovalAlertItem[];
+};
+
+async function loadAdminSubmitterLookup(
+  supabaseAdmin: any,
+): Promise<
+  Map<string, { username: string; fullName: string; role: "owner" | "manager" | "staff" }>
+> {
+  const map = new Map<
+    string,
+    { username: string; fullName: string; role: "owner" | "manager" | "staff" }
+  >();
+  try {
+    const { data: rows } = await supabaseAdmin
+      .from("admin_access")
+      .select("username, full_name, role");
+    for (const r of rows || []) {
+      const uname = String(r.username || "")
+        .trim()
+        .toLowerCase();
+      if (!uname) continue;
+      const resolvedRole: "owner" | "manager" | "staff" =
+        r.role === "owner" || r.role === "manager" || r.role === "staff" ? r.role : "staff";
+      const display = String(r.full_name || "").trim() || uname;
+      map.set(uname, { username: uname, fullName: display, role: resolvedRole });
+    }
+  } catch {
+    // Graceful fallback when admin_access is unavailable
+  }
+  return map;
+}
+
+function resolveSubmitterMeta(
+  recordedBy: string | null | undefined,
+  lookup: Map<string, { username: string; fullName: string; role: "owner" | "manager" | "staff" }>,
+  defaultRole: "manager" | "staff" = "staff",
+): { username: string; fullName: string; role: "owner" | "manager" | "staff" } {
+  const raw = String(recordedBy || "").trim();
+  const key = raw.toLowerCase();
+  if (key && lookup.has(key)) {
+    return lookup.get(key)!;
+  }
+  if (key === "owner" || key === "admin") {
+    return { username: key, fullName: "Farm Owner", role: "owner" };
+  }
+  if (key === "manager") {
+    return { username: "manager", fullName: "Farm Manager", role: "manager" };
+  }
+  if (key === "owner" || key === "admin") {
+    return { username: key, fullName: "Farm Owner", role: "owner" };
+  }
+  if (!key) {
+    return {
+      username: defaultRole,
+      fullName: "Unknown legacy submitter",
+      role: defaultRole,
+    };
+  }
+  return {
+    username: raw,
+    fullName: raw,
+    role: defaultRole,
+  };
+}
+
+async function fetchEnrichedApprovalsByStatus(supabaseAdmin: any, statuses: string[], limit = 200) {
+  const [
+    lookup,
+    { data: finRows },
+    { data: actRows },
+    contactRes,
+    pmtRes,
+    partnerFinRes,
+    partnerActRes,
+  ] = await Promise.all([
+    loadAdminSubmitterLookup(supabaseAdmin),
+    supabaseAdmin
+      .from("farm_financials")
+      .select("*, farm_batches(batch_name)")
+      .is("source_contact_id", null)
+      .in("approval_status", statuses)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabaseAdmin
+      .from("farm_activities")
+      .select("*, farm_batches(batch_name)")
+      .in("approval_status", statuses)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabaseAdmin
+      .from("contact_transactions")
+      .select("*, special_contacts(contact_name), farm_batches(batch_name)")
+      .in("approval_status", statuses)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    (supabaseAdmin as any)
+      .from("farm_financial_payments")
+      .select("*, farm_financials(party_name, description, type, farm_batches(batch_name))")
+      .in("approval_status", statuses)
+      .order("created_at", { ascending: false })
+      .limit(limit),
+    supabaseAdmin
+      .from("partner_financials")
+      .select("id", { count: "exact", head: true })
+      .eq("approval_status", "pending_approval")
+      .is("removed_at", null),
+    supabaseAdmin
+      .from("partner_activities")
+      .select("id", { count: "exact", head: true })
+      .eq("approval_status", "pending_approval")
+      .is("removed_at", null),
+  ]);
+
+  const financials: FarmFinancial[] = (finRows || []).map((r: any) => {
+    const mapped = mapFinancialRow(r);
+    const meta = resolveSubmitterMeta(mapped.recordedBy, lookup, "staff");
+    return {
+      ...mapped,
+      recordedByName: r.recorded_by_name || meta.fullName,
+      recordedByRole: meta.role,
+    };
+  });
+
+  const activities: FarmActivity[] = (actRows || []).map((r: any) => {
+    const mapped = mapActivityRow(r);
+    const meta = resolveSubmitterMeta(mapped.recordedBy, lookup, "staff");
+    return {
+      ...mapped,
+      recordedByName: r.recorded_by_name || meta.fullName,
+      recordedByRole: meta.role,
+    };
+  });
+
+  const contactTransactions: PendingContactTransaction[] = (
+    contactRes.error ? [] : contactRes.data || []
+  ).map((r: any) => {
+    const meta = resolveSubmitterMeta(r.recorded_by, lookup, "manager");
+    const resolved = resolveEffectiveApprovalState(r.approval_status, r.rejection_reason ?? null);
+    return {
+      id: r.id,
+      contactId: r.contact_id,
+      contactName: r.special_contacts?.contact_name ?? "Special Contact",
+      batchId: r.batch_id ?? null,
+      batchName: r.farm_batches?.batch_name ?? null,
+      transactionType: r.transaction_type,
+      transactionDate: r.transaction_date,
+      itemDescription: r.item_description,
+      totalAmount: Number(r.total_amount || 0),
+      amountPaid: Number(r.amount_paid || 0),
+      recordedBy: r.recorded_by ?? null,
+      recordedByName: r.recorded_by_name || meta.fullName,
+      recordedByRole: r.recorded_by_role || meta.role,
+      approvalStatus: resolved.approvalStatus as any,
+      rejectionReason: resolved.rejectionReason,
+      createdAt: r.created_at,
+    };
+  });
+
+  const financialPayments: PendingFinancialPayment[] = (pmtRes.error ? [] : pmtRes.data || []).map(
+    (r: any) => {
+      const meta = resolveSubmitterMeta(r.recorded_by, lookup, "staff");
+      const resolved = resolveEffectiveApprovalState(
+        r.approval_status || "pending",
+        r.rejection_reason ?? null,
+      );
+      return {
+        id: r.id,
+        financialId: r.financial_id,
+        paymentDate: r.payment_date,
+        amount: Number(r.amount || 0),
+        paymentMethod: r.payment_method || "Bank Transfer",
+        referenceNo: r.reference_no ?? null,
+        notes: r.notes ?? null,
+        approvalStatus: resolved.approvalStatus as any,
+        rejectionReason: resolved.rejectionReason,
+        recordedBy: r.recorded_by ?? null,
+        recordedByName: r.recorded_by_name || meta.fullName,
+        recordedByRole: r.recorded_by_role || meta.role,
+        createdAt: r.created_at,
+        partyName: r.farm_financials?.party_name ?? null,
+        financialDescription: r.farm_financials?.description ?? "Partial Payment",
+        financialType: r.farm_financials?.type === "income" ? "income" : "expense",
+        batchName: r.farm_financials?.farm_batches?.batch_name ?? null,
+      };
+    },
+  );
+
+  const partnerPendingCount =
+    (partnerFinRes.error ? 0 : partnerFinRes.count || 0) +
+    (partnerActRes.error ? 0 : partnerActRes.count || 0);
+
+  return { financials, activities, contactTransactions, financialPayments, partnerPendingCount };
+}
 
 export const adminGetPendingApprovalsCount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => baseAuthSchema.parse(data))
-  .handler(async ({ data }): Promise<{ count: number }> => {
+  .handler(async ({ data }): Promise<PendingApprovalsSummary> => {
     const role = await checkPasscode(data.passcode);
-    if (role !== "owner") return { count: 0 };
+    if (role !== "owner") {
+      return {
+        count: 0,
+        managerCount: 0,
+        staffCount: 0,
+        partnerPendingCount: 0,
+        submitters: [],
+        recentItems: [],
+      };
+    }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { financials, activities, contactTransactions, financialPayments, partnerPendingCount } =
+      await fetchEnrichedApprovalsByStatus(supabaseAdmin, ["pending_approval", "pending"]);
 
-    const [{ count: finCount }, { count: actCount }, contactRes, pmtRes] = await Promise.all([
-      supabaseAdmin
-        .from("farm_financials")
-        .select("id", { count: "exact", head: true })
-        .eq("approval_status", "pending_approval"),
-      supabaseAdmin
-        .from("farm_activities")
-        .select("id", { count: "exact", head: true })
-        .eq("approval_status", "pending_approval"),
-      supabaseAdmin
-        .from("contact_transactions")
-        .select("id", { count: "exact", head: true })
-        .eq("approval_status", "pending_approval"),
-      (supabaseAdmin as any)
-        .from("farm_financial_payments")
-        .select("id", { count: "exact", head: true })
-        .eq("approval_status", "pending"),
-    ]);
+    // Exclude flagged records waiting on staff/manager edits from the Owner's urgent action count
+    const pendingFin = financials.filter((f) => f.approvalStatus !== "flagged");
+    const pendingAct = activities.filter((a) => a.approvalStatus !== "flagged");
+    const pendingContact = contactTransactions.filter((c) => c.approvalStatus !== "flagged");
+    const pendingPmt = financialPayments.filter((p) => p.approvalStatus !== "flagged");
 
-    const contactCount = contactRes.error ? 0 : (contactRes.count || 0);
-    const pmtCount = pmtRes.error ? 0 : (pmtRes.count || 0);
-    return { count: (finCount || 0) + (actCount || 0) + contactCount + pmtCount };
+    const recentItems: PendingApprovalAlertItem[] = [
+      ...pendingFin.map((f) => ({
+        id: f.id,
+        targetType: "financial" as const,
+        title: `${f.type === "income" ? "Income" : "Expense"} · ${f.category} (₦${f.amount.toLocaleString()})`,
+        subtitle: `${f.description}${f.batchName ? ` · ${f.batchName}` : ""}`,
+        date: f.transactionDate,
+        submitterUsername: f.recordedBy || "staff",
+        submitterName: f.recordedByName || f.recordedBy || "Staff",
+        submitterRole: (f.recordedByRole || "staff") as "owner" | "manager" | "staff",
+        createdAt: f.createdAt,
+      })),
+      ...pendingAct.map((a) => ({
+        id: a.id,
+        targetType: "activity" as const,
+        title: `${a.activityType}${a.mortalityCount > 0 ? ` · ${a.mortalityCount} mortality` : ""}`,
+        subtitle: `${a.batchName || "Pen Log"}${a.notes ? ` · ${a.notes}` : ""}`,
+        date: a.activityDate,
+        submitterUsername: a.recordedBy || "staff",
+        submitterName: a.recordedByName || a.recordedBy || "Staff",
+        submitterRole: (a.recordedByRole || "staff") as "owner" | "manager" | "staff",
+        createdAt: a.createdAt,
+      })),
+      ...pendingContact.map((c) => ({
+        id: c.id,
+        targetType: "contact_tx" as const,
+        title: `${c.contactName} (₦${c.totalAmount.toLocaleString()})`,
+        subtitle: `${c.itemDescription}${c.batchName ? ` · ${c.batchName}` : ""}`,
+        date: c.transactionDate,
+        submitterUsername: c.recordedBy || "manager",
+        submitterName: c.recordedByName || c.recordedBy || "Manager",
+        submitterRole: (c.recordedByRole || "manager") as "owner" | "manager" | "staff",
+        createdAt: c.createdAt,
+      })),
+      ...pendingPmt.map((p) => ({
+        id: p.id,
+        targetType: "fin_payment" as const,
+        title: `Credit Payment · ₦${p.amount.toLocaleString()}`,
+        subtitle: `${p.partyName || p.financialDescription}${p.batchName ? ` · ${p.batchName}` : ""}`,
+        date: p.paymentDate,
+        submitterUsername: p.recordedBy || "staff",
+        submitterName: p.recordedByName || p.recordedBy || "Staff",
+        submitterRole: (p.recordedByRole || "staff") as "owner" | "manager" | "staff",
+        createdAt: p.createdAt,
+      })),
+    ].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+
+    let managerCount = 0;
+    let staffCount = 0;
+    const submitterMap = new Map<string, PendingApprovalSubmitterSummary>();
+    for (const item of recentItems) {
+      if (item.submitterRole === "manager") managerCount++;
+      else if (item.submitterRole === "staff") staffCount++;
+      const key = `${item.submitterRole}:${item.submitterUsername.toLowerCase()}`;
+      const existing = submitterMap.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        submitterMap.set(key, {
+          username: item.submitterUsername,
+          fullName: item.submitterName,
+          role: item.submitterRole,
+          count: 1,
+        });
+      }
+    }
+
+    return {
+      count: recentItems.length,
+      managerCount,
+      staffCount,
+      partnerPendingCount,
+      submitters: Array.from(submitterMap.values()).sort((a, b) => b.count - a.count),
+      recentItems: recentItems.slice(0, 12),
+    };
   });
 
 export const adminListPendingApprovals = createServerFn({ method: "POST" })
@@ -2125,77 +3121,98 @@ export const adminListPendingApprovals = createServerFn({ method: "POST" })
       activities: FarmActivity[];
       contactTransactions: PendingContactTransaction[];
       financialPayments: PendingFinancialPayment[];
+      partnerPendingCount: number;
+    }> => {
+      await checkOwner(data.passcode);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      return fetchEnrichedApprovalsByStatus(supabaseAdmin, [
+        "pending_approval",
+        "pending",
+        "flagged",
+      ]);
+    },
+  );
+
+export const adminListRejectedApprovals = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) => baseAuthSchema.parse(data))
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      financials: FarmFinancial[];
+      activities: FarmActivity[];
+      contactTransactions: PendingContactTransaction[];
+      financialPayments: PendingFinancialPayment[];
+    }> => {
+      await checkOwner(data.passcode);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const res = await fetchEnrichedApprovalsByStatus(supabaseAdmin, ["rejected"], 100);
+      return {
+        financials: res.financials,
+        activities: res.activities,
+        contactTransactions: res.contactTransactions,
+        financialPayments: res.financialPayments,
+      };
+    },
+  );
+
+export const adminListApprovalsByFilter = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    baseAuthSchema
+      .extend({
+        statusFilter: z.enum(["pending", "approved", "rejected", "all"]).default("pending"),
+        limit: z.number().int().min(10).max(500).default(250),
+      })
+      .parse(data),
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      financials: FarmFinancial[];
+      activities: FarmActivity[];
+      contactTransactions: PendingContactTransaction[];
+      financialPayments: PendingFinancialPayment[];
     }> => {
       await checkOwner(data.passcode);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-      const [{ data: finRows }, { data: actRows }, contactRes, pmtRes] = await Promise.all([
-        supabaseAdmin
-          .from("farm_financials")
-          .select("*, farm_batches(batch_name)")
-          .eq("approval_status", "pending_approval")
-          .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("farm_activities")
-          .select("*, farm_batches(batch_name)")
-          .eq("approval_status", "pending_approval")
-          .order("created_at", { ascending: false }),
-        supabaseAdmin
-          .from("contact_transactions")
-          .select("*, special_contacts(contact_name), farm_batches(batch_name)")
-          .eq("approval_status", "pending_approval")
-          .order("created_at", { ascending: false }),
-        (supabaseAdmin as any)
-          .from("farm_financial_payments")
-          .select("*, farm_financials(party_name, description, type, farm_batches(batch_name))")
-          .eq("approval_status", "pending")
-          .order("created_at", { ascending: false }),
-      ]);
+      const statuses =
+        data.statusFilter === "pending"
+          ? ["pending_approval", "pending", "flagged"]
+          : data.statusFilter === "approved"
+            ? ["approved"]
+            : data.statusFilter === "rejected"
+              ? ["rejected"]
+              : ["pending_approval", "pending", "flagged", "approved", "rejected"];
 
-      const financials: FarmFinancial[] = (finRows || []).map(mapFinancialRow);
+      const res = await fetchEnrichedApprovalsByStatus(supabaseAdmin, statuses, data.limit);
 
-      const activities: FarmActivity[] = (actRows || []).map(mapActivityRow);
+      // For Approved History (and approved entries inside "All"), focus on Staff & Manager submissions
+      // so Owner-self-logged records don't clutter the Staff/Manager Approval Audit Log.
+      const keepRecord = (
+        status: string | undefined | null,
+        recordedBy: string | null | undefined,
+        role: string | null | undefined,
+      ) => {
+        if ((status || "approved") !== "approved") return true;
+        return Boolean(recordedBy && recordedBy.trim()) && role !== "owner";
+      };
 
-      const contactTransactions: PendingContactTransaction[] = (
-        contactRes.error ? [] : contactRes.data || []
-      ).map((r: any) => ({
-        id: r.id,
-        contactId: r.contact_id,
-        contactName: r.special_contacts?.contact_name ?? "Special Contact",
-        batchId: r.batch_id ?? null,
-        batchName: r.farm_batches?.batch_name ?? null,
-        transactionType: r.transaction_type,
-        transactionDate: r.transaction_date,
-        itemDescription: r.item_description,
-        totalAmount: Number(r.total_amount || 0),
-        amountPaid: Number(r.amount_paid || 0),
-        recordedBy: r.recorded_by ?? null,
-        approvalStatus: r.approval_status,
-        rejectionReason: r.rejection_reason ?? null,
-        createdAt: r.created_at,
-      }));
-
-      const financialPayments: PendingFinancialPayment[] = (
-        pmtRes.error ? [] : pmtRes.data || []
-      ).map((r: any) => ({
-        id: r.id,
-        financialId: r.financial_id,
-        paymentDate: r.payment_date,
-        amount: Number(r.amount || 0),
-        paymentMethod: r.payment_method || "Bank Transfer",
-        referenceNo: r.reference_no ?? null,
-        notes: r.notes ?? null,
-        approvalStatus: r.approval_status || "pending",
-        rejectionReason: r.rejection_reason ?? null,
-        recordedBy: r.recorded_by ?? null,
-        createdAt: r.created_at,
-        partyName: r.farm_financials?.party_name ?? null,
-        financialDescription: r.farm_financials?.description ?? "Partial Payment",
-        financialType: r.farm_financials?.type === "income" ? "income" : "expense",
-        batchName: r.farm_financials?.farm_batches?.batch_name ?? null,
-      }));
-
-      return { financials, activities, contactTransactions, financialPayments };
+      return {
+        financials: res.financials.filter((f) =>
+          keepRecord(f.approvalStatus, f.recordedBy, f.recordedByRole),
+        ),
+        activities: res.activities.filter((a) =>
+          keepRecord(a.approvalStatus, a.recordedBy, a.recordedByRole),
+        ),
+        contactTransactions: res.contactTransactions.filter((c) =>
+          keepRecord(c.approvalStatus, c.recordedBy, c.recordedByRole),
+        ),
+        financialPayments: res.financialPayments.filter((p) =>
+          keepRecord(p.approvalStatus, p.recordedBy, p.recordedByRole),
+        ),
+      };
     },
   );
 
@@ -2213,39 +3230,32 @@ async function approvePendingFinancialPayment(supabaseAdmin: any, paymentId: str
     .update({ approval_status: "approved", rejection_reason: null })
     .eq("id", paymentId);
   if (updErr) throw new Error(updErr.message);
-
-  const { data: fin } = await (supabaseAdmin as any)
-    .from("farm_financials")
-    .select("id, amount, amount_paid")
-    .eq("id", pmt.financial_id)
-    .maybeSingle();
-
-  if (fin) {
-    const total = Number(fin.amount || 0);
-    const currentPaid = fin.amount_paid !== null && fin.amount_paid !== undefined ? Number(fin.amount_paid) : total;
-    const nextPaid = Math.min(total, Math.round((currentPaid + Number(pmt.amount || 0)) * 100) / 100);
-    await (supabaseAdmin as any)
-      .from("farm_financials")
-      .update({ amount_paid: nextPaid })
-      .eq("id", fin.id);
-  }
 }
 
 export const adminApproveStaffRecord = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      id: z.string().uuid(),
-      targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        id: z.string().uuid(),
+        targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     await checkOwner(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     if (data.targetType === "fin_payment") {
       await approvePendingFinancialPayment(supabaseAdmin, data.id);
     } else if (data.targetType === "financial") {
+      const { data: fin } = await supabaseAdmin
+        .from("farm_financials")
+        .select("batch_id")
+        .eq("id", data.id)
+        .maybeSingle();
+
       const { error } = await supabaseAdmin
         .from("farm_financials")
         .update({ approval_status: "approved", rejection_reason: null } as any)
@@ -2256,6 +3266,10 @@ export const adminApproveStaffRecord = createServerFn({ method: "POST" })
           .update({ approval_status: "approved" })
           .eq("id", data.id);
         if (fallback) throw new Error(fallback.message);
+      }
+
+      if (fin?.batch_id) {
+        await notifyLinkedBatchPartners(supabaseAdmin, fin.batch_id, cred.username || "owner");
       }
     } else if (data.targetType === "contact_tx") {
       const { error } = await (supabaseAdmin as any)
@@ -2282,8 +3296,16 @@ export const adminApproveStaffRecord = createServerFn({ method: "POST" })
         if (fallback) throw new Error(fallback.message);
       }
 
-      if (act && act.approval_status !== "approved" && act.batch_id && Number(act.mortality_count || 0) > 0) {
+      if (
+        act &&
+        act.approval_status !== "approved" &&
+        act.batch_id &&
+        Number(act.mortality_count || 0) > 0
+      ) {
         await adjustBatchHeadcount(supabaseAdmin, act.batch_id, Number(act.mortality_count || 0));
+      }
+      if (act?.batch_id) {
+        await notifyLinkedBatchPartners(supabaseAdmin, act.batch_id, cred.username || "owner");
       }
     }
 
@@ -2294,33 +3316,40 @@ export const adminApproveAllPending = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => baseAuthSchema.parse(data))
   .handler(async ({ data }): Promise<{ approvedCount: number }> => {
     await checkOwner(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: pendingFin } = await supabaseAdmin
       .from("farm_financials")
-      .select("id")
-      .eq("approval_status", "pending_approval");
+      .select("id, batch_id, rejection_reason")
+      .is("source_contact_id", null)
+      .in("approval_status", ["pending_approval", "pending"]);
 
     const { data: pendingAct } = await supabaseAdmin
       .from("farm_activities")
-      .select("id, batch_id, mortality_count")
-      .eq("approval_status", "pending_approval");
+      .select("id, batch_id, mortality_count, rejection_reason")
+      .in("approval_status", ["pending_approval", "pending"]);
 
     const pendingContactRes = await supabaseAdmin
       .from("contact_transactions")
-      .select("id")
-      .eq("approval_status", "pending_approval");
+      .select("id, rejection_reason")
+      .in("approval_status", ["pending_approval", "pending"]);
 
     const pendingPmtRes = await (supabaseAdmin as any)
       .from("farm_financial_payments")
-      .select("id")
-      .eq("approval_status", "pending");
+      .select("id, rejection_reason")
+      .in("approval_status", ["pending", "pending_approval"]);
 
-    const finIds = (pendingFin || []).map((r: any) => r.id);
-    const actRows = pendingAct || [];
+    const notFlagged = (r: any) => !String(r?.rejection_reason || "").startsWith(FLAG_PREFIX);
+    const finIds = (pendingFin || []).filter(notFlagged).map((r: any) => r.id);
+    const actRows = (pendingAct || []).filter(notFlagged);
     const actIds = actRows.map((r: any) => r.id);
-    const contactIds = pendingContactRes.error ? [] : (pendingContactRes.data || []).map((r: any) => r.id);
-    const pmtIds = pendingPmtRes.error ? [] : (pendingPmtRes.data || []).map((r: any) => r.id);
+    const contactIds = pendingContactRes.error
+      ? []
+      : (pendingContactRes.data || []).filter(notFlagged).map((r: any) => r.id);
+    const pmtIds = pendingPmtRes.error
+      ? []
+      : (pendingPmtRes.data || []).filter(notFlagged).map((r: any) => r.id);
 
     if (finIds.length > 0) {
       const { error } = await supabaseAdmin
@@ -2370,17 +3399,30 @@ export const adminApproveAllPending = createServerFn({ method: "POST" })
       await approvePendingFinancialPayment(supabaseAdmin, pId);
     }
 
+    const touchedBatchIds = new Set<string>();
+    for (const r of (pendingFin || []) as any[]) {
+      if (r.batch_id) touchedBatchIds.add(r.batch_id);
+    }
+    for (const r of (actRows || []) as any[]) {
+      if (r.batch_id) touchedBatchIds.add(r.batch_id);
+    }
+    for (const bId of touchedBatchIds) {
+      await notifyLinkedBatchPartners(supabaseAdmin, bId, cred.username || "owner");
+    }
+
     return { approvedCount: finIds.length + actIds.length + contactIds.length + pmtIds.length };
   });
 
 export const adminRejectStaffRecord = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      id: z.string().uuid(),
-      targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
-      reason: z.string().trim().max(500).optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        id: z.string().uuid(),
+        targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
+        reason: z.string().trim().max(500).optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     await checkOwner(data.passcode);
@@ -2416,52 +3458,153 @@ export const adminRejectStaffRecord = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const adminFlagStaffRecord = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        id: z.string().uuid(),
+        targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
+        note: z
+          .string()
+          .trim()
+          .min(1, "Please add a short note explaining what needs editing.")
+          .max(500),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const table =
+      data.targetType === "fin_payment"
+        ? "farm_financial_payments"
+        : data.targetType === "financial"
+          ? "farm_financials"
+          : data.targetType === "contact_tx"
+            ? "contact_transactions"
+            : "farm_activities";
+
+    const noteText = data.note.trim();
+    const { error } = await (supabaseAdmin as any)
+      .from(table)
+      .update({ approval_status: "flagged", rejection_reason: noteText })
+      .eq("id", data.id);
+
+    if (error) {
+      if (/check|constraint|approval_status/i.test(error.message)) {
+        const fallbackStatus = data.targetType === "fin_payment" ? "pending" : "pending_approval";
+        const { error: fallback } = await (supabaseAdmin as any)
+          .from(table)
+          .update({
+            approval_status: fallbackStatus,
+            rejection_reason: `${FLAG_PREFIX}${noteText}`,
+          })
+          .eq("id", data.id);
+        if (fallback) throw new Error(fallback.message);
+        return { ok: true };
+      }
+      throw new Error(error.message);
+    }
+
+    return { ok: true };
+  });
+
+export const adminDeleteRejectedRecord = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        id: z.string().uuid(),
+        targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const table =
+      data.targetType === "fin_payment"
+        ? "farm_financial_payments"
+        : data.targetType === "financial"
+          ? "farm_financials"
+          : data.targetType === "contact_tx"
+            ? "contact_transactions"
+            : "farm_activities";
+
+    const { error } = await (supabaseAdmin as any)
+      .from(table)
+      .delete()
+      .eq("id", data.id)
+      .eq("approval_status", "rejected");
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 export const adminListMySubmissions = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => baseAuthSchema.parse(data))
   .handler(async ({ data }): Promise<MySubmissionItem[]> => {
     await checkPasscode(data.passcode);
     const credential = parseAdminCredential(data.passcode);
+    const usernamePattern = (credential.username || "").trim();
+    if (!usernamePattern) return [];
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const [finRes, actRes, contactRes] = await Promise.all([
+    const [finRes, actRes, contactRes, finPmtRes] = await Promise.all([
       supabaseAdmin
         .from("farm_financials")
-        .select("id, type, category, amount, description, transaction_date, approval_status, rejection_reason, created_at, farm_batches(batch_name)")
-        .eq("recorded_by", credential.username)
+        .select("*, farm_batches(batch_name)")
+        .eq("recorded_by", usernamePattern)
         .order("created_at", { ascending: false })
-        .limit(30),
+        .limit(200),
       supabaseAdmin
         .from("farm_activities")
-        .select("id, activity_type, activity_date, mortality_count, feed_consumed_kg, notes, approval_status, rejection_reason, created_at, farm_batches(batch_name)")
-        .eq("recorded_by", credential.username)
+        .select("*, farm_batches(batch_name)")
+        .eq("recorded_by", usernamePattern)
         .order("created_at", { ascending: false })
-        .limit(30),
+        .limit(200),
       supabaseAdmin
         .from("contact_transactions")
-        .select("id, transaction_type, item_description, total_amount, transaction_date, approval_status, rejection_reason, created_at, special_contacts(contact_name), farm_batches(batch_name)")
-        .eq("recorded_by", credential.username)
+        .select(
+          "id, transaction_type, item_description, total_amount, transaction_date, approval_status, rejection_reason, created_at, special_contacts(contact_name), farm_batches(batch_name)",
+        )
+        .eq("recorded_by", usernamePattern)
         .order("created_at", { ascending: false })
-        .limit(30),
+        .limit(200),
+      (supabaseAdmin as any)
+        .from("farm_financial_payments")
+        .select(
+          "id, amount, payment_date, payment_method, notes, approval_status, rejection_reason, created_at, farm_financials(party_name, description, farm_batches(batch_name))",
+        )
+        .eq("recorded_by", usernamePattern)
+        .order("created_at", { ascending: false })
+        .limit(200),
     ]);
 
     const items: MySubmissionItem[] = [];
 
     for (const r of (finRes.data || []) as any[]) {
+      const finMapped = mapFinancialRow(r);
       items.push({
         id: r.id,
         targetType: "financial",
         title: `${r.type === "income" ? "Income" : "Expense"} · ${r.category}`,
         subtitle: r.description,
         date: r.transaction_date,
-        batchName: r.farm_batches?.batch_name ?? null,
+        batchName: finMapped.batchName ?? null,
         amount: Number(r.amount || 0),
-        approvalStatus: (r.approval_status || "approved") as any,
-        rejectionReason: r.rejection_reason ?? null,
+        approvalStatus: finMapped.approvalStatus as any,
+        rejectionReason: finMapped.rejectionReason ?? null,
         createdAt: r.created_at,
+        financialRecord: finMapped,
       });
     }
 
     for (const r of (actRes.data || []) as any[]) {
+      const actMapped = mapActivityRow(r);
       items.push({
         id: r.id,
         targetType: "activity",
@@ -2475,16 +3618,21 @@ export const adminListMySubmissions = createServerFn({ method: "POST" })
             .filter(Boolean)
             .join(" · ") || "Activity log",
         date: r.activity_date,
-        batchName: r.farm_batches?.batch_name ?? null,
+        batchName: actMapped.batchName ?? null,
         amount: null,
-        approvalStatus: (r.approval_status || "approved") as any,
-        rejectionReason: r.rejection_reason ?? null,
+        approvalStatus: actMapped.approvalStatus as any,
+        rejectionReason: actMapped.rejectionReason ?? null,
         createdAt: r.created_at,
+        activityRecord: actMapped,
       });
     }
 
     if (!contactRes.error) {
       for (const r of (contactRes.data || []) as any[]) {
+        const resolved = resolveEffectiveApprovalState(
+          r.approval_status || "approved",
+          r.rejection_reason ?? null,
+        );
         items.push({
           id: r.id,
           targetType: "contact_tx",
@@ -2493,23 +3641,55 @@ export const adminListMySubmissions = createServerFn({ method: "POST" })
           date: r.transaction_date,
           batchName: r.farm_batches?.batch_name ?? null,
           amount: Number(r.total_amount || 0),
-          approvalStatus: (r.approval_status || "approved") as any,
-          rejectionReason: r.rejection_reason ?? null,
+          approvalStatus: resolved.approvalStatus as any,
+          rejectionReason: resolved.rejectionReason,
           createdAt: r.created_at,
         });
       }
     }
 
-    return items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (!finPmtRes.error) {
+      for (const r of (finPmtRes.data || []) as any[]) {
+        const resolved = resolveEffectiveApprovalState(
+          r.approval_status || "approved",
+          r.rejection_reason ?? null,
+        );
+        const party = r.farm_financials?.party_name ? `${r.farm_financials.party_name} — ` : "";
+        items.push({
+          id: r.id,
+          targetType: "fin_payment",
+          title: `Credit / Follow-up Payment (${r.payment_method || "Transfer"})`,
+          subtitle: `${party}${r.farm_financials?.description || r.notes || "Partial Payment"}`,
+          date: r.payment_date,
+          batchName: r.farm_financials?.farm_batches?.batch_name ?? null,
+          amount: Number(r.amount || 0),
+          approvalStatus: resolved.approvalStatus as any,
+          rejectionReason: resolved.rejectionReason,
+          createdAt: r.created_at,
+        });
+      }
+    }
+
+    const { data: dismissals, error: dismissalError } = await (supabaseAdmin as any)
+      .from("submission_dismissals")
+      .select("source_id")
+      .eq("username", credential.username);
+    if (dismissalError) throw new Error(dismissalError.message);
+    const hidden = new Set((dismissals || []).map((d: { source_id: string }) => d.source_id));
+    return items
+      .filter((item) => item.approvalStatus !== "rejected" || !hidden.has(item.id))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   });
 
 export const adminDismissMySubmission = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      id: z.string().uuid(),
-      targetType: z.enum(["financial", "activity", "contact_tx"]),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        id: z.string().uuid(),
+        targetType: z.enum(["financial", "activity", "contact_tx", "fin_payment"]),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ ok: boolean }> => {
     const role = await checkPasscode(data.passcode);
@@ -2517,34 +3697,71 @@ export const adminDismissMySubmission = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const table =
-      data.targetType === "financial"
-        ? "farm_financials"
-        : data.targetType === "contact_tx"
-          ? "contact_transactions"
-          : "farm_activities";
+      data.targetType === "fin_payment"
+        ? "farm_financial_payments"
+        : data.targetType === "financial"
+          ? "farm_financials"
+          : data.targetType === "contact_tx"
+            ? "contact_transactions"
+            : "farm_activities";
 
-    let query = (supabaseAdmin as any)
+    const { data: record, error: recordError } = await (supabaseAdmin as any)
       .from(table)
-      .delete()
+      .select("recorded_by, approval_status")
       .eq("id", data.id)
-      .eq("approval_status", "rejected");
-    if (role !== "owner") {
-      query = query.eq("recorded_by", credential.username);
-    }
-    const { error } = await query;
+      .single();
+    if (recordError) throw new Error(recordError.message);
+    if (
+      record.approval_status !== "rejected" ||
+      (role !== "owner" && record.recorded_by?.toLowerCase() !== credential.username)
+    )
+      throw new Error("Cannot dismiss this record.");
+    const { error } = await (supabaseAdmin as any)
+      .from("submission_dismissals")
+      .upsert({ username: credential.username, source_table: table, source_id: data.id });
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 function normalizeActivityType(rawType: string): string {
   const lower = (rawType || "").toLowerCase().trim();
-  if (lower.includes("mortality") || lower.includes("death") || lower.includes("die")) return "Mortality Record";
+  if (lower.includes("mortality") || lower.includes("death") || lower.includes("die"))
+    return "Mortality Record";
   if (lower.includes("egg") || lower.includes("crate")) return "Egg Collection";
-  if (lower.includes("feed") || lower.includes("mash") || lower.includes("pellet") || lower.includes("starter") || lower.includes("grower") || lower.includes("finisher")) return "Feeding";
-  if (lower.includes("med") || lower.includes("vac") || lower.includes("health") || lower.includes("drug") || lower.includes("vit") || lower.includes("treat")) return "Medication / Vaccination";
-  if (lower.includes("weight") || lower.includes("kg") || lower.includes("weigh")) return "Weight Check";
-  if (lower.includes("clean") || lower.includes("sanitat") || lower.includes("wash") || lower.includes("disinfect")) return "Cleaning & Sanitation";
-  if (lower.includes("pen") || lower.includes("maint") || lower.includes("repair") || lower.includes("house")) return "Pen Maintenance";
+  if (
+    lower.includes("feed") ||
+    lower.includes("mash") ||
+    lower.includes("pellet") ||
+    lower.includes("starter") ||
+    lower.includes("grower") ||
+    lower.includes("finisher")
+  )
+    return "Feeding";
+  if (
+    lower.includes("med") ||
+    lower.includes("vac") ||
+    lower.includes("health") ||
+    lower.includes("drug") ||
+    lower.includes("vit") ||
+    lower.includes("treat")
+  )
+    return "Medication / Vaccination";
+  if (lower.includes("weight") || lower.includes("kg") || lower.includes("weigh"))
+    return "Weight Check";
+  if (
+    lower.includes("clean") ||
+    lower.includes("sanitat") ||
+    lower.includes("wash") ||
+    lower.includes("disinfect")
+  )
+    return "Cleaning & Sanitation";
+  if (
+    lower.includes("pen") ||
+    lower.includes("maint") ||
+    lower.includes("repair") ||
+    lower.includes("house")
+  )
+    return "Pen Maintenance";
   return "General Activity";
 }
 
@@ -2565,10 +3782,10 @@ export const adminImportActivities = createServerFn({ method: "POST" })
             eggsCollected: z.number().default(0),
             medicationGiven: z.string().optional().nullable(),
             notes: z.string().optional().nullable(),
-          })
+          }),
         ),
       })
-      .parse(data)
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ importedCount: number }> => {
     const role = await checkPasscode(data.passcode);
@@ -2593,7 +3810,9 @@ export const adminImportActivities = createServerFn({ method: "POST" })
         resolvedBatchId = batchMap.get(item.batchName.toLowerCase().trim()) || null;
       }
       if (!resolvedBatchId) {
-        throw new Error("Every imported activity row must target an active batch. Please select a default active batch or include a matching Batch name.");
+        throw new Error(
+          "Every imported activity row must target an active batch. Please select a default active batch or include a matching Batch name.",
+        );
       }
       if (!validatedOpenBatches.has(resolvedBatchId)) {
         await assertBatchOpen(supabaseAdmin, resolvedBatchId);

@@ -93,6 +93,8 @@ export interface FarmPartner {
   projectName: string;
   batchId: string | null;
   batchName?: string | null;
+  batchAllocationPercentage: number;
+  autoSyncBatch: boolean;
   status: "active" | "matured" | "completed" | "paused";
   active: boolean;
   lastLoginAt?: string | null;
@@ -210,7 +212,9 @@ async function checkOwnerOrManager(
       .eq("key", "hide_partners_from_manager")
       .maybeSingle();
     if (settingRow?.value === "true") {
-      throw new Error("Access denied. Partner dashboard and records have been restricted to Owner-only by the Farm Owner.");
+      throw new Error(
+        "Access denied. Partner dashboard and records have been restricted to Owner-only by the Farm Owner.",
+      );
     }
   }
   const cred = parseAdminCredential(value);
@@ -282,7 +286,7 @@ function b64url(bytes: Uint8Array): string {
   return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function fromB64url(str: string): Uint8Array {
+function fromB64url(str: string): Uint8Array<ArrayBuffer> {
   const pad = str.length % 4 === 0 ? "" : "=".repeat(4 - (str.length % 4));
   const bin = atob(str.replace(/-/g, "+").replace(/_/g, "/") + pad);
   return Uint8Array.from(bin, (c) => c.charCodeAt(0));
@@ -298,10 +302,17 @@ async function hmacKey(): Promise<CryptoKey> {
   );
 }
 
-async function signSession(partnerId: string, username: string): Promise<{ token: string; expiresAt: number }> {
+async function signSession(
+  partnerId: string,
+  username: string,
+): Promise<{ token: string; expiresAt: number }> {
   const expiresAt = Date.now() + SESSION_TTL_MS;
-  const payload = b64url(new TextEncoder().encode(JSON.stringify({ pid: partnerId, u: username, exp: expiresAt })));
-  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", await hmacKey(), new TextEncoder().encode(payload)));
+  const payload = b64url(
+    new TextEncoder().encode(JSON.stringify({ pid: partnerId, u: username, exp: expiresAt })),
+  );
+  const sig = new Uint8Array(
+    await crypto.subtle.sign("HMAC", await hmacKey(), new TextEncoder().encode(payload)),
+  );
   return { token: `${payload}.${b64url(sig)}`, expiresAt };
 }
 
@@ -315,8 +326,13 @@ async function verifySession(token: string): Promise<{ pid: string; u: string }>
     new TextEncoder().encode(payload),
   );
   if (!ok) throw new Error("Your session is invalid. Please sign in again.");
-  const data = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as { pid: string; u: string; exp: number };
-  if (!data.exp || Date.now() > data.exp) throw new Error("Your session has expired. Please sign in again.");
+  const data = JSON.parse(new TextDecoder().decode(fromB64url(payload))) as {
+    pid: string;
+    u: string;
+    exp: number;
+  };
+  if (!data.exp || Date.now() > data.exp)
+    throw new Error("Your session has expired. Please sign in again.");
   return { pid: data.pid, u: data.u };
 }
 
@@ -442,7 +458,9 @@ function extractPartnerArchivesAndElection(p: any): {
   visibleAuditLog: PartnerAuditEvent[];
 } {
   const rawHistory: PartnerAuditEvent[] = Array.isArray(p.terms_history) ? p.terms_history : [];
-  let archivedCycles: PartnerCycleArchive[] = Array.isArray(p.archived_cycles) ? p.archived_cycles : [];
+  let archivedCycles: PartnerCycleArchive[] = Array.isArray(p.archived_cycles)
+    ? p.archived_cycles
+    : [];
   let payoutElection: PartnerPayoutElection | null = p.payout_election ?? null;
 
   // Fallback extraction from terms_history if native columns aren't populated yet
@@ -467,18 +485,30 @@ function mapPartner(p: any, finRows: any[], actRows: any[] = []): FarmPartner {
   const profitPct = Number(p.profit_share_percentage ?? 50);
   const lossPct = Number(p.loss_share_percentage ?? 100);
 
-  const mappedFins = finRows.map(mapFin).filter((f) => !isArchivedCycleRow(f.removalReason));
-  const mappedActs = actRows.map(mapAct).filter((a) => !isArchivedCycleRow(a.removalReason));
+  const mappedFins = finRows
+    .map(mapFin)
+    .filter((f: PartnerFinancial) => !isArchivedCycleRow(f.removalReason));
+  const mappedActs = actRows
+    .map(mapAct)
+    .filter((a: PartnerActivity) => !isArchivedCycleRow(a.removalReason));
 
   // Only approved entries affect live settlement calculations
-  const approvedFins = mappedFins.filter((f) => f.approvalStatus === "approved");
+  const approvedFins = mappedFins.filter((f: PartnerFinancial) => f.approvalStatus === "approved");
   const pendingCount =
-    mappedFins.filter((f) => f.approvalStatus === "pending_approval" && !f.removedAt).length +
-    mappedActs.filter((a) => a.approvalStatus === "pending_approval" && !a.removedAt).length;
+    mappedFins.filter(
+      (f: PartnerFinancial) => f.approvalStatus === "pending_approval" && !f.removedAt,
+    ).length +
+    mappedActs.filter(
+      (a: PartnerActivity) => a.approvalStatus === "pending_approval" && !a.removedAt,
+    ).length;
 
   const settlement = computeSettlement(
     { initialInvestment: initial, profitSharePercentage: profitPct, lossSharePercentage: lossPct },
-    approvedFins.map((r) => ({ type: r.type, amount: Number(r.amount) || 0, removedAt: r.removedAt ?? null })),
+    approvedFins.map((r) => ({
+      type: r.type,
+      amount: Number(r.amount) || 0,
+      removedAt: r.removedAt ?? null,
+    })),
   );
 
   const { archivedCycles, payoutElection, visibleAuditLog } = extractPartnerArchivesAndElection(p);
@@ -496,6 +526,8 @@ function mapPartner(p: any, finRows: any[], actRows: any[] = []): FarmPartner {
     projectName: p.project_name || "Broiler Cycle Partnership",
     batchId: p.batch_id,
     batchName: p.farm_batches?.batch_name ?? null,
+    batchAllocationPercentage: Number(p.batch_allocation_percentage ?? 100),
+    autoSyncBatch: p.auto_sync_batch !== false,
     status: p.status,
     active: Boolean(p.active),
     lastLoginAt: p.last_login_at,
@@ -551,8 +583,12 @@ async function loadPartnerBundle(supabaseAdmin: any, partnerId: string) {
   if (aErr) throw new Error(aErr.message);
 
   const partner = mapPartner(p, finRows || [], actRows || []);
-  const financials = (finRows || []).map(mapFin).filter((f) => !isArchivedCycleRow(f.removalReason));
-  const activities = (actRows || []).map(mapAct).filter((a) => !isArchivedCycleRow(a.removalReason));
+  const financials = (finRows || [])
+    .map(mapFin)
+    .filter((f: PartnerFinancial) => !isArchivedCycleRow(f.removalReason));
+  const activities = (actRows || [])
+    .map(mapAct)
+    .filter((a: PartnerActivity) => !isArchivedCycleRow(a.removalReason));
   return { partner, financials, activities, raw: p };
 }
 
@@ -561,12 +597,20 @@ function buildSummaryAndCharts(
   activities: PartnerActivity[],
   initialInvestment = 0,
 ): { summary: PartnerDashboardSummary; charts: PartnerChartData } {
-  const approvedFins = financials.filter((f) => f.approvalStatus === "approved" && !f.removedAt);
-  const approvedActs = activities.filter((a) => a.approvalStatus === "approved" && !a.removedAt);
+  const approvedFins = financials.filter(
+    (f: PartnerFinancial) => f.approvalStatus === "approved" && !f.removedAt,
+  );
+  const approvedActs = activities.filter(
+    (a: PartnerActivity) => a.approvalStatus === "approved" && !a.removedAt,
+  );
 
   const pendingApprovalsCount =
-    financials.filter((f) => f.approvalStatus === "pending_approval" && !f.removedAt).length +
-    activities.filter((a) => a.approvalStatus === "pending_approval" && !a.removedAt).length;
+    financials.filter(
+      (f: PartnerFinancial) => f.approvalStatus === "pending_approval" && !f.removedAt,
+    ).length +
+    activities.filter(
+      (a: PartnerActivity) => a.approvalStatus === "pending_approval" && !a.removedAt,
+    ).length;
 
   const stocked = approvedActs.reduce((s, a) => s + a.stockHeadcount, 0);
   const mortality = approvedActs.reduce((s, a) => s + a.mortalityCount, 0);
@@ -582,14 +626,16 @@ function buildSummaryAndCharts(
     estimatedBiomassKg > 0 && feed > 0 ? Math.round((feed / estimatedBiomassKg) * 100) / 100 : null;
 
   const totalExpenses = approvedFins
-    .filter((f) => f.type === "expense")
+    .filter((f: PartnerFinancial) => f.type === "expense")
     .reduce((sum, f) => sum + f.amount, 0);
   const totalSales = approvedFins
-    .filter((f) => f.type === "income")
+    .filter((f: PartnerFinancial) => f.type === "income")
     .reduce((sum, f) => sum + f.amount, 0);
 
   const costPerLiveBird =
-    currentStockCount > 0 && totalExpenses > 0 ? Math.round(totalExpenses / currentStockCount) : null;
+    currentStockCount > 0 && totalExpenses > 0
+      ? Math.round(totalExpenses / currentStockCount)
+      : null;
 
   // Break-even selling price per remaining live bird to recover total capital/expenses
   const targetRecoveryBase = Math.max(initialInvestment, totalExpenses);
@@ -614,14 +660,14 @@ function buildSummaryAndCharts(
       pendingApprovalsCount,
     },
     charts: buildChartData(
-      approvedFins.map((f) => ({
+      approvedFins.map((f: PartnerFinancial) => ({
         type: f.type,
         amount: f.amount,
         removedAt: f.removedAt,
         category: f.category,
         transactionDate: f.transactionDate,
       })),
-      approvedActs.map((a) => ({
+      approvedActs.map((a: PartnerActivity) => ({
         activityDate: a.activityDate,
         stockHeadcount: a.stockHeadcount,
         mortalityCount: a.mortalityCount,
@@ -633,14 +679,21 @@ function buildSummaryAndCharts(
 }
 
 async function assertCycleOpen(supabaseAdmin: any, partnerId: string) {
-  const { data } = await supabaseAdmin.from("farm_partners").select("cycle_status").eq("id", partnerId).single();
+  const { data } = await supabaseAdmin
+    .from("farm_partners")
+    .select("cycle_status")
+    .eq("id", partnerId)
+    .single();
   if (data?.cycle_status === "closed") {
     throw new Error("This cycle is closed and settled. Re-open the cycle to make changes.");
   }
 }
 
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)");
-const pct = z.number().min(0, "Percentage cannot be below 0").max(100, "Percentage cannot exceed 100");
+const pct = z
+  .number()
+  .min(0, "Percentage cannot be below 0")
+  .max(100, "Percentage cannot exceed 100");
 
 // ─── Owner & Manager Admin Server Functions ───────────────────────────────────
 
@@ -753,7 +806,8 @@ async function computePartnerBatchFeedStats(
   const bagsBought = Math.round(rawBagsBought * ratio * 10) / 10;
   const bagsFinished = Math.round(rawBagsFinished * ratio * 10) / 10;
   const bagsInStock = Math.max(0, Math.round((bagsBought - bagsFinished) * 10) / 10);
-  const avgCostPerBag = rawBagsBought > 0 ? Math.round((totalFeedSpend / rawBagsBought) * 100) / 100 : 0;
+  const avgCostPerBag =
+    rawBagsBought > 0 ? Math.round((totalFeedSpend / rawBagsBought) * 100) / 100 : 0;
 
   return {
     bagsBought,
@@ -765,7 +819,9 @@ async function computePartnerBatchFeedStats(
 }
 
 export const adminGetPartnerDetail = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data),
+  )
   .handler(
     async ({
       data,
@@ -779,9 +835,16 @@ export const adminGetPartnerDetail = createServerFn({ method: "POST" })
     }> => {
       const { role } = await checkOwnerOrManager(data.passcode);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+      const { partner, financials, activities } = await loadPartnerBundle(
+        supabaseAdmin,
+        data.partnerId,
+      );
       const computed = buildSummaryAndCharts(financials, activities, partner.initialInvestment);
-      const feedBagStats = await computePartnerBatchFeedStats(supabaseAdmin, partner, financials).catch(() => null);
+      const feedBagStats = await computePartnerBatchFeedStats(
+        supabaseAdmin,
+        partner,
+        financials,
+      ).catch(() => null);
       return {
         partner,
         financials,
@@ -808,7 +871,10 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
           .toLowerCase()
           .min(3, "Username must be at least 3 characters")
           .max(40)
-          .regex(/^[a-z0-9_.-]+$/, "Username can only contain letters, numbers, underscores, and dots"),
+          .regex(
+            /^[a-z0-9_.-]+$/,
+            "Username can only contain letters, numbers, underscores, and dots",
+          ),
         password: z.string().trim().min(6, "Password must be at least 6 characters"),
         initialInvestment: z.number().min(0, "Investment amount cannot be negative"),
         investmentDate: dateStr,
@@ -820,11 +886,14 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
         cycleStartDate: dateStr,
         cycleEndDate: dateStr.optional().nullable(),
         batchId: z.string().uuid().optional().nullable(),
+        batchAllocationPercentage: pct.default(100),
+        autoSyncBatch: z.boolean().default(true),
       })
       .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const reserved = ["owner", "admin", "staff", "manager", "everyone", "system"];
@@ -873,6 +942,8 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
       cycle_end_date: data.cycleEndDate || null,
       cycle_status: "open",
       batch_id: data.batchId || null,
+      batch_allocation_percentage: data.batchAllocationPercentage ?? 100,
+      auto_sync_batch: data.autoSyncBatch ?? true,
       status: "active",
       active: true,
     };
@@ -894,7 +965,9 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
       }
 
       lastError = error;
-      const match = error?.message?.match(/Could not find the '([^']+)' column of 'farm_partners'/i);
+      const match = error?.message?.match(
+        /Could not find the '([^']+)' column of 'farm_partners'/i,
+      );
       if (match && match[1] && match[1] in insertPayload) {
         delete insertPayload[match[1]];
         continue;
@@ -903,6 +976,18 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
     }
 
     if (!insertedId) throw new Error(lastError?.message || "Failed to create partner account");
+
+    if (data.batchId && data.autoSyncBatch !== false) {
+      await syncBatchTransactionsForPartner(supabaseAdmin, insertedId, cred.username || "owner", {
+        role: "owner",
+        allocationPercentage: data.batchAllocationPercentage ?? 100,
+        syncFinancials: true,
+        syncActivities: true,
+      }).catch((err) => {
+        console.warn("[adminCreatePartner] initial batch auto-sync warning:", err?.message || err);
+      });
+    }
+
     return { ok: true, partnerId: insertedId };
   });
 
@@ -914,8 +999,21 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
         partnerId: z.string().uuid(),
         fullName: z.string().trim().min(2),
         phone: z.string().trim().min(7),
-        email: z.string().trim().email().optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
-        address: z.string().trim().optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
+        email: z
+          .string()
+          .trim()
+          .email()
+          .optional()
+          .nullable()
+          .or(z.literal(""))
+          .transform((v) => (v ? v : null)),
+        address: z
+          .string()
+          .trim()
+          .optional()
+          .nullable()
+          .or(z.literal(""))
+          .transform((v) => (v ? v : null)),
         initialInvestment: z.number().min(0),
         investmentDate: dateStr,
         profitSharePercentage: pct,
@@ -924,11 +1022,30 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
         projectName: z.string().trim().min(2),
         cycleName: z.string().trim().min(2),
         cycleStartDate: dateStr,
-        cycleEndDate: dateStr.optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
-        batchId: z.string().uuid().optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
+        cycleEndDate: dateStr
+          .optional()
+          .nullable()
+          .or(z.literal(""))
+          .transform((v) => (v ? v : null)),
+        batchId: z
+          .string()
+          .uuid()
+          .optional()
+          .nullable()
+          .or(z.literal(""))
+          .transform((v) => (v ? v : null)),
+        batchAllocationPercentage: pct.optional(),
+        autoSyncBatch: z.boolean().optional(),
         status: z.enum(["active", "matured", "completed", "paused"]),
         amendReason: z.string().trim().max(500).optional().nullable(),
-        newPassword: z.string().trim().min(6).optional().nullable().or(z.literal("")).transform((v) => (v ? v : null)),
+        newPassword: z
+          .string()
+          .trim()
+          .min(6)
+          .optional()
+          .nullable()
+          .or(z.literal(""))
+          .transform((v) => (v ? v : null)),
       })
       .parse(data),
   )
@@ -956,13 +1073,18 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
       oldLoss !== data.lossSharePercentage ||
       oldCapital !== data.initialInvestment;
 
-    const auditLog: PartnerAuditEvent[] = Array.isArray(current.terms_history) ? [...current.terms_history] : [];
+    const auditLog: PartnerAuditEvent[] = Array.isArray(current.terms_history)
+      ? [...current.terms_history]
+      : [];
 
     if (termsChanged) {
       if (current.cycle_status === "closed") {
-        throw new Error("This cycle is closed and settled. Re-open the cycle before amending terms or capital.");
+        throw new Error(
+          "This cycle is closed and settled. Re-open the cycle before amending terms or capital.",
+        );
       }
-      const effectiveAmendReason = data.amendReason?.trim() || "Terms and details updated by farm owner";
+      const effectiveAmendReason =
+        data.amendReason?.trim() || "Terms and details updated by farm owner";
       auditLog.push({
         at: new Date().toISOString(),
         by: cred.username || "owner",
@@ -988,6 +1110,10 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
       cycle_start_date: data.cycleStartDate,
       cycle_end_date: data.cycleEndDate || null,
       batch_id: data.batchId || null,
+      ...(data.batchAllocationPercentage !== undefined
+        ? { batch_allocation_percentage: data.batchAllocationPercentage }
+        : {}),
+      ...(data.autoSyncBatch !== undefined ? { auto_sync_batch: data.autoSyncBatch } : {}),
       status: data.status,
       terms_history: auditLog,
       updated_at: new Date().toISOString(),
@@ -1012,7 +1138,9 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
       }
 
       lastError = error;
-      const match = error?.message?.match(/Could not find the '([^']+)' column of 'farm_partners'/i);
+      const match = error?.message?.match(
+        /Could not find the '([^']+)' column of 'farm_partners'/i,
+      );
       if (match && match[1] && match[1] in updatePayload) {
         delete updatePayload[match[1]];
         continue;
@@ -1021,11 +1149,31 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
     }
 
     if (!updated) throw new Error(lastError?.message || "Failed to update partner details");
+
+    if (data.batchId && data.autoSyncBatch !== false && current.cycle_status !== "closed") {
+      await syncBatchTransactionsForPartner(
+        supabaseAdmin,
+        data.partnerId,
+        cred.username || "owner",
+        {
+          role: "owner",
+          allocationPercentage:
+            data.batchAllocationPercentage ?? Number(current.batch_allocation_percentage ?? 100),
+          syncFinancials: true,
+          syncActivities: true,
+        },
+      ).catch((err) => {
+        console.warn("[adminUpdatePartner] auto-sync warning:", err?.message || err);
+      });
+    }
+
     return { ok: true };
   });
 
 export const adminClosePartnerCycle = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -1035,7 +1183,9 @@ export const adminClosePartnerCycle = createServerFn({ method: "POST" })
     if (partner.cycleStatus === "closed") throw new Error("This cycle is already closed.");
 
     const now = new Date().toISOString();
-    const auditLog: PartnerAuditEvent[] = Array.isArray(raw.terms_history) ? [...raw.terms_history] : [];
+    const auditLog: PartnerAuditEvent[] = Array.isArray(raw.terms_history)
+      ? [...raw.terms_history]
+      : [];
     auditLog.push({ at: now, by: cred.username || "owner", kind: "cycle_closed", reason: null });
 
     const { error } = await supabaseAdmin
@@ -1077,8 +1227,15 @@ export const adminReopenPartnerCycle = createServerFn({ method: "POST" })
 
     const { raw } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
     const now = new Date().toISOString();
-    const auditLog: PartnerAuditEvent[] = Array.isArray(raw.terms_history) ? [...raw.terms_history] : [];
-    auditLog.push({ at: now, by: cred.username || "owner", kind: "cycle_reopened", reason: data.reason });
+    const auditLog: PartnerAuditEvent[] = Array.isArray(raw.terms_history)
+      ? [...raw.terms_history]
+      : [];
+    auditLog.push({
+      at: now,
+      by: cred.username || "owner",
+      kind: "cycle_reopened",
+      reason: data.reason,
+    });
 
     const { error } = await supabaseAdmin
       .from("farm_partners")
@@ -1124,7 +1281,10 @@ export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
       throw new Error("Cycle end date cannot be before the start date.");
     }
 
-    const { partner, financials, activities, raw } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
+    const { partner, financials, activities, raw } = await loadPartnerBundle(
+      supabaseAdmin,
+      data.partnerId,
+    );
     const { summary } = buildSummaryAndCharts(financials, activities, partner.initialInvestment);
     const now = new Date().toISOString();
     const cycleId = `cycle_${Date.now()}`;
@@ -1152,7 +1312,9 @@ export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
     };
 
     const existingArchives = [...partner.archivedCycles, archiveEntry];
-    const rawHistory: PartnerAuditEvent[] = Array.isArray(raw.terms_history) ? [...raw.terms_history] : [];
+    const rawHistory: PartnerAuditEvent[] = Array.isArray(raw.terms_history)
+      ? [...raw.terms_history]
+      : [];
 
     // Store archive both in terms_history fallback and in archived_cycles column
     rawHistory.push({
@@ -1274,7 +1436,9 @@ export const adminResetPartnerPasscode = createServerFn({ method: "POST" })
 
 export const adminTogglePartnerActive = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({ passcode: z.string().min(1), partnerId: z.string().uuid(), active: z.boolean() }).parse(data),
+    z
+      .object({ passcode: z.string().min(1), partnerId: z.string().uuid(), active: z.boolean() })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
@@ -1289,7 +1453,9 @@ export const adminTogglePartnerActive = createServerFn({ method: "POST" })
   });
 
 export const adminDeletePartner = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data))
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data),
+  )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -1334,7 +1500,9 @@ export const adminRecordPartnerFinancial = createServerFn({ method: "POST" })
     const { partner } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
 
     if (partner.cycleStatus === "closed" && data.type !== "payout") {
-      throw new Error("This cycle is closed and settled. Re-open the cycle to add expenses or income.");
+      throw new Error(
+        "This cycle is closed and settled. Re-open the cycle to add expenses or income.",
+      );
     }
     if (data.type === "payout") {
       const owed = partner.settlement.balanceOwed;
@@ -1668,7 +1836,65 @@ export const adminDecidePartnerRecordApproval = createServerFn({ method: "POST" 
     return { ok: true };
   });
 
-// ─── 1-Click Farm Batch -> Partner Log Synchronization ────────────────────────
+// ─── 1-Click & Automatic Farm Batch -> Partner Log Synchronization ────────────
+
+export async function syncBatchTransactionsForPartner(
+  supabaseAdmin: any,
+  partnerId: string,
+  actorUsername: string,
+  options: {
+    role?: "owner" | "manager" | "system";
+    allocationPercentage?: number;
+    syncFinancials?: boolean;
+    syncActivities?: boolean;
+  } = {},
+): Promise<{
+  importedFinancials: number;
+  updatedFinancials: number;
+  importedActivities: number;
+  approvalStatus: string;
+}> {
+  const { error } = await supabaseAdmin.rpc("reconcile_partner_batch", {
+    partner_id_input: partnerId,
+    allocation_input: options.allocationPercentage ?? null,
+  });
+  if (error) throw new Error(`Partner reconciliation failed: ${error.message}`);
+  const commerce = await supabaseAdmin.rpc("reconcile_partner_commerce", {
+    partner_id_input: partnerId,
+  });
+  if (commerce.error) throw new Error(commerce.error.message);
+  return {
+    importedFinancials: 0,
+    updatedFinancials: 0,
+    importedActivities: 0,
+    approvalStatus: "approved",
+  };
+}
+
+export async function syncPartnersLinkedToBatch(
+  supabaseAdmin: any,
+  batchId: string | null | undefined,
+  actorUsername = "owner",
+): Promise<void> {
+  if (!batchId) return;
+  const { data: linked } = await supabaseAdmin
+    .from("farm_partners")
+    .select("id, cycle_status, auto_sync_batch, batch_allocation_percentage")
+    .eq("batch_id", batchId);
+
+  for (const row of linked || []) {
+    if (row.cycle_status === "closed") continue;
+    if (row.auto_sync_batch === false) continue;
+    await syncBatchTransactionsForPartner(supabaseAdmin, row.id, actorUsername, {
+      role: "system",
+      allocationPercentage: Number(row.batch_allocation_percentage ?? 100),
+      syncFinancials: true,
+      syncActivities: true,
+    }).catch((err) => {
+      console.warn(`[syncPartnersLinkedToBatch] partner=${row.id} warning:`, err?.message || err);
+    });
+  }
+}
 
 export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
@@ -1686,178 +1912,167 @@ export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
     const { role, username } = await checkOwnerOrManager(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, data.partnerId);
-    if (!partner.batchId) {
-      throw new Error("This partner is not linked to a Farm Batch yet. Link a batch in Partner Settings first.");
-    }
-    if (partner.cycleStatus === "closed") {
-      throw new Error("Cannot sync into a closed cycle.");
-    }
+    // Persist chosen allocation percentage on the partner record when column exists
+    await supabaseAdmin
+      .from("farm_partners")
+      .update({ batch_allocation_percentage: data.allocationPercentage } as any)
+      .eq("id", data.partnerId);
 
-    const ratio = data.allocationPercentage / 100;
-    const approvalStatus = role === "owner" ? "approved" : "pending_approval";
-    const now = new Date().toISOString();
-
-    let importedFinancials = 0;
-    let importedActivities = 0;
-
-    if (data.syncFinancials) {
-      const { data: batchFins } = await supabaseAdmin
-        .from("farm_financials")
-        .select("*")
-        .eq("batch_id", partner.batchId)
-        .order("transaction_date", { ascending: true });
-
-      const existingRefs = new Set(
-        financials.map((f) => f.referenceNo).filter(Boolean),
-      );
-
-      for (const bf of batchFins || []) {
-        if (bf.approval_status && bf.approval_status !== "approved") continue;
-        const syncRef = `BATCH-SYNC-${String(bf.id).slice(0, 8)}`;
-        if (existingRefs.has(syncRef)) continue;
-        if (partner.cycleStartDate && bf.transaction_date < partner.cycleStartDate) continue;
-
-        const effectiveAmount =
-          bf.type === "income" && bf.amount_paid !== null && bf.amount_paid !== undefined
-            ? Number(bf.amount_paid)
-            : Number(bf.amount || 0);
-        const scaledAmount = Math.round(effectiveAmount * ratio * 100) / 100;
-        if (scaledAmount <= 0) continue;
-
-        const bagCountLabel =
-          Number(bf.feed_bags || 0) > 0
-            ? ` · ${Math.round(Number(bf.feed_bags) * ratio * 10) / 10} bags${bf.feed_brand ? ` (${bf.feed_brand})` : ""}`
-            : "";
-        const descBase =
-          data.allocationPercentage < 100
-            ? `${bf.description}${bagCountLabel} (${data.allocationPercentage}% batch share)`
-            : `${bf.description}${bagCountLabel}`;
-
-        const packedDesc = packTextWithMeta(descBase, {
-          approvalStatus,
-          approvedBy: role === "owner" ? username : null,
-          approvedAt: role === "owner" ? now : null,
-          cycleName: partner.cycleName,
-        });
-
-        const baseRow = {
-          partner_id: partner.id,
-          batch_id: partner.batchId,
-          type: bf.type === "income" ? "income" : "expense",
-          category: bf.category || "Batch Operations",
-          amount: scaledAmount,
-          description: packedDesc,
-          payment_method: bf.payment_method || "Bank Transfer",
-          transaction_date: bf.transaction_date,
-          reference_no: syncRef,
-          recorded_by: username,
-        };
-
-        const { error } = await supabaseAdmin.from("partner_financials").insert({
-          ...baseRow,
-          approval_status: approvalStatus,
-          approved_by: role === "owner" ? username : null,
-          approved_at: role === "owner" ? now : null,
-          cycle_name: partner.cycleName,
-        });
-        if (error) {
-          await supabaseAdmin.from("partner_financials").insert(baseRow);
-        }
-        importedFinancials++;
-      }
-    }
-
-    if (data.syncActivities) {
-      const { data: batchActs } = await supabaseAdmin
-        .from("farm_activities")
-        .select("*")
-        .eq("batch_id", partner.batchId)
-        .order("activity_date", { ascending: true });
-
-      const existingSyncTags = new Set(
-        activities
-          .map((a) => {
-            const m = (a.notes || "").match(/\[SYNC:([a-z0-9-]+)\]/i);
-            return m ? m[1] : null;
-          })
-          .filter(Boolean),
-      );
-
-      for (const ba of batchActs || []) {
-        if (ba.approval_status && ba.approval_status !== "approved") continue;
-        const shortId = String(ba.id).slice(0, 8);
-        if (existingSyncTags.has(shortId)) continue;
-        if (partner.cycleStartDate && ba.activity_date < partner.cycleStartDate) continue;
-
-        const isDailyLog = ba.activity_type === "Daily Log";
-        const mappedType: PartnerActivity["activityType"] = isDailyLog
-          ? Number(ba.feed_consumed_kg || 0) > 0
-            ? "Feeding"
-            : Number(ba.mortality_count || 0) > 0
-              ? "Mortality Record"
-              : "General Note"
-          : ba.activity_type === "Feeding" ||
-              ba.activity_type === "Mortality Record" ||
-              ba.activity_type === "Weight Check" ||
-              ba.activity_type === "Medication / Vaccination" ||
-              ba.activity_type === "Cleaning & Sanitation"
-            ? ba.activity_type
-            : "General Note";
-
-        const dailyBits: string[] = [];
-        if (ba.feed_bag_no && ba.feed_bag_status) {
-          dailyBits.push(`Bag #${ba.feed_bag_no} ${ba.feed_bag_status === "finished" ? "Finished" : "Opened"}`);
-        }
-        if (isDailyLog) {
-          if (Number(ba.sick_count || 0) > 0) dailyBits.push(`Sick: ${ba.sick_count}`);
-          if (ba.feed_brand) dailyBits.push(`Feed: ${ba.feed_brand}`);
-          if (ba.water_given) dailyBits.push("Water ✓");
-          if (ba.temperature) dailyBits.push(`Temp: ${ba.temperature}`);
-        }
-        const baseNote = ba.notes || (isDailyLog ? "Daily log" : ba.activity_type);
-        const noteText = `${baseNote}${dailyBits.length ? ` · ${dailyBits.join(" · ")}` : ""}${ba.medication_given ? ` · Med: ${ba.medication_given}` : ""} [SYNC:${shortId}]`;
-        const packedNotes = packTextWithMeta(noteText, {
-          approvalStatus,
-          approvedBy: role === "owner" ? username : null,
-          approvedAt: role === "owner" ? now : null,
-          cycleName: partner.cycleName,
-        });
-
-        const baseRow = {
-          partner_id: partner.id,
-          batch_id: partner.batchId,
-          activity_date: ba.activity_date,
-          activity_type: mappedType,
-          stock_headcount: 0,
-          mortality_count: Math.round(Number(ba.mortality_count || 0) * ratio),
-          cause_of_mortality: ba.cause_of_mortality || null,
-          feed_consumed_kg: Math.round(Number(ba.feed_consumed_kg || 0) * ratio * 10) / 10,
-          average_weight_kg: 0,
-          notes: packedNotes,
-          recorded_by: username,
-        };
-
-        const { error } = await supabaseAdmin.from("partner_activities").insert({
-          ...baseRow,
-          approval_status: approvalStatus,
-          approved_by: role === "owner" ? username : null,
-          approved_at: role === "owner" ? now : null,
-          cycle_name: partner.cycleName,
-        });
-        if (error) {
-          await supabaseAdmin.from("partner_activities").insert(baseRow);
-        }
-        importedActivities++;
-      }
-    }
+    const res = await syncBatchTransactionsForPartner(supabaseAdmin, data.partnerId, username, {
+      role,
+      allocationPercentage: data.allocationPercentage,
+      syncFinancials: data.syncFinancials,
+      syncActivities: data.syncActivities,
+    });
 
     return {
       ok: true,
-      importedFinancials,
-      importedActivities,
-      approvalStatus,
+      importedFinancials: res.importedFinancials + res.updatedFinancials,
+      importedActivities: res.importedActivities,
+      approvalStatus: res.approvalStatus,
     };
+  });
+
+export interface BatchInvestorSummary {
+  batchId: string;
+  batchName: string;
+  batchType: string;
+  batchStatus: string;
+  startDate: string;
+  totalIncome: number;
+  totalExpense: number;
+  netProfit: number;
+  totalCommittedCapital: number;
+  totalAllocatedProfitPct: number;
+  farmRetainedProfitPct: number;
+  investors: Array<{
+    partnerId: string;
+    fullName: string;
+    username: string;
+    initialInvestment: number;
+    profitSharePercentage: number;
+    lossSharePercentage: number;
+    batchAllocationPercentage: number;
+    autoSyncBatch: boolean;
+    cycleStatus: "open" | "closed";
+    settlement: Settlement;
+  }>;
+}
+
+export const adminGetBatchInvestors = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z.object({ passcode: z.string().min(1), batchId: z.string().uuid() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<BatchInvestorSummary> => {
+    await checkOwnerOrManager(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const [{ data: batchRow, error: bErr }, { data: finRows }, { data: partnerRows }] =
+      await Promise.all([
+        supabaseAdmin.from("farm_batches").select("*").eq("id", data.batchId).single(),
+        supabaseAdmin
+          .from("farm_financials")
+          .select("type, amount, amount_paid, approval_status")
+          .eq("batch_id", data.batchId),
+        supabaseAdmin
+          .from("farm_partners")
+          .select("*")
+          .eq("batch_id", data.batchId)
+          .order("created_at", { ascending: true }),
+      ]);
+
+    if (bErr || !batchRow) throw new Error("Batch not found.");
+
+    let totalIncome = 0;
+    let totalExpense = 0;
+    for (const f of finRows || []) {
+      if (f.approval_status && f.approval_status !== "approved") continue;
+      if (f.type === "income") {
+        totalIncome += Number(f.amount_paid ?? f.amount ?? 0);
+      } else {
+        totalExpense += Number(f.amount || 0);
+      }
+    }
+    const netProfit = totalIncome - totalExpense;
+
+    const partnerIds = (partnerRows || []).map((p: any) => p.id);
+    const { data: pFins } = partnerIds.length
+      ? await supabaseAdmin.from("partner_financials").select("*").in("partner_id", partnerIds)
+      : { data: [] };
+
+    const finByPartner = new Map<string, any[]>();
+    for (const pf of pFins || []) {
+      const list = finByPartner.get(pf.partner_id) || [];
+      list.push(pf);
+      finByPartner.set(pf.partner_id, list);
+    }
+
+    const investors = (partnerRows || []).map((p: any) => {
+      const mapped = mapPartner(p, finByPartner.get(p.id) || [], []);
+      return {
+        partnerId: mapped.id,
+        fullName: mapped.fullName,
+        username: mapped.username,
+        initialInvestment: mapped.initialInvestment,
+        profitSharePercentage: mapped.profitSharePercentage,
+        lossSharePercentage: mapped.lossSharePercentage,
+        batchAllocationPercentage: mapped.batchAllocationPercentage,
+        autoSyncBatch: mapped.autoSyncBatch,
+        cycleStatus: mapped.cycleStatus,
+        settlement: mapped.settlement,
+      };
+    });
+
+    const totalCommittedCapital = investors.reduce((s, inv) => s + inv.initialInvestment, 0);
+    const totalAllocatedProfitPct =
+      Math.round(investors.reduce((s, inv) => s + inv.profitSharePercentage, 0) * 100) / 100;
+
+    return {
+      batchId: batchRow.id,
+      batchName: batchRow.batch_name,
+      batchType: batchRow.batch_type,
+      batchStatus: batchRow.status,
+      startDate: batchRow.start_date,
+      totalIncome,
+      totalExpense,
+      netProfit,
+      totalCommittedCapital,
+      totalAllocatedProfitPct,
+      farmRetainedProfitPct: Math.max(0, Math.round((100 - totalAllocatedProfitPct) * 100) / 100),
+      investors,
+    };
+  });
+
+export const adminAllocateBatchInvestors = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1),
+        batchId: z.string().uuid(),
+        allocations: z.array(
+          z.object({
+            partnerId: z.string().uuid(),
+            initialInvestment: z.number().min(0),
+            profitSharePercentage: pct,
+            lossSharePercentage: pct,
+            batchAllocationPercentage: pct.min(1).default(100),
+            autoSyncBatch: z.boolean().default(true),
+          }),
+        ),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const cred = parseAdminCredential(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { error } = await (supabaseAdmin as any).rpc("allocate_batch_investors", {
+      batch_id_input: data.batchId,
+      allocations_input: data.allocations,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true, count: data.allocations.length };
   });
 
 // ─── Partner Portal Server Functions (Strict Multi-Tenant Isolation) ──────────
@@ -1874,7 +2089,13 @@ export const partnerVerifyLogin = createServerFn({ method: "POST" })
   .handler(
     async ({
       data,
-    }): Promise<{ ok: boolean; token: string; expiresAt: number; fullName: string; username: string }> => {
+    }): Promise<{
+      ok: boolean;
+      token: string;
+      expiresAt: number;
+      fullName: string;
+      username: string;
+    }> => {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       const { data: partner, error } = await supabaseAdmin
@@ -1885,11 +2106,14 @@ export const partnerVerifyLogin = createServerFn({ method: "POST" })
 
       if (error || !partner) throw new Error("Invalid partner username or passcode.");
       if (!partner.active) {
-        throw new Error("This partner account is inactive. Please contact Dignity Agro Farms administration.");
+        throw new Error(
+          "This partner account is inactive. Please contact Dignity Agro Farms administration.",
+        );
       }
 
       const targetHash = await hashPasscode(data.passcode);
-      if (partner.passcode_hash !== targetHash) throw new Error("Invalid partner username or passcode.");
+      if (partner.passcode_hash !== targetHash)
+        throw new Error("Invalid partner username or passcode.");
 
       void supabaseAdmin
         .from("farm_partners")
@@ -1897,7 +2121,13 @@ export const partnerVerifyLogin = createServerFn({ method: "POST" })
         .eq("id", partner.id);
 
       const { token, expiresAt } = await signSession(partner.id, partner.username);
-      return { ok: true, token, expiresAt, fullName: partner.full_name, username: partner.username };
+      return {
+        ok: true,
+        token,
+        expiresAt,
+        fullName: partner.full_name,
+        username: partner.username,
+      };
     },
   );
 
@@ -1909,12 +2139,18 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
 
     const { partner, financials, activities } = await loadPartnerBundle(supabaseAdmin, session.pid);
     if (!partner.active) {
-      throw new Error("Your partner account is inactive. Contact Dignity Agro Farms administration.");
+      throw new Error(
+        "Your partner account is inactive. Contact Dignity Agro Farms administration.",
+      );
     }
 
     // Partners ONLY see approved entries; pending_approval or rejected entries from managers never leak!
-    const approvedFinancials = financials.filter((f) => f.approvalStatus === "approved");
-    const approvedActivities = activities.filter((a) => a.approvalStatus === "approved");
+    const approvedFinancials = financials.filter(
+      (f: PartnerFinancial) => f.approvalStatus === "approved",
+    );
+    const approvedActivities = activities.filter(
+      (a: PartnerActivity) => a.approvalStatus === "approved",
+    );
 
     const MASK = "Farm Management";
     const maskedPartner: FarmPartner = {
@@ -1924,21 +2160,29 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
         by: e.kind === "agreement_signed" || e.kind === "payout_election" ? e.by : MASK,
       })),
     };
-    const maskedFin = approvedFinancials.map((f) => ({
+    const maskedFin = approvedFinancials.map((f: PartnerFinancial) => ({
       ...f,
       recordedBy: f.recordedBy ? MASK : null,
       removedBy: f.removedBy ? MASK : null,
       approvedBy: f.approvedBy ? MASK : null,
     }));
-    const maskedAct = approvedActivities.map((a) => ({
+    const maskedAct = approvedActivities.map((a: PartnerActivity) => ({
       ...a,
       recordedBy: a.recordedBy ? MASK : null,
       removedBy: a.removedBy ? MASK : null,
       approvedBy: a.approvedBy ? MASK : null,
     }));
 
-    const computed = buildSummaryAndCharts(approvedFinancials, approvedActivities, partner.initialInvestment);
-    const feedBagStats = await computePartnerBatchFeedStats(supabaseAdmin, partner, approvedFinancials).catch(() => null);
+    const computed = buildSummaryAndCharts(
+      approvedFinancials,
+      approvedActivities,
+      partner.initialInvestment,
+    );
+    const feedBagStats = await computePartnerBatchFeedStats(
+      supabaseAdmin,
+      partner,
+      approvedFinancials,
+    ).catch(() => null);
 
     return {
       partner: maskedPartner,
@@ -1966,8 +2210,13 @@ export const partnerSubmitCycleElection = createServerFn({ method: "POST" })
     const session = await verifySession(data.token);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    if (data.choice === "bank_payout" && (!data.bankName || !data.accountNumber || !data.accountName)) {
-      throw new Error("Please provide your Bank Name, Account Number, and Account Name for payout disbursement.");
+    if (
+      data.choice === "bank_payout" &&
+      (!data.bankName || !data.accountNumber || !data.accountName)
+    ) {
+      throw new Error(
+        "Please provide your Bank Name, Account Number, and Account Name for payout disbursement.",
+      );
     }
 
     const { data: partner, error: pErr } = await supabaseAdmin
@@ -1995,7 +2244,9 @@ export const partnerSubmitCycleElection = createServerFn({ method: "POST" })
           ? "Rollover Principal into Next Cycle (Payout Profit)"
           : "Full Rollover (Principal + Profit) into Next Cycle";
 
-    const history: PartnerAuditEvent[] = Array.isArray(partner.terms_history) ? [...partner.terms_history] : [];
+    const history: PartnerAuditEvent[] = Array.isArray(partner.terms_history)
+      ? [...partner.terms_history]
+      : [];
     history.push({
       at: now,
       by: partner.full_name,
@@ -2192,9 +2443,7 @@ export const adminUpdatePartnerAgreementTerms = createServerFn({ method: "POST" 
 // ─── Partner System Visibility Controls ─────────────────────────────────────
 
 export const adminGetPartnerSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
-    z.object({ passcode: z.string().min(1).max(200) }).parse(data),
-  )
+  .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1).max(200) }).parse(data))
   .handler(async ({ data }) => {
     const role = await checkPasscode(data.passcode);
     if (role !== "owner" && role !== "manager") {
@@ -2223,16 +2472,14 @@ export const adminSetPartnerManagerVisibility = createServerFn({ method: "POST" 
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("app_settings")
-      .upsert(
-        {
-          key: "hide_partners_from_manager",
-          value: data.hide ? "true" : "false",
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "key" },
-      );
+    const { error } = await supabaseAdmin.from("app_settings").upsert(
+      {
+        key: "hide_partners_from_manager",
+        value: data.hide ? "true" : "false",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
 
     if (error) {
       throw new Error(`Failed to update setting: ${error.message}`);

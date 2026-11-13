@@ -1,3 +1,4 @@
+import { resolveAdminRole } from "./admin-auth";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -23,7 +24,10 @@ export const MIN_ORDER_SUBTOTAL = 5000;
 
 // Codes are used inside PostgREST .or() filters, so keep them to safe chars.
 function safeCode(input: string): string {
-  return input.trim().toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  return input
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "");
 }
 
 const itemSchema = z.object({
@@ -39,9 +43,12 @@ const createOrderSchema = z.object({
   address: z.string().trim().min(3).max(300),
   deliveryZone: z.enum(["owerri", "outside"]),
   items: z.array(itemSchema).min(1).max(20),
-  subtotal: z.number().int().min(MIN_ORDER_SUBTOTAL, {
-    message: `Minimum order is ${"\u20a6"}5,000. Please add a little more to your order.`,
-  }),
+  subtotal: z
+    .number()
+    .int()
+    .min(MIN_ORDER_SUBTOTAL, {
+      message: `Minimum order is ${"\u20a6"}5,000. Please add a little more to your order.`,
+    }),
   deliveryFee: z.number().int().min(0),
   total: z.number().int().min(0),
   notes: z.string().trim().max(1000).optional().nullable(),
@@ -55,7 +62,11 @@ const createOrderSchema = z.object({
     .nullable(),
 });
 
-const normalizeVoucherCode = (input: string) => input.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+const normalizeVoucherCode = (input: string) =>
+  input
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, "");
 
 type VoucherRow = {
   code: string;
@@ -68,14 +79,17 @@ type VoucherRow = {
 };
 
 function calculateVoucherDiscount(voucher: VoucherRow, subtotal: number): number {
-  if (voucher.discount_type === "percent") return Math.min(subtotal, Math.floor((subtotal * voucher.discount_value) / 100));
+  if (voucher.discount_type === "percent")
+    return Math.min(subtotal, Math.floor((subtotal * voucher.discount_value) / 100));
   return Math.min(subtotal, voucher.discount_value);
 }
 
 function voucherIsUsable(voucher: VoucherRow): boolean {
-  return voucher.active &&
+  return (
+    voucher.active &&
     (!voucher.expires_at || new Date(voucher.expires_at).getTime() >= Date.now()) &&
-    (voucher.max_uses === null || voucher.uses_count < voucher.max_uses);
+    (voucher.max_uses === null || voucher.uses_count < voucher.max_uses)
+  );
 }
 
 async function findUsableVoucher(code: string): Promise<VoucherRow | null> {
@@ -100,7 +114,13 @@ export const validateVoucher = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const code = normalizeVoucherCode(data.code);
     const voucher = await findUsableVoucher(code);
-    if (!voucher) return { valid: false as const, code, discountAmount: 0, message: "That voucher is invalid, expired, inactive, or fully used." };
+    if (!voucher)
+      return {
+        valid: false as const,
+        code,
+        discountAmount: 0,
+        message: "That voucher is invalid, expired, inactive, or fully used.",
+      };
     const discountAmount = calculateVoucherDiscount(voucher, data.subtotal);
     return {
       valid: true as const,
@@ -108,9 +128,10 @@ export const validateVoucher = createServerFn({ method: "POST" })
       discountAmount,
       discountType: voucher.discount_type,
       discountValue: voucher.discount_value,
-      message: voucher.discount_type === "percent"
-        ? `${voucher.discount_value}% discount applied.`
-        : `Discount of ${"\u20a6"}${voucher.discount_value.toLocaleString("en-NG")} applied.`,
+      message:
+        voucher.discount_type === "percent"
+          ? `${voucher.discount_value}% discount applied.`
+          : `Discount of ${"\u20a6"}${voucher.discount_value.toLocaleString("en-NG")} applied.`,
     };
   });
 
@@ -119,37 +140,40 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { PRODUCTS } = await import("@/lib/products");
-    
+
     // RECALCULATE SUBTOTAL FROM TRUE BACKEND PRICES
     let trueSubtotal = 0;
-    const validatedItems = data.items.map(item => {
+    const validatedItems = data.items.map((item) => {
       // Find base product name (strip out "PRE-ORDER · " prefix if present)
       const baseProductName = item.product.replace(/^PRE-ORDER · /, "");
-      const product = PRODUCTS.find(p => p.name === baseProductName);
+      const product = PRODUCTS.find((p) => p.name === baseProductName);
       if (!product) throw new Error(`Product "${baseProductName}" not found on the server.`);
-      
+
       // Find option (strip out preorder date suffixes)
-      const optionMatch = product.options.find(o => item.option.startsWith(o.label));
-      if (!optionMatch) throw new Error(`Option "${item.option}" not found for ${baseProductName}.`);
-      
+      const optionMatch = product.options.find((o) => item.option.startsWith(o.label));
+      if (!optionMatch)
+        throw new Error(`Option "${item.option}" not found for ${baseProductName}.`);
+
       const truePrice = optionMatch.price;
       trueSubtotal += truePrice * item.qty;
-      
+
       return {
         product: item.product,
         option: item.option,
         qty: item.qty,
-        unitPrice: truePrice // Overwrite with true backend price
+        unitPrice: truePrice, // Overwrite with true backend price
       };
     });
 
     if (trueSubtotal < MIN_ORDER_SUBTOTAL) {
-      throw new Error(`Minimum order is ₦${MIN_ORDER_SUBTOTAL.toLocaleString("en-NG")}. Please add a little more to your order.`);
+      throw new Error(
+        `Minimum order is ₦${MIN_ORDER_SUBTOTAL.toLocaleString("en-NG")}. Please add a little more to your order.`,
+      );
     }
 
     const trueDeliveryFee = data.deliveryZone === "owerri" ? 0 : 1000;
     const phone = normalizePhone(data.phone);
-    
+
     let discountAmount = 0;
     let voucherCode: string | null = null;
     if (data.voucherCode?.trim()) {
@@ -182,7 +206,7 @@ export const createOrder = createServerFn({ method: "POST" })
           notes: data.notes ?? null,
           status: "received",
         })
-         .select("order_code, track_code")
+        .select("order_code, track_code")
         .single();
 
       if (!error && row) {
@@ -193,7 +217,10 @@ export const createOrder = createServerFn({ method: "POST" })
             .eq("code", voucherCode)
             .maybeSingle();
           if (voucher) {
-            await supabaseAdmin.from("discount_vouchers").update({ uses_count: voucher.uses_count + 1 }).eq("code", voucherCode);
+            await supabaseAdmin
+              .from("discount_vouchers")
+              .update({ uses_count: voucher.uses_count + 1 })
+              .eq("code", voucherCode);
           }
         }
         if (data.placedBy) {
@@ -209,17 +236,24 @@ export const createOrder = createServerFn({ method: "POST" })
               role: data.placedBy.role,
               at: new Date().toISOString(),
             };
-            await supabaseAdmin
-              .from("app_settings")
-              .upsert(
-                { key: "order_placed_by_map", value: JSON.stringify(existingMap), updated_at: new Date().toISOString() },
-                { onConflict: "key" },
-              );
+            await supabaseAdmin.from("app_settings").upsert(
+              {
+                key: "order_placed_by_map",
+                value: JSON.stringify(existingMap),
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "key" },
+            );
           } catch (metaErr) {
             console.warn("Could not record order_placed_by_map metadata:", metaErr);
           }
         }
-        return { orderCode: row.order_code, trackCode: row.track_code as string, total: finalTotal, discountAmount };
+        return {
+          orderCode: row.order_code,
+          trackCode: row.track_code as string,
+          total: finalTotal,
+          discountAmount,
+        };
       }
       if (error && !/duplicate key|unique/i.test(error.message)) {
         console.error("createOrder failed", error);
@@ -230,6 +264,7 @@ export const createOrder = createServerFn({ method: "POST" })
   });
 
 const trackSchema = z.object({
+  phone: z.string().max(30).optional(),
   trackCode: z.string().trim().min(4).max(20),
 });
 
@@ -260,11 +295,16 @@ export const trackByCode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => trackSchema.parse(data))
   .handler(async ({ data }): Promise<{ orders: TrackedOrder[] }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (
+      await import("./customer-access.server")
+    ).requireCustomerAccess(supabaseAdmin, data.trackCode, data.phone);
     const code = safeCode(data.trackCode);
 
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
-      .select("order_code, track_code, customer_name, phone, address, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
+      .select(
+        "order_code, track_code, customer_name, phone, address, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason",
+      )
       .or(`track_code.eq.${code},order_code.eq.${code}`)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -328,12 +368,17 @@ export const trackUnified = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => trackSchema.parse(data))
   .handler(async ({ data }): Promise<{ result: TrackedOrderResult | null }> => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (
+      await import("./customer-access.server")
+    ).requireCustomerAccess(supabaseAdmin, data.trackCode, data.phone);
     const code = safeCode(data.trackCode);
 
     // Try regular orders table first
     const { data: orderRows, error: orderError } = await supabaseAdmin
       .from("orders")
-      .select("order_code, track_code, customer_name, phone, address, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason")
+      .select(
+        "order_code, track_code, customer_name, phone, address, status, status_note, eta, items, subtotal, delivery_fee, total, delivery_zone, created_at, updated_at, payment_status, payment_rejection_reason, cancelled_at, cancelled_by, cancel_reason",
+      )
       .or(`track_code.eq.${code},order_code.eq.${code}`)
       .order("created_at", { ascending: false })
       .limit(1);
@@ -372,7 +417,9 @@ export const trackUnified = createServerFn({ method: "POST" })
     // Try preorders table
     const { data: preorderRow, error: preorderError } = await supabaseAdmin
       .from("preorders")
-      .select("preorder_code, customer_name, phone, address, product, quantity, total_amount, amount_paid, balance, reservation_type, payment_status, delivery_status, preferred_delivery_date, notes, created_at, updated_at")
+      .select(
+        "preorder_code, customer_name, phone, address, product, quantity, total_amount, amount_paid, balance, reservation_type, payment_status, delivery_status, preferred_delivery_date, notes, created_at, updated_at",
+      )
       .eq("preorder_code", code)
       .maybeSingle();
 
@@ -409,28 +456,23 @@ export const trackUnified = createServerFn({ method: "POST" })
 
 // Lost your code? Look it up with the phone number used on the order.
 export const recoverCodesByPhone = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ phone: z.string().trim().min(7).max(30) }).parse(data))
-  .handler(async ({ data }): Promise<{ codes: { code: string; status: string; createdAt: string; total: number }[] }> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const phone = normalizePhone(data.phone);
-    const { data: rows, error } = await supabaseAdmin
-      .from("orders")
-      .select("order_code, status, created_at, total")
-      .eq("phone", phone)
-      .order("created_at", { ascending: false })
-      .limit(5);
-    if (error) throw new Error("Could not look that up. Please try again.");
-    return {
-      codes: (rows ?? []).map((r) => ({
-        code: r.order_code,
-        status: r.status as string,
-        createdAt: r.created_at,
-        total: r.total,
-      })),
-    };
-  });
+  .inputValidator((data: unknown) =>
+    z.object({ phone: z.string().trim().min(7).max(30) }).parse(data),
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      codes: { code: string; status: string; createdAt: string; total: number }[];
+    }> => {
+      throw new Error(
+        "For privacy, phone-only recovery is unavailable. Enter your order reference and phone, or contact the farm for help.",
+      );
+    },
+  );
 
 const cancelSchema = z.object({
+  phone: z.string().max(30).optional(),
   trackCode: z.string().trim().min(4).max(20),
   reason: z.string().trim().min(1).max(300),
 });
@@ -439,6 +481,9 @@ export const cancelOrderByCustomer = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => cancelSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (
+      await import("./customer-access.server")
+    ).requireCustomerAccess(supabaseAdmin, data.trackCode, data.phone);
     const { data: row, error } = await supabaseAdmin
       .from("orders")
       .update({
@@ -454,7 +499,8 @@ export const cancelOrderByCustomer = createServerFn({ method: "POST" })
       .select("order_code")
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!row) throw new Error("This order can no longer be cancelled online. Please call 081 6709 9492.");
+    if (!row)
+      throw new Error("This order can no longer be cancelled online. Please call 081 6709 9492.");
     return { ok: true };
   });
 
@@ -489,75 +535,39 @@ export async function checkPasscode(value: string): Promise<AdminRole> {
   if (!value) throw new Error("Invalid login details.");
   const credential = parseAdminCredential(value);
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-  const master = process.env.ADMIN_PASSCODE;
-  const masterUsername = (process.env.ADMIN_USERNAME || "owner").toLowerCase();
-  const isReservedOwnerUsername =
-    credential.username === "owner" ||
-    credential.username === "admin" ||
-    credential.username === masterUsername;
-
-  // First check explicit account in admin_access DB table
-  const { data: configured } = await supabaseAdmin
+  const { data: account, error } = await supabaseAdmin
     .from("admin_access")
-    .select("username, role, passcode_hash, active")
+    .select("username,role,passcode_hash,active")
     .eq("username", credential.username)
     .maybeSingle();
-
-  if (configured) {
-    // Auto-heal if the primary "owner" or "admin" username was accidentally demoted or deactivated
-    if (isReservedOwnerUsername && (configured.role !== "owner" || !configured.active)) {
-      await (supabaseAdmin.from("admin_access" as any) as any)
-        .update({
-          role: "owner",
-          active: true,
-          status: "active",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("username", credential.username);
-      configured.role = "owner";
-      configured.active = true;
-    }
-
-    if (!configured.active) {
-      throw new Error("This account is deactivated. Contact your Administrator.");
-    }
-    const targetHash = await hashPasscode(credential.passcode);
-    if (configured.passcode_hash === targetHash) {
-      void supabaseAdmin
-        .from("admin_access")
-        .update({ last_login_at: new Date().toISOString() })
-        .eq("username", credential.username);
-      return (isReservedOwnerUsername ? "owner" : configured.role) as AdminRole;
-    }
-    // If not the reserved owner account, fail immediately on hash mismatch
-    if (!isReservedOwnerUsername) {
-      throw new Error("Invalid username or passcode.");
-    }
-  }
-
-  // Master owner recovery environment check
-  if (isReservedOwnerUsername && master && credential.passcode === master) return "owner";
-
-  // Legacy staff / owner setting check
-  const { data: staffSetting } = await supabaseAdmin
+  if (error) throw new Error("Login is temporarily unavailable.");
+  const { data: legacy, error: legacyError } = await supabaseAdmin
     .from("app_settings")
     .select("value")
     .eq("key", "admin_passcode")
     .maybeSingle();
-  if (credential.username === "staff" && staffSetting?.value && credential.passcode === staffSetting.value) return "staff";
-  if (isReservedOwnerUsername && staffSetting?.value && credential.passcode === staffSetting.value) return "owner";
-
-  throw new Error("Invalid username or passcode.");
+  if (legacyError) throw new Error("Login is temporarily unavailable.");
+  const role = resolveAdminRole({
+    username: credential.username,
+    suppliedPasscode: credential.passcode,
+    suppliedHash: await hashPasscode(credential.passcode),
+    account,
+    masterUsername: process.env.ADMIN_USERNAME || "owner",
+    masterPasscode: process.env.ADMIN_PASSCODE,
+    legacyStaffPasscode: legacy?.value,
+  });
+  await (await import("./request-actor.server")).setRequestActor(credential.username, role);
+  return role;
 }
 
 export const adminVerifyLogin = createServerFn({ method: "POST" })
-  .inputValidator(
-    (data: unknown) =>
-      z.object({
+  .inputValidator((data: unknown) =>
+    z
+      .object({
         username: z.string().trim().min(1).toLowerCase(),
         passcode: z.string().trim().min(1),
-      }).parse(data),
+      })
+      .parse(data),
   )
   .handler(async ({ data }): Promise<{ ok: boolean; role: AdminRole; username: string }> => {
     const credStr = JSON.stringify({ username: data.username, passcode: data.passcode });
@@ -575,22 +585,18 @@ export async function checkOwner(value: string) {
 export const adminGetPasscode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => z.object({ passcode: z.string().min(1).max(200) }).parse(data))
   .handler(async ({ data }): Promise<{ current: string; isMaster: boolean }> => {
-    const role = await checkPasscode(data.passcode);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row } = await supabaseAdmin
-      .from("app_settings")
-      .select("value")
-      .eq("key", "admin_passcode")
-      .maybeSingle();
-    return { current: row?.value ?? "", isMaster: role === "owner" };
+    await checkOwner(data.passcode);
+    return { current: "", isMaster: true };
   });
 
 export const adminSetPasscode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string().min(1).max(200),
-      newPasscode: z.string().trim().min(6).max(60),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string().min(1).max(200),
+        newPasscode: z.string().trim().min(6).max(60),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
@@ -599,18 +605,16 @@ export const adminSetPasscode = createServerFn({ method: "POST" })
 
     // Upsert owner's admin_access row with new hashed passcode without overwriting legacy staff app_settings
     const hash = await hashPasscode(data.newPasscode);
-    const { error } = await supabaseAdmin
-      .from("admin_access")
-      .upsert(
-        {
-          username: credential.username || "owner",
-          role: "owner",
-          passcode_hash: hash,
-          active: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "username" },
-      );
+    const { error } = await supabaseAdmin.from("admin_access").upsert(
+      {
+        username: credential.username || "owner",
+        role: "owner",
+        passcode_hash: hash,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "username" },
+    );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -645,19 +649,6 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
       .select("*")
       .order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
-
-    // Auto-heal if owner/admin was accidentally changed to another role
-    for (const r of rows || []) {
-      const u = String(r.username || "").toLowerCase();
-      if ((u === "owner" || u === "admin" || u === masterUser) && (r.role !== "owner" || !r.active)) {
-        await (supabaseAdmin.from("admin_access" as any) as any)
-          .update({ role: "owner", active: true, status: "active", updated_at: new Date().toISOString() })
-          .eq("username", r.username);
-        r.role = "owner";
-        r.active = true;
-        (r as any).status = "active";
-      }
-    }
 
     const items: UserAccountItem[] = (rows || []).map((r: any) => ({
       id: r.id,
@@ -696,19 +687,21 @@ export const adminListUserAccounts = createServerFn({ method: "POST" })
 
 export const adminCreateUserAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().trim().min(3).max(50).toLowerCase(),
-      targetPasscode: z.string().trim().min(6).max(60),
-      targetRole: z.enum(["owner", "manager", "staff"]),
-      fullName: z.string().optional().nullable(),
-      phone: z.string().optional().nullable(),
-      email: z.string().optional().nullable(),
-      address: z.string().optional().nullable(),
-      department: z.string().optional().nullable(),
-      emergencyContact: z.string().optional().nullable(),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().trim().min(3).max(50).toLowerCase(),
+        targetPasscode: z.string().trim().min(6).max(60),
+        targetRole: z.enum(["owner", "manager", "staff"]),
+        fullName: z.string().optional().nullable(),
+        phone: z.string().optional().nullable(),
+        email: z.string().optional().nullable(),
+        address: z.string().optional().nullable(),
+        department: z.string().optional().nullable(),
+        emergencyContact: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     try {
@@ -725,7 +718,9 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
         );
       }
 
-      console.log(`[adminCreateUserAccount] Initializing Supabase to create user: ${targetUsername}`);
+      console.log(
+        `[adminCreateUserAccount] Initializing Supabase to create user: ${targetUsername}`,
+      );
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       // Check if username already exists so we never overwrite an existing user account
@@ -736,34 +731,36 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
         .maybeSingle();
 
       if (existingUser) {
-        throw new Error(`Username "${targetUsername}" already exists! Please choose a unique username.`);
+        throw new Error(
+          `Username "${targetUsername}" already exists! Please choose a unique username.`,
+        );
       }
 
       const hash = await hashPasscode(data.targetPasscode);
 
       console.log(`[adminCreateUserAccount] Executing insert for: ${targetUsername}`);
-      const { error } = await (supabaseAdmin
-        .from("admin_access" as any) as any)
-        .insert({
-          username: targetUsername,
-          role: data.targetRole,
-          passcode_hash: hash,
-          active: true,
-          full_name: data.fullName ?? null,
-          phone: data.phone ?? null,
-          email: data.email ?? null,
-          address: data.address ?? null,
-          department: data.department ?? "Farm Operations",
-          status: "active",
-          emergency_contact: data.emergencyContact ?? null,
-          notes: data.notes ?? null,
-          updated_at: new Date().toISOString(),
-        });
+      const { error } = await (supabaseAdmin.from("admin_access" as any) as any).insert({
+        username: targetUsername,
+        role: data.targetRole,
+        passcode_hash: hash,
+        active: true,
+        full_name: data.fullName ?? null,
+        phone: data.phone ?? null,
+        email: data.email ?? null,
+        address: data.address ?? null,
+        department: data.department ?? "Farm Operations",
+        status: "active",
+        emergency_contact: data.emergencyContact ?? null,
+        notes: data.notes ?? null,
+        updated_at: new Date().toISOString(),
+      });
 
       if (error) {
         console.error("[adminCreateUserAccount] Supabase insert error:", error);
         if (/duplicate key|unique/i.test(error.message)) {
-          throw new Error(`Username "${targetUsername}" already exists! Please choose a unique username.`);
+          throw new Error(
+            `Username "${targetUsername}" already exists! Please choose a unique username.`,
+          );
         }
         throw new Error(error.message);
       }
@@ -778,10 +775,12 @@ export const adminCreateUserAccount = createServerFn({ method: "POST" })
 
 export const adminDeleteUserAccount = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().trim().min(1).toLowerCase(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().trim().min(1).toLowerCase(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     try {
@@ -807,11 +806,13 @@ export const adminDeleteUserAccount = createServerFn({ method: "POST" })
 
 export const adminResetUserPasscode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().trim().min(1).toLowerCase(),
-      newPasscode: z.string().trim().min(6).max(60),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().trim().min(1).toLowerCase(),
+        newPasscode: z.string().trim().min(6).max(60),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     try {
@@ -835,11 +836,13 @@ export const adminResetUserPasscode = createServerFn({ method: "POST" })
 
 export const adminToggleUserActive = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().trim().min(1).toLowerCase(),
-      active: z.boolean(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().trim().min(1).toLowerCase(),
+        active: z.boolean(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     try {
@@ -873,7 +876,10 @@ export async function verifyTotpCode(code: string, secretBase32: string): Promis
     const crypto = cryptoModule.default || cryptoModule;
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
     let bits = "";
-    const cleanB32 = secretBase32.toUpperCase().replace(/=/g, "").replace(/[^A-Z2-7]/g, "");
+    const cleanB32 = secretBase32
+      .toUpperCase()
+      .replace(/=/g, "")
+      .replace(/[^A-Z2-7]/g, "");
     for (let i = 0; i < cleanB32.length; i++) {
       const val = alphabet.indexOf(cleanB32.charAt(i));
       if (val >= 0) bits += val.toString(2).padStart(5, "0");
@@ -910,13 +916,15 @@ export async function verifyTotpCode(code: string, secretBase32: string): Promis
 
 export const adminRecoverPasscode = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      recoveryMethod: z.enum(["key", "totp"]).default("key"),
-      recoveryKey: z.string().trim().optional().nullable(),
-      totpCode: z.string().trim().optional().nullable(),
-      targetUsername: z.string().trim().min(1).toLowerCase(),
-      newPasscode: z.string().trim().min(6).max(60),
-    }).parse(data),
+    z
+      .object({
+        recoveryMethod: z.enum(["key", "totp"]).default("key"),
+        recoveryKey: z.string().trim().optional().nullable(),
+        totpCode: z.string().trim().optional().nullable(),
+        targetUsername: z.string().trim().min(1).toLowerCase(),
+        newPasscode: z.string().trim().min(6).max(60),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     const masterRecovery = process.env.ADMIN_RECOVERY_KEY;
@@ -966,21 +974,23 @@ export const adminRecoverPasscode = createServerFn({ method: "POST" })
 
     const preservedRole: AdminRole =
       (existingAccount?.role as AdminRole) ||
-      (data.targetUsername === "staff" ? "staff" : data.targetUsername === "manager" ? "manager" : "owner");
+      (data.targetUsername === "staff"
+        ? "staff"
+        : data.targetUsername === "manager"
+          ? "manager"
+          : "owner");
 
     const hash = await hashPasscode(data.newPasscode);
-    const { error } = await supabaseAdmin
-      .from("admin_access")
-      .upsert(
-        {
-          username: data.targetUsername,
-          role: preservedRole,
-          passcode_hash: hash,
-          active: true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "username" },
-      );
+    const { error } = await supabaseAdmin.from("admin_access").upsert(
+      {
+        username: data.targetUsername,
+        role: preservedRole,
+        passcode_hash: hash,
+        active: true,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "username" },
+    );
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -1047,10 +1057,13 @@ export const adminListOrders = createServerFn({ method: "POST" })
     if (data.from) q = q.gte("created_at", new Date(data.from + "T00:00:00").toISOString());
     if (data.to) q = q.lte("created_at", new Date(data.to + "T23:59:59.999").toISOString());
     if (data.status) q = q.eq("status", data.status as AdminOrder["status"]);
-    if (data.paymentStatus) q = q.eq("payment_status", data.paymentStatus as AdminOrder["paymentStatus"]);
+    if (data.paymentStatus)
+      q = q.eq("payment_status", data.paymentStatus as AdminOrder["paymentStatus"]);
     if (data.zone) q = q.eq("delivery_zone", data.zone);
-    if (data.view === "cancelled_customer") q = q.eq("status", "cancelled").eq("cancelled_by", "customer");
-    if (data.view === "cancelled_admin") q = q.eq("status", "cancelled").neq("cancelled_by", "customer");
+    if (data.view === "cancelled_customer")
+      q = q.eq("status", "cancelled").eq("cancelled_by", "customer");
+    if (data.view === "cancelled_admin")
+      q = q.eq("status", "cancelled").neq("cancelled_by", "customer");
     if (data.view === "not_completed") {
       const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       q = q
@@ -1090,7 +1103,11 @@ export const adminListOrders = createServerFn({ method: "POST" })
 
     return {
       orders: (rows ?? []).map((r) => {
-        const { cleanNotes, placedBy } = extractAndStripPlacedBy(r.notes, r.order_code, placedByMap);
+        const { cleanNotes, placedBy } = extractAndStripPlacedBy(
+          r.notes,
+          r.order_code,
+          placedByMap,
+        );
         return {
           id: r.id,
           orderCode: r.order_code,
@@ -1119,7 +1136,7 @@ export const adminListOrders = createServerFn({ method: "POST" })
           cancelledBy: r.cancelled_by,
           cancelReason: r.cancel_reason,
           batchId: (r as any).batch_id ?? null,
-          batchName: (r as any).batch_id ? batchMap.get((r as any).batch_id) ?? null : null,
+          batchName: (r as any).batch_id ? (batchMap.get((r as any).batch_id) ?? null) : null,
           placedBy,
         };
       }),
@@ -1170,7 +1187,11 @@ export const adminUpdateOrder = createServerFn({ method: "POST" })
         status_note: data.statusNote ?? null,
         eta: data.eta ?? null,
         ...(data.status === "cancelled"
-          ? { cancelled_at: new Date().toISOString(), cancelled_by: "admin", cancel_reason: data.statusNote ?? null }
+          ? {
+              cancelled_at: new Date().toISOString(),
+              cancelled_by: "admin",
+              cancel_reason: data.statusNote ?? null,
+            }
           : {}),
       })
       .eq("id", data.id);
@@ -1192,12 +1213,15 @@ export const adminCorrectOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("orders").update({
-      customer_name: data.customerName,
-      phone: normalizePhone(data.phone),
-      address: data.address,
-      notes: data.notes ?? null,
-    }).eq("id", data.id);
+    const { error } = await supabaseAdmin
+      .from("orders")
+      .update({
+        customer_name: data.customerName,
+        phone: normalizePhone(data.phone),
+        address: data.address,
+        notes: data.notes ?? null,
+      })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -1255,7 +1279,9 @@ export const adminListClients = createServerFn({ method: "POST" })
     // 1. Regular Orders
     const { data: rows, error } = await supabaseAdmin
       .from("orders")
-      .select("customer_name, phone, address, order_code, created_at, total, payment_status, status, discount_amount, voucher_code")
+      .select(
+        "customer_name, phone, address, order_code, created_at, total, payment_status, status, discount_amount, voucher_code",
+      )
       .order("created_at", { ascending: false })
       .limit(5000);
     if (error) throw new Error(error.message);
@@ -1263,7 +1289,9 @@ export const adminListClients = createServerFn({ method: "POST" })
     // 2. December Pre-Orders
     const { data: preRows } = await supabaseAdmin
       .from("preorders")
-      .select("customer_name, phone, address, preorder_code, created_at, total_amount, amount_paid, payment_status, delivery_status")
+      .select(
+        "customer_name, phone, address, preorder_code, created_at, total_amount, amount_paid, payment_status, delivery_status",
+      )
       .order("created_at", { ascending: false })
       .limit(5000);
 
@@ -1314,13 +1342,16 @@ export const adminListClients = createServerFn({ method: "POST" })
       const key = phone ? phone.replace(/\D/g, "") : prow.customer_name.trim().toLowerCase();
       if (!key) continue;
       const existing = grouped.get(key);
-      const isPaid = prow.payment_status === "fully_paid" || prow.payment_status === "partially_paid";
+      const isPaid =
+        prow.payment_status === "fully_paid" || prow.payment_status === "partially_paid";
       const preorderSummary: ClientOrderSummary = {
         orderCode: prow.preorder_code,
         createdAt: prow.created_at,
         total: prow.total_amount || 0,
         paymentStatus: (isPaid ? "approved" : "submitted") as AdminOrder["paymentStatus"],
-        status: (prow.delivery_status === "delivered" ? "delivered" : "processing") as AdminOrder["status"],
+        status: (prow.delivery_status === "delivered"
+          ? "delivered"
+          : "processing") as AdminOrder["status"],
         discountAmount: 0,
         voucherCode: null,
       };
@@ -1334,7 +1365,9 @@ export const adminListClients = createServerFn({ method: "POST" })
         if (new Date(prow.created_at).getTime() > new Date(existing.lastOrderAt).getTime()) {
           existing.lastOrderAt = prow.created_at;
           existing.lastOrderCode = prow.preorder_code;
-          existing.lastStatus = (prow.delivery_status === "delivered" ? "delivered" : "processing") as AdminOrder["status"];
+          existing.lastStatus = (
+            prow.delivery_status === "delivered" ? "delivered" : "processing"
+          ) as AdminOrder["status"];
         }
       } else {
         grouped.set(key, {
@@ -1348,17 +1381,22 @@ export const adminListClients = createServerFn({ method: "POST" })
           amountOrdered: prow.total_amount ?? 0,
           lastOrderAt: prow.created_at,
           lastOrderCode: prow.preorder_code,
-          lastStatus: (prow.delivery_status === "delivered" ? "delivered" : "processing") as AdminOrder["status"],
+          lastStatus: (prow.delivery_status === "delivered"
+            ? "delivered"
+            : "processing") as AdminOrder["status"],
           orders: [preorderSummary],
         });
       }
     }
 
     const search = data.search?.trim().toLowerCase();
-    const clients = Array.from(grouped.values()).filter((client) => !search ||
-      client.customerName.toLowerCase().includes(search) ||
-      client.phone.includes(search) ||
-      client.address.toLowerCase().includes(search));
+    const clients = Array.from(grouped.values()).filter(
+      (client) =>
+        !search ||
+        client.customerName.toLowerCase().includes(search) ||
+        client.phone.includes(search) ||
+        client.address.toLowerCase().includes(search),
+    );
     return { clients };
   });
 
@@ -1412,12 +1450,15 @@ export const adminListVouchers = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ vouchers: AdminVoucher[] }> => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: rows, error } = await supabaseAdmin.from("discount_vouchers").select("*").order("created_at", { ascending: false });
+    const { data: rows, error } = await supabaseAdmin
+      .from("discount_vouchers")
+      .select("*")
+      .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    
+
     const vouchers = (rows ?? []).map((row) => mapVoucher(row as Record<string, unknown>));
-    const voucherCodes = vouchers.map(v => v.code);
-    
+    const voucherCodes = vouchers.map((v) => v.code);
+
     const usageMap = new Map<string, AdminVoucher["usedByOrders"]>();
     if (voucherCodes.length > 0) {
       const { data: ordersRows } = await supabaseAdmin
@@ -1439,11 +1480,11 @@ export const adminListVouchers = createServerFn({ method: "POST" })
       }
     }
 
-    return { 
-      vouchers: vouchers.map(v => ({
+    return {
+      vouchers: vouchers.map((v) => ({
         ...v,
-        usedByOrders: usageMap.get(v.code) || []
-      })) 
+        usedByOrders: usageMap.get(v.code) || [],
+      })),
     };
   });
 
@@ -1467,23 +1508,31 @@ export const adminCreateVoucher = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => createVoucherSchema.parse(data))
   .handler(async ({ data }): Promise<{ voucher: AdminVoucher }> => {
     await checkPasscode(data.passcode);
-    if (data.discountType === "percent" && data.discountValue > 100) throw new Error("Percentage discount cannot exceed 100%.");
+    if (data.discountType === "percent" && data.discountValue > 100)
+      throw new Error("Percentage discount cannot exceed 100%.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const code = normalizeVoucherCode(data.code || makeVoucherCode());
     if (code.length < 3) throw new Error("Voucher code must be at least 3 characters.");
-    const { data: row, error } = await supabaseAdmin.from("discount_vouchers").insert({
-      code,
-      display_name: data.displayName || null,
-      discount_type: data.discountType,
-      discount_value: data.discountValue,
-      recipient_name: data.recipientName || null,
-      recipient_phone: data.recipientPhone ? normalizePhone(data.recipientPhone) : null,
-      note: data.note || null,
-      expires_at: data.expiresAt ? new Date(`${data.expiresAt}T23:59:59.999Z`).toISOString() : null,
-      max_uses: data.maxUses ?? null,
-    } as never).select("*").single();
+    const { data: row, error } = await supabaseAdmin
+      .from("discount_vouchers")
+      .insert({
+        code,
+        display_name: data.displayName || null,
+        discount_type: data.discountType,
+        discount_value: data.discountValue,
+        recipient_name: data.recipientName || null,
+        recipient_phone: data.recipientPhone ? normalizePhone(data.recipientPhone) : null,
+        note: data.note || null,
+        expires_at: data.expiresAt
+          ? new Date(`${data.expiresAt}T23:59:59.999Z`).toISOString()
+          : null,
+        max_uses: data.maxUses ?? null,
+      } as never)
+      .select("*")
+      .single();
     if (error) {
-      if (/duplicate key|unique/i.test(error.message)) throw new Error("That voucher code already exists.");
+      if (/duplicate key|unique/i.test(error.message))
+        throw new Error("That voucher code already exists.");
       throw new Error(error.message);
     }
     return { voucher: mapVoucher(row as Record<string, unknown>) };
@@ -1496,7 +1545,10 @@ export const adminToggleVoucher = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin.from("discount_vouchers").update({ active: data.active }).eq("id", data.id);
+    const { error } = await supabaseAdmin
+      .from("discount_vouchers")
+      .update({ active: data.active })
+      .eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -1519,7 +1571,8 @@ export const adminUpdateVoucher = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => updateVoucherSchema.parse(data))
   .handler(async ({ data }): Promise<{ voucher: AdminVoucher }> => {
     await checkPasscode(data.passcode);
-    if (data.discountType === "percent" && data.discountValue > 100) throw new Error("Percentage discount cannot exceed 100%.");
+    if (data.discountType === "percent" && data.discountValue > 100)
+      throw new Error("Percentage discount cannot exceed 100%.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const updateObj: Record<string, any> = {
       discount_type: data.discountType,
@@ -1533,7 +1586,12 @@ export const adminUpdateVoucher = createServerFn({ method: "POST" })
       active: data.active,
     };
     if (data.code) updateObj.code = normalizeVoucherCode(data.code);
-    const { data: row, error } = await supabaseAdmin.from("discount_vouchers").update(updateObj as never).eq("id", data.id).select("*").single();
+    const { data: row, error } = await supabaseAdmin
+      .from("discount_vouchers")
+      .update(updateObj as never)
+      .eq("id", data.id)
+      .select("*")
+      .single();
     if (error) throw new Error(error.message);
     return { voucher: mapVoucher(row as Record<string, unknown>) };
   });
@@ -1553,6 +1611,7 @@ export const adminDeleteVoucher = createServerFn({ method: "POST" })
 // ---------- Receipt ----------
 
 const receiptSchema = z.object({
+  phone: z.string().max(30).optional(),
   orderCode: z.string().trim().min(1).max(20),
   trackCode: z.string().trim().min(4).max(20),
 });
@@ -1561,95 +1620,109 @@ export type ReceiptOrder = AdminOrder;
 
 export const getOrderReceipt = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => receiptSchema.parse(data))
-  .handler(async ({ data }): Promise<{ type: "order"; order: ReceiptOrder } | { type: "preorder"; preorder: any; payments: any[] }> => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: r, error } = await supabaseAdmin
-      .from("orders")
-      .select("*")
-      .eq("order_code", safeCode(data.orderCode))
-      .or(`track_code.eq.${safeCode(data.trackCode)},order_code.eq.${safeCode(data.trackCode)}`)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!r) {
-      // Try preorders
-      const { data: preorder, error: preErr } = await supabaseAdmin
-        .from("preorders")
-        .select(`*, preorder_payments(*)`)
-        .eq("preorder_code", safeCode(data.orderCode))
+  .handler(
+    async ({
+      data,
+    }): Promise<
+      { type: "order"; order: ReceiptOrder } | { type: "preorder"; preorder: any; payments: any[] }
+    > => {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await (
+        await import("./customer-access.server")
+      ).requireCustomerAccess(supabaseAdmin, data.orderCode, data.phone);
+      const { data: r, error } = await supabaseAdmin
+        .from("orders")
+        .select("*")
+        .eq("order_code", safeCode(data.orderCode))
+        .or(`track_code.eq.${safeCode(data.trackCode)},order_code.eq.${safeCode(data.trackCode)}`)
         .maybeSingle();
-      if (preErr) throw new Error(preErr.message);
-      if (!preorder) throw new Error("No order found for that tracking code.");
-      
+      if (error) throw new Error(error.message);
+      if (!r) {
+        // Try preorders
+        const { data: preorder, error: preErr } = await supabaseAdmin
+          .from("preorders")
+          .select(`*, preorder_payments(*)`)
+          .eq("preorder_code", safeCode(data.orderCode))
+          .maybeSingle();
+        if (preErr) throw new Error(preErr.message);
+        if (!preorder) throw new Error("No order found for that tracking code.");
+
+        return {
+          type: "preorder",
+          preorder: {
+            id: preorder.id,
+            preorderCode: preorder.preorder_code,
+            customerName: preorder.customer_name,
+            phone: preorder.phone,
+            address: preorder.address,
+            product: preorder.product,
+            quantity: preorder.quantity,
+            unitPrice: preorder.unit_price,
+            totalAmount: preorder.total_amount,
+            amountPaid: preorder.amount_paid,
+            balance: preorder.balance,
+            reservationType: preorder.reservation_type,
+            paymentStatus: preorder.payment_status,
+            deliveryStatus: preorder.delivery_status,
+            preferredDeliveryDate: preorder.preferred_delivery_date,
+            notes: preorder.notes,
+            createdAt: preorder.created_at,
+            updatedAt: preorder.updated_at,
+          },
+          payments: (preorder.preorder_payments || [])
+            .filter((p: any) => p.confirmed_by_admin)
+            .map((p: any) => ({
+              id: p.id,
+              amount: p.amount,
+              paymentDate: p.payment_date,
+              paymentReference: p.payment_reference,
+              confirmedByAdmin: p.confirmed_by_admin,
+            }))
+            .sort(
+              (a: any, b: any) =>
+                new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime(),
+            ),
+        };
+      }
+
       return {
-        type: "preorder",
-        preorder: {
-          id: preorder.id,
-          preorderCode: preorder.preorder_code,
-          customerName: preorder.customer_name,
-          phone: preorder.phone,
-          address: preorder.address,
-          product: preorder.product,
-          quantity: preorder.quantity,
-          unitPrice: preorder.unit_price,
-          totalAmount: preorder.total_amount,
-          amountPaid: preorder.amount_paid,
-          balance: preorder.balance,
-          reservationType: preorder.reservation_type,
-          paymentStatus: preorder.payment_status,
-          deliveryStatus: preorder.delivery_status,
-          preferredDeliveryDate: preorder.preferred_delivery_date,
-          notes: preorder.notes,
-          createdAt: preorder.created_at,
-          updatedAt: preorder.updated_at,
+        type: "order",
+        order: {
+          id: r.id,
+          orderCode: r.order_code,
+          trackCode: (r as { track_code: string | null }).track_code ?? "",
+          customerName: r.customer_name,
+          phone: r.phone,
+          address: r.address,
+          notes: r.notes,
+          status: r.status as AdminOrder["status"],
+          statusNote: r.status_note,
+          eta: r.eta,
+          items: (r.items as AdminOrder["items"]) ?? [],
+          subtotal: r.subtotal,
+          deliveryFee: r.delivery_fee,
+          total: r.total,
+          deliveryZone: r.delivery_zone,
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          paymentStatus: r.payment_status as AdminOrder["paymentStatus"],
+          paymentRejectionReason: r.payment_rejection_reason,
+          paymentSubmittedAt: r.payment_submitted_at,
+          paymentApprovedAt: r.payment_approved_at,
+          discountAmount: r.discount_amount ?? 0,
+          voucherCode: r.voucher_code,
+          cancelledAt: r.cancelled_at,
+          cancelledBy: r.cancelled_by,
+          cancelReason: r.cancel_reason,
         },
-        payments: (preorder.preorder_payments || [])
-          .filter((p: any) => p.confirmed_by_admin)
-          .map((p: any) => ({
-            id: p.id,
-            amount: p.amount,
-            paymentDate: p.payment_date,
-            paymentReference: p.payment_reference,
-            confirmedByAdmin: p.confirmed_by_admin
-          })).sort((a: any, b: any) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime())
       };
-    }
-    
-    return {
-      type: "order",
-      order: {
-        id: r.id,
-        orderCode: r.order_code,
-        trackCode: (r as { track_code: string | null }).track_code ?? "",
-        customerName: r.customer_name,
-        phone: r.phone,
-        address: r.address,
-        notes: r.notes,
-        status: r.status as AdminOrder["status"],
-        statusNote: r.status_note,
-        eta: r.eta,
-        items: (r.items as AdminOrder["items"]) ?? [],
-        subtotal: r.subtotal,
-        deliveryFee: r.delivery_fee,
-        total: r.total,
-        deliveryZone: r.delivery_zone,
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-        paymentStatus: r.payment_status as AdminOrder["paymentStatus"],
-        paymentRejectionReason: r.payment_rejection_reason,
-        paymentSubmittedAt: r.payment_submitted_at,
-        paymentApprovedAt: r.payment_approved_at,
-        discountAmount: r.discount_amount ?? 0,
-        voucherCode: r.voucher_code,
-        cancelledAt: r.cancelled_at,
-        cancelledBy: r.cancelled_by,
-        cancelReason: r.cancel_reason,
-      },
-    };
-  });
+    },
+  );
 
 // ---------- Payment ----------
 
 const markPaidSchema = z.object({
+  phone: z.string().max(30).optional(),
   trackCode: z.string().trim().min(4).max(20),
 });
 
@@ -1657,6 +1730,9 @@ export const markPaymentSubmitted = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => markPaidSchema.parse(data))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await (
+      await import("./customer-access.server")
+    ).requireCustomerAccess(supabaseAdmin, data.trackCode, data.phone);
     const { data: row, error } = await supabaseAdmin
       .from("orders")
       .update({ payment_status: "submitted", payment_submitted_at: new Date().toISOString() })
@@ -1697,18 +1773,20 @@ export const adminDecidePayment = createServerFn({ method: "POST" })
 
 export const adminUpdateStaffMember = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().trim().min(1).toLowerCase(),
-      fullName: z.string().optional().nullable(),
-      phone: z.string().optional().nullable(),
-      email: z.string().optional().nullable(),
-      address: z.string().optional().nullable(),
-      department: z.string().optional().nullable(),
-      status: z.enum(["active", "suspended", "on_leave", "terminated"]).optional(),
-      emergencyContact: z.string().optional().nullable(),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().trim().min(1).toLowerCase(),
+        fullName: z.string().optional().nullable(),
+        phone: z.string().optional().nullable(),
+        email: z.string().optional().nullable(),
+        address: z.string().optional().nullable(),
+        department: z.string().optional().nullable(),
+        status: z.enum(["active", "suspended", "on_leave", "terminated"]).optional(),
+        emergencyContact: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
@@ -1724,11 +1802,11 @@ export const adminUpdateStaffMember = createServerFn({ method: "POST" })
       updatePayload.status = data.status;
       updatePayload.active = data.status === "active";
     }
-    if (data.emergencyContact !== undefined) updatePayload.emergency_contact = data.emergencyContact;
+    if (data.emergencyContact !== undefined)
+      updatePayload.emergency_contact = data.emergencyContact;
     if (data.notes !== undefined) updatePayload.notes = data.notes;
 
-    const { error } = await (supabaseAdmin
-      .from("admin_access" as any) as any)
+    const { error } = await (supabaseAdmin.from("admin_access" as any) as any)
       .update(updatePayload)
       .eq("username", data.targetUsername);
 
@@ -1738,21 +1816,25 @@ export const adminUpdateStaffMember = createServerFn({ method: "POST" })
 
 export const adminRecordSuspension = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      staffUsername: z.string().trim().min(1).toLowerCase(),
-      reason: z.string().trim().min(3),
-      startDate: z.string().optional(),
-      endDate: z.string().optional().nullable(),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        staffUsername: z.string().trim().min(1).toLowerCase(),
+        reason: z.string().trim().min(3),
+        startDate: z.string().optional(),
+        endDate: z.string().optional().nullable(),
+        notes: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Insert suspension record
-    const { error: insertErr } = await (supabaseAdmin.from("staff_suspensions" as any) as any).insert({
+    const { error: insertErr } = await (
+      supabaseAdmin.from("staff_suspensions" as any) as any
+    ).insert({
       staff_username: data.staffUsername,
       reason: data.reason,
       start_date: data.startDate || new Date().toISOString().split("T")[0],
@@ -1764,8 +1846,7 @@ export const adminRecordSuspension = createServerFn({ method: "POST" })
     if (insertErr) throw new Error(insertErr.message);
 
     // Update staff account status to suspended
-    await (supabaseAdmin
-      .from("admin_access" as any) as any)
+    await (supabaseAdmin.from("admin_access" as any) as any)
       .update({ status: "suspended", active: false, updated_at: new Date().toISOString() })
       .eq("username", data.staffUsername);
 
@@ -1778,8 +1859,7 @@ export const adminListSuspensions = createServerFn({ method: "POST" })
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: rows, error } = await (supabaseAdmin
-      .from("staff_suspensions" as any) as any)
+    const { data: rows, error } = await (supabaseAdmin.from("staff_suspensions" as any) as any)
       .select("*")
       .order("created_at", { ascending: false });
 
@@ -1799,14 +1879,16 @@ export const adminListSuspensions = createServerFn({ method: "POST" })
 
 export const adminUploadStaffDocument = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().trim().min(1).toLowerCase(),
-      documentName: z.string().trim().min(1),
-      documentType: z.enum(["contract", "nda", "guarantor_form", "id_card", "other"]),
-      fileUrl: z.string().trim().min(1),
-      fileSize: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().trim().min(1).toLowerCase(),
+        documentName: z.string().trim().min(1),
+        documentType: z.enum(["contract", "nda", "guarantor_form", "id_card", "other"]),
+        fileUrl: z.string().trim().min(1),
+        fileSize: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
@@ -1827,16 +1909,20 @@ export const adminUploadStaffDocument = createServerFn({ method: "POST" })
 
 export const adminListStaffDocuments = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      targetUsername: z.string().optional(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        targetUsername: z.string().optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q = (supabaseAdmin.from("staff_documents" as any) as any).select("*").order("created_at", { ascending: false });
+    let q = (supabaseAdmin.from("staff_documents" as any) as any)
+      .select("*")
+      .order("created_at", { ascending: false });
     if (data.targetUsername) {
       q = q.eq("username", data.targetUsername.toLowerCase());
     }
@@ -1858,16 +1944,20 @@ export const adminListStaffDocuments = createServerFn({ method: "POST" })
 
 export const adminDeleteStaffDocument = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      documentId: z.string().uuid(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        documentId: z.string().uuid(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin.from("staff_documents" as any) as any).delete().eq("id", data.documentId);
+    const { error } = await (supabaseAdmin.from("staff_documents" as any) as any)
+      .delete()
+      .eq("id", data.documentId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -1876,22 +1966,25 @@ export const adminDeleteStaffDocument = createServerFn({ method: "POST" })
 
 export const staffClockIn = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().trim().min(1).toLowerCase(),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().trim().min(1).toLowerCase(),
+        notes: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const cred = parseAdminCredential(data.passcode);
-    const verifiedUsername = (cred.username && cred.username !== "unknown" ? cred.username : data.username).toLowerCase();
+    const verifiedUsername = (
+      cred.username && cred.username !== "unknown" ? cred.username : data.username
+    ).toLowerCase();
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const today = new Date().toISOString().split("T")[0];
 
-    const { data: existing } = await (supabaseAdmin
-      .from("staff_attendance" as any) as any)
+    const { data: existing } = await (supabaseAdmin.from("staff_attendance" as any) as any)
       .select("id")
       .eq("username", verifiedUsername)
       .eq("attendance_date", today)
@@ -1915,18 +2008,22 @@ export const staffClockIn = createServerFn({ method: "POST" })
 
 export const adminListAttendance = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().optional(),
-      startDate: z.string().optional(),
-      endDate: z.string().optional(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().optional(),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q = (supabaseAdmin.from("staff_attendance" as any) as any).select("*").order("attendance_date", { ascending: false });
+    let q = (supabaseAdmin.from("staff_attendance" as any) as any)
+      .select("*")
+      .order("attendance_date", { ascending: false });
     if (data.username) {
       q = q.eq("username", data.username.toLowerCase());
     }
@@ -1954,13 +2051,15 @@ export const adminListAttendance = createServerFn({ method: "POST" })
 
 export const adminMarkAttendance = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().trim().min(1).toLowerCase(),
-      attendanceDate: z.string(),
-      status: z.enum(["present", "absent", "late", "on_leave"]),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().trim().min(1).toLowerCase(),
+        attendanceDate: z.string(),
+        status: z.enum(["present", "absent", "late", "on_leave"]),
+        notes: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
@@ -1985,14 +2084,16 @@ export const adminMarkAttendance = createServerFn({ method: "POST" })
 
 export const adminCreatePaymentReceipt = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().trim().min(1).toLowerCase(),
-      monthYear: z.string().trim().min(1),
-      amount: z.number().min(0),
-      paymentDate: z.string().optional(),
-      notes: z.string().optional().nullable(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().trim().min(1).toLowerCase(),
+        monthYear: z.string().trim().min(1),
+        amount: z.number().min(0),
+        paymentDate: z.string().optional(),
+        notes: z.string().optional().nullable(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
@@ -2013,16 +2114,20 @@ export const adminCreatePaymentReceipt = createServerFn({ method: "POST" })
 
 export const adminListPaymentReceipts = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().optional(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q = (supabaseAdmin.from("staff_payment_receipts" as any) as any).select("*").order("created_at", { ascending: false });
+    let q = (supabaseAdmin.from("staff_payment_receipts" as any) as any)
+      .select("*")
+      .order("created_at", { ascending: false });
     if (data.username) {
       q = q.eq("username", data.username.toLowerCase());
     }
@@ -2046,21 +2151,24 @@ export const adminListPaymentReceipts = createServerFn({ method: "POST" })
 
 export const staffSignPaymentReceipt = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      receiptId: z.string().uuid(),
-      username: z.string().trim().min(1).toLowerCase(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        receiptId: z.string().uuid(),
+        username: z.string().trim().min(1).toLowerCase(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const cred = parseAdminCredential(data.passcode);
-    const verifiedUsername = (cred.username && cred.username !== "unknown" ? cred.username : data.username).toLowerCase();
+    const verifiedUsername = (
+      cred.username && cred.username !== "unknown" ? cred.username : data.username
+    ).toLowerCase();
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { error } = await (supabaseAdmin
-      .from("staff_payment_receipts" as any) as any)
+    const { error } = await (supabaseAdmin.from("staff_payment_receipts" as any) as any)
       .update({ status: "signed", signed_at: new Date().toISOString() })
       .eq("id", data.receiptId)
       .eq("username", verifiedUsername);
@@ -2073,19 +2181,23 @@ export const staffSignPaymentReceipt = createServerFn({ method: "POST" })
 
 export const staffSubmitLeaveRequest = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().trim().min(1).toLowerCase(),
-      leaveType: z.enum(["annual", "sick", "emergency", "casual"]),
-      startDate: z.string().min(1),
-      endDate: z.string().min(1),
-      reason: z.string().trim().min(3),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().trim().min(1).toLowerCase(),
+        leaveType: z.enum(["annual", "sick", "emergency", "casual"]),
+        startDate: z.string().min(1),
+        endDate: z.string().min(1),
+        reason: z.string().trim().min(3),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const cred = parseAdminCredential(data.passcode);
-    const verifiedUsername = (cred.username && cred.username !== "unknown" ? cred.username : data.username).toLowerCase();
+    const verifiedUsername = (
+      cred.username && cred.username !== "unknown" ? cred.username : data.username
+    ).toLowerCase();
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -2104,16 +2216,20 @@ export const staffSubmitLeaveRequest = createServerFn({ method: "POST" })
 
 export const adminListLeaveRequests = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      username: z.string().optional(),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        username: z.string().optional(),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    let q = (supabaseAdmin.from("staff_leave_requests" as any) as any).select("*").order("created_at", { ascending: false });
+    let q = (supabaseAdmin.from("staff_leave_requests" as any) as any)
+      .select("*")
+      .order("created_at", { ascending: false });
     if (data.username) {
       q = q.eq("username", data.username.toLowerCase());
     }
@@ -2137,27 +2253,27 @@ export const adminListLeaveRequests = createServerFn({ method: "POST" })
 
 export const adminDecideLeaveRequest = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
-    z.object({
-      passcode: z.string(),
-      requestId: z.string().uuid(),
-      decision: z.enum(["approved", "rejected"]),
-    }).parse(data),
+    z
+      .object({
+        passcode: z.string(),
+        requestId: z.string().uuid(),
+        decision: z.enum(["approved", "rejected"]),
+      })
+      .parse(data),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Fetch leave details
-    const { data: leave } = await (supabaseAdmin
-      .from("staff_leave_requests" as any) as any)
+    const { data: leave } = await (supabaseAdmin.from("staff_leave_requests" as any) as any)
       .select("*")
       .eq("id", data.requestId)
       .single();
 
     if (!leave) throw new Error("Leave request not found");
 
-    const { error } = await (supabaseAdmin
-      .from("staff_leave_requests" as any) as any)
+    const { error } = await (supabaseAdmin.from("staff_leave_requests" as any) as any)
       .update({
         status: data.decision,
         reviewed_by: "HR/Owner",
@@ -2171,7 +2287,7 @@ export const adminDecideLeaveRequest = createServerFn({ method: "POST" })
     if (data.decision === "approved" && leave.start_date) {
       const start = new Date(leave.start_date);
       const end = new Date(leave.end_date || leave.start_date);
-      
+
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
         const dateStr = d.toISOString().split("T")[0];
         await (supabaseAdmin.from("staff_attendance" as any) as any).upsert(
@@ -2186,8 +2302,7 @@ export const adminDecideLeaveRequest = createServerFn({ method: "POST" })
       }
 
       // Also update staff account status to 'on_leave'
-      await (supabaseAdmin
-        .from("admin_access" as any) as any)
+      await (supabaseAdmin.from("admin_access" as any) as any)
         .update({ status: "on_leave", updated_at: new Date().toISOString() })
         .eq("username", leave.username);
     }

@@ -32,7 +32,9 @@ import {
   X,
   Truck,
   Package,
+  Flag,
 } from "lucide-react";
+import { TypoReviewModal } from "./TypoReviewModal";
 import {
   adminListSpecialContacts,
   adminGetContactDetail,
@@ -40,6 +42,7 @@ import {
   adminUpdateSpecialContact,
   adminDeleteSpecialContact,
   adminRecordContactTransaction,
+  adminUpdateContactTransaction,
   adminDeleteContactTransaction,
   type SpecialContact,
   type ContactTransaction,
@@ -67,7 +70,9 @@ export function SpecialContactsPanel({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | SpecialContactType>("all");
-  const [balanceFilter, setBalanceFilter] = useState<"all" | "owing" | "settled" | "payable">("all");
+  const [balanceFilter, setBalanceFilter] = useState<"all" | "owing" | "settled" | "payable">(
+    "all",
+  );
 
   const listFn = useServerFn(adminListSpecialContacts);
   const contactsQuery = useQuery({
@@ -130,9 +135,12 @@ export function SpecialContactsPanel({
               Special Contacts & Accounts · Wholesale & Vendors
             </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight">Bulk Buyers & Suppliers</h2>
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight">
+            Bulk Buyers & Suppliers
+          </h2>
           <p className="max-w-2xl text-xs text-white/80 leading-relaxed">
-            Record numbers of special bulk offloaders, cold rooms, market buyers, and hatchery/feed vendors. Track offload volumes, sales history, debt collections, and supplier balances.
+            Record numbers of special bulk offloaders, cold rooms, market buyers, and hatchery/feed
+            vendors. Track offload volumes, sales history, debt collections, and supplier balances.
           </p>
         </div>
 
@@ -367,7 +375,11 @@ export function SpecialContactsPanel({
                                 : "bg-purple-100 text-purple-800"
                           }`}
                         >
-                          {isBuyer ? "Bulk Offloader" : isSupplier ? "Farm Supplier" : c.contactType}
+                          {isBuyer
+                            ? "Bulk Offloader"
+                            : isSupplier
+                              ? "Farm Supplier"
+                              : c.contactType}
                         </span>
 
                         {/* Balance Badge */}
@@ -405,7 +417,10 @@ export function SpecialContactsPanel({
                           <span className="flex items-center gap-1.5 font-mono">
                             <Phone size={13} className="text-slate-400" /> {c.phone}
                           </span>
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                          <div
+                            className="flex items-center gap-1.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <a
                               href={`tel:${c.phone}`}
                               className="rounded-lg bg-slate-100 p-1.5 text-slate-600 hover:bg-[#0F3D24] hover:text-white transition"
@@ -493,6 +508,7 @@ function ContactDetailView({
 }) {
   const qc = useQueryClient();
   const [isRecordTxOpen, setIsRecordTxOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<ContactTransaction | null>(null);
   const [isEditContactOpen, setIsEditContactOpen] = useState(false);
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
 
@@ -510,7 +526,9 @@ function ContactDetailView({
       <div className="rounded-3xl border border-[#0F3D24]/10 bg-white p-16 text-center shadow-sm">
         <Loader2 className="mx-auto animate-spin text-[#3F8F3F]" size={36} />
         <h3 className="mt-3 text-base font-bold text-[#0F3D24]">Loading Contact Record...</h3>
-        <p className="text-xs text-slate-500">Retrieving wholesale offload statement and balances.</p>
+        <p className="text-xs text-slate-500">
+          Retrieving wholesale offload statement and balances.
+        </p>
       </div>
     );
   }
@@ -541,7 +559,11 @@ function ContactDetailView({
   const hasPayable = isSupplier && contact.balanceDue > 0;
 
   const handleDeleteContact = async () => {
-    if (!confirm(`Are you sure you want to delete ${contact.contactName}? All associated transactions will also be removed.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete ${contact.contactName}? All associated transactions will also be removed.`,
+      )
+    ) {
       return;
     }
     try {
@@ -657,14 +679,12 @@ function ContactDetailView({
           {contact.locationAddress && (
             <div className="flex items-center gap-2 text-slate-600">
               <MapPin size={14} className="text-[#3F8F3F] shrink-0" />
-              <span>Location: <strong>{contact.locationAddress}</strong></span>
+              <span>
+                Location: <strong>{contact.locationAddress}</strong>
+              </span>
             </div>
           )}
-          {contact.notes && (
-            <div className="text-slate-600 italic">
-              Notes: "{contact.notes}"
-            </div>
-          )}
+          {contact.notes && <div className="text-slate-600 italic">Notes: "{contact.notes}"</div>}
         </div>
       </div>
 
@@ -689,9 +709,7 @@ function ContactDetailView({
           <div className="mt-1 text-2xl font-black text-emerald-700 tabular-nums">
             {naira(contact.totalPaid)}
           </div>
-          <div className="mt-1 text-[11px] text-slate-500">
-            Confirmed remittances to date
-          </div>
+          <div className="mt-1 text-[11px] text-slate-500">Confirmed remittances to date</div>
         </div>
 
         <div
@@ -708,7 +726,11 @@ function ContactDetailView({
               hasDebt ? "text-rose-800" : hasPayable ? "text-amber-800" : "text-emerald-800"
             }`}
           >
-            {hasDebt ? "Outstanding Debt Owed" : hasPayable ? "Payable Balance Due" : "Current Balance"}
+            {hasDebt
+              ? "Outstanding Debt Owed"
+              : hasPayable
+                ? "Payable Balance Due"
+                : "Current Balance"}
           </div>
           <div
             className={`mt-1 text-2xl font-black tabular-nums ${
@@ -756,7 +778,9 @@ function ContactDetailView({
         {transactions.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-[#FAF9F6] p-12 text-center text-xs text-slate-500 space-y-2">
             <Receipt className="mx-auto text-slate-400" size={36} />
-            <p className="font-bold text-slate-700">No transactions recorded for this contact yet.</p>
+            <p className="font-bold text-slate-700">
+              No transactions recorded for this contact yet.
+            </p>
             <p>Click "Record Offload / Sale" to key in their first transaction or bulk purchase.</p>
           </div>
         ) : (
@@ -800,14 +824,50 @@ function ContactDetailView({
                                   : "bg-slate-100 text-slate-700"
                           }`}
                         >
-                          {isSale ? "Sale / Offload" : isPayment ? "Payment" : isSupply ? "Supply" : t.transactionType}
+                          {isSale
+                            ? "Sale / Offload"
+                            : isPayment
+                              ? "Payment"
+                              : isSupply
+                                ? "Supply"
+                                : t.transactionType}
                         </span>
                       </td>
                       <td className="py-3 px-3 font-semibold text-[#0F3D24]">
-                        <div>{t.itemDescription}</div>
-                        {t.referenceNo && (
-                          <div className="text-[10px] font-mono text-slate-400">Ref: {t.referenceNo}</div>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{t.itemDescription}</span>
+                          {(t.approvalStatus === "pending_approval" ||
+                            t.approvalStatus === "pending") && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[9px] font-extrabold uppercase text-amber-800">
+                              Pending Owner Approval
+                            </span>
+                          )}
+                          {t.approvalStatus === "flagged" && (
+                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[9px] font-extrabold uppercase text-orange-900 ring-1 ring-orange-300">
+                              Flagged · Edit Needed
+                            </span>
+                          )}
+                          {t.approvalStatus === "rejected" && (
+                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[9px] font-extrabold uppercase text-rose-800">
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px] text-slate-400">
+                          {t.referenceNo && <span className="font-mono">Ref: {t.referenceNo}</span>}
+                          <span className="font-semibold text-slate-500">
+                            Logged by: {t.recordedBy || "Owner"}
+                          </span>
+                        </div>
+                        {(t.approvalStatus === "rejected" || t.approvalStatus === "flagged") &&
+                          t.rejectionReason && (
+                            <div
+                              className={`text-[10px] mt-0.5 font-semibold ${t.approvalStatus === "flagged" ? "text-orange-800" : "text-rose-600"}`}
+                            >
+                              {t.approvalStatus === "flagged" ? "Owner Flag Note: " : "Reason: "}
+                              {t.rejectionReason}
+                            </div>
+                          )}
                       </td>
                       <td className="py-3 px-3 text-slate-600 whitespace-nowrap">
                         {t.batchName ? (
@@ -850,7 +910,21 @@ function ContactDetailView({
                           {t.paymentStatus}
                         </span>
                       </td>
-                      <td className="py-3 px-2 text-center">
+                      <td className="py-3 px-2 text-center whitespace-nowrap space-x-1">
+                        {(role === "owner" || t.approvalStatus !== "approved") && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingTx(t)}
+                            className="rounded-lg p-1 text-[#3F8F3F] hover:bg-emerald-50 hover:text-[#0F3D24] transition"
+                            title={
+                              t.approvalStatus !== "approved"
+                                ? "Edit & Resubmit entry"
+                                : "Edit entry"
+                            }
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleDeleteTx(t.id)}
@@ -869,17 +943,26 @@ function ContactDetailView({
         )}
       </div>
 
-      {/* Record Transaction Modal */}
-      {isRecordTxOpen && (
+      {/* Record / Edit Transaction Modal */}
+      {(isRecordTxOpen || editingTx) && (
         <RecordTransactionModal
           passcode={passcode}
+          role={role}
           contact={contact}
           batches={batches}
-          onClose={() => setIsRecordTxOpen(false)}
+          editingTx={editingTx}
+          onClose={() => {
+            setIsRecordTxOpen(false);
+            setEditingTx(null);
+          }}
           onSuccess={() => {
             setIsRecordTxOpen(false);
+            setEditingTx(null);
             detailQuery.refetch();
             qc.invalidateQueries({ queryKey: ["admin-special-contacts"] });
+            qc.invalidateQueries({ queryKey: ["my-submissions"] });
+            qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+            qc.invalidateQueries({ queryKey: ["pending-approvals-count"] });
           }}
         />
       )}
@@ -987,7 +1070,8 @@ function AddSpecialContactModal({
           initialOffload: hasInitialTx
             ? {
                 batchId: batchId || null,
-                itemDescription: itemDescription.trim() || `${quantity} ${unit} @ ${naira(unitPrice)}`,
+                itemDescription:
+                  itemDescription.trim() || `${quantity} ${unit} @ ${naira(unitPrice)}`,
                 quantity,
                 unit,
                 unitPrice,
@@ -1165,7 +1249,9 @@ function AddSpecialContactModal({
               <div className="space-y-3 pt-2 border-t border-slate-200">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Active Farm Batch *</label>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Active Farm Batch *
+                    </label>
                     <select
                       value={batchId}
                       onChange={(e) => setBatchId(e.target.value)}
@@ -1221,7 +1307,9 @@ function AddSpecialContactModal({
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Amount Paid Now (₦)</label>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Amount Paid Now (₦)
+                    </label>
                     <NumberField
                       allowDecimal
                       min={0}
@@ -1231,7 +1319,9 @@ function AddSpecialContactModal({
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-slate-700 mb-1">Remaining Debt (₦)</label>
+                    <label className="block font-bold text-slate-700 mb-1">
+                      Remaining Debt (₦)
+                    </label>
                     <div
                       className={`w-full rounded-xl border px-3 py-2 font-black tabular-nums ${
                         totalAmount - amountPaid > 0
@@ -1273,38 +1363,55 @@ function AddSpecialContactModal({
 
 function RecordTransactionModal({
   passcode,
+  role,
   contact,
   batches,
+  editingTx,
   onClose,
   onSuccess,
 }: {
   passcode: string;
+  role?: AdminRole;
   contact: SpecialContact;
   batches: FarmBatch[];
+  editingTx?: ContactTransaction | null;
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const recordTxFn = useServerFn(adminRecordContactTransaction);
+  const updateTxFn = useServerFn(adminUpdateContactTransaction);
 
   const isBuyer = contact.contactType === "bulk_buyer" || contact.contactType === "offloader";
   const defaultTxType: TransactionType = isBuyer ? "sale_to_contact" : "purchase_from_supplier";
 
   const activeBatches = batches.filter((b) => b.status === "active");
-  const [transactionType, setTransactionType] = useState<TransactionType>(defaultTxType);
-  const [batchId, setBatchId] = useState(activeBatches[0]?.id || "");
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [itemDescription, setItemDescription] = useState(
-    isBuyer ? "Live Broiler Chickens (Offload)" : "Starter / Finisher Feed Supply"
+  const [transactionType, setTransactionType] = useState<TransactionType>(
+    editingTx?.transactionType || defaultTxType,
   );
-  const [quantity, setQuantity] = useState(100);
-  const [unit, setUnit] = useState(isBuyer ? "birds" : "bags");
-  const [unitPrice, setUnitPrice] = useState(isBuyer ? 3800 : 17500);
-  const [totalAmount, setTotalAmount] = useState(quantity * unitPrice);
-  const [amountPaid, setAmountPaid] = useState(quantity * unitPrice);
-  const [paymentMethod, setPaymentMethod] = useState("Bank Transfer");
-  const [referenceNo, setReferenceNo] = useState("");
-  const [notes, setNotes] = useState("");
-  const [syncToFarmBatch, setSyncToFarmBatch] = useState(true);
+  const [batchId, setBatchId] = useState(editingTx?.batchId ?? (activeBatches[0]?.id || ""));
+  const [transactionDate, setTransactionDate] = useState(
+    editingTx?.transactionDate || new Date().toISOString().slice(0, 10),
+  );
+  const [itemDescription, setItemDescription] = useState(
+    editingTx?.itemDescription ||
+      (isBuyer ? "Live Broiler Chickens (Offload)" : "Starter / Finisher Feed Supply"),
+  );
+  const [quantity, setQuantity] = useState(editingTx ? editingTx.quantity : 100);
+  const [unit, setUnit] = useState(editingTx?.unit || (isBuyer ? "birds" : "bags"));
+  const [unitPrice, setUnitPrice] = useState(
+    editingTx ? editingTx.unitPrice : isBuyer ? 3800 : 17500,
+  );
+  const [totalAmount, setTotalAmount] = useState(
+    editingTx ? editingTx.totalAmount : quantity * unitPrice,
+  );
+  const [amountPaid, setAmountPaid] = useState(
+    editingTx ? editingTx.amountPaid : quantity * unitPrice,
+  );
+  const [paymentMethod, setPaymentMethod] = useState(editingTx?.paymentMethod || "Bank Transfer");
+  const [referenceNo, setReferenceNo] = useState(editingTx?.referenceNo || "");
+  const [notes, setNotes] = useState(editingTx?.notes || "");
+  const [syncToFarmBatch, setSyncToFarmBatch] = useState(!editingTx);
+  const [showTypoCheck, setShowTypoCheck] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1320,9 +1427,63 @@ function RecordTransactionModal({
 
   const balanceDue = Math.max(0, totalAmount - amountPaid);
 
+  const executeSave = async () => {
+    setSubmitting(true);
+    setErrorMsg(null);
+
+    try {
+      if (editingTx) {
+        await updateTxFn({
+          data: {
+            passcode,
+            transactionId: editingTx.id,
+            batchId: batchId || null,
+            transactionDate,
+            itemDescription: itemDescription.trim(),
+            quantity,
+            unit,
+            unitPrice,
+            totalAmount,
+            amountPaid,
+            paymentMethod,
+            referenceNo: referenceNo.trim() || null,
+            notes: notes.trim() || null,
+          },
+        });
+      } else {
+        await recordTxFn({
+          data: {
+            passcode,
+            contactId: contact.id,
+            transactionType,
+            batchId,
+            transactionDate,
+            itemDescription: itemDescription.trim(),
+            quantity,
+            unit,
+            unitPrice,
+            totalAmount,
+            amountPaid,
+            paymentMethod,
+            referenceNo: referenceNo.trim() || null,
+            notes: notes.trim() || null,
+            syncToFarmBatch,
+          },
+        });
+      }
+      setShowTypoCheck(false);
+      onSuccess();
+    } catch (err: any) {
+      setShowTypoCheck(false);
+      setErrorMsg(err.message || "Failed to save transaction");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!batchId) {
+    if (!editingTx && !batchId) {
       setErrorMsg("Please select an active farm batch.");
       return;
     }
@@ -1334,274 +1495,319 @@ function RecordTransactionModal({
       setErrorMsg("Total amount must be greater than zero.");
       return;
     }
-
-    setSubmitting(true);
-    setErrorMsg(null);
-
-    try {
-      await recordTxFn({
-        data: {
-          passcode,
-          contactId: contact.id,
-          transactionType,
-          batchId,
-          transactionDate,
-          itemDescription: itemDescription.trim(),
-          quantity,
-          unit,
-          unitPrice,
-          totalAmount,
-          amountPaid,
-          paymentMethod,
-          referenceNo: referenceNo.trim() || null,
-          notes: notes.trim() || null,
-          syncToFarmBatch,
-        },
-      });
-
-      onSuccess();
-    } catch (err: any) {
-      setErrorMsg(err.message || "Failed to record transaction");
-    } finally {
-      setSubmitting(false);
+    if (role && role !== "owner") {
+      setShowTypoCheck(true);
+      return;
     }
+    await executeSave();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
-      <div className="relative my-8 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div>
-            <div className="text-base font-black text-[#0F3D24]">
-              {isBuyer ? "Record Offload / Bulk Sale" : "Record Supplier Supply"}
-            </div>
-            <div className="text-xs text-slate-500">
-              For: <strong className="text-[#0F3D24]">{contact.contactName}</strong> ({contact.businessName || contact.contactType})
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {errorMsg && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Transaction Type */}
-          <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Transaction Nature</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setTransactionType(isBuyer ? "sale_to_contact" : "purchase_from_supplier")}
-                className={`rounded-xl border p-2.5 font-bold transition ${
-                  transactionType === "sale_to_contact" || transactionType === "purchase_from_supplier"
-                    ? "border-[#0F3D24] bg-[#0F3D24] text-white shadow-sm"
-                    : "border-slate-200 bg-[#FAF9F6] text-slate-700"
-                }`}
-              >
-                {isBuyer ? "Offload / Bird Sale" : "Stock Supply / Delivery"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setTransactionType(isBuyer ? "payment_from_contact" : "payment_to_supplier")}
-                className={`rounded-xl border p-2.5 font-bold transition ${
-                  transactionType === "payment_from_contact" || transactionType === "payment_to_supplier"
-                    ? "border-[#0F3D24] bg-[#0F3D24] text-white shadow-sm"
-                    : "border-slate-200 bg-[#FAF9F6] text-slate-700"
-                }`}
-              >
-                {isBuyer ? "Debt Payment Remittance" : "Payment Sent to Vendor"}
-              </button>
-            </div>
-          </div>
-
-          {/* Date & Batch */}
-          <div className="grid gap-3 sm:grid-cols-2">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm overflow-y-auto">
+        <div className="relative my-8 w-full max-w-xl rounded-3xl bg-white p-6 sm:p-8 shadow-2xl space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Transaction Date</label>
-              <input
-                type="date"
-                required
-                value={transactionDate}
-                onChange={(e) => setTransactionDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Active Farm Batch *</label>
-              <select
-                required
-                value={batchId}
-                onChange={(e) => setBatchId(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
-              >
-                <option value="">Select active batch...</option>
-                {activeBatches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.batchName} ({b.batchType} - {b.currentHeadcount} live)
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Item Description */}
-          <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Item Description *</label>
-            <input
-              type="text"
-              required
-              placeholder="e.g. 150 Live Broilers @ ₦3,800/bird (Offload to Relief Market)"
-              value={itemDescription}
-              onChange={(e) => setItemDescription(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
-            />
-          </div>
-
-          {/* Quantity, Unit & Price */}
-          <div className="grid grid-cols-3 gap-2">
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Quantity</label>
-              <NumberField
-                min={1}
-                value={quantity}
-                onValueChange={(n) => handleQtyPriceChange(n ?? 0, unitPrice)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
-              />
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Unit</label>
-              <select
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
-              >
-                <option value="birds">birds</option>
-                <option value="bags">bags</option>
-                <option value="crates">crates</option>
-                <option value="kg">kg</option>
-                <option value="units">units</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Unit Price (₦)</label>
-              <NumberField
-                allowDecimal
-                min={0}
-                value={unitPrice}
-                onValueChange={(n) => handleQtyPriceChange(quantity, n ?? 0)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
-              />
-            </div>
-          </div>
-
-          {/* Financial Calculation Bar */}
-          <div className="rounded-2xl border border-slate-200 bg-[#FAF9F6] p-4 space-y-3">
-            <div className="grid grid-cols-3 gap-3 text-center">
-              <div>
-                <div className="text-[10px] font-bold uppercase text-slate-500">Gross Total</div>
-                <div className="text-base font-black text-[#0F3D24] tabular-nums">{naira(totalAmount)}</div>
+              <div className="text-base font-black text-[#0F3D24]">
+                {editingTx
+                  ? role !== "owner"
+                    ? "Edit & Resubmit Contact Transaction"
+                    : "Edit Contact Transaction"
+                  : isBuyer
+                    ? "Record Offload / Bulk Sale"
+                    : "Record Supplier Supply"}
               </div>
-              <div>
-                <div className="text-[10px] font-bold uppercase text-slate-500">Amount Paid</div>
-                <NumberField
-                  allowDecimal
-                  min={0}
-                  value={amountPaid}
-                  onValueChange={(n) => setAmountPaid(n ?? 0)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-center font-bold text-emerald-700"
-                />
-              </div>
-              <div>
-                <div className="text-[10px] font-bold uppercase text-slate-500">Balance Debt</div>
-                <div
-                  className={`text-base font-black tabular-nums ${
-                    balanceDue > 0 ? "text-rose-700" : "text-emerald-700"
-                  }`}
-                >
-                  {naira(balanceDue)}
-                </div>
+              <div className="text-xs text-slate-500">
+                For: <strong className="text-[#0F3D24]">{contact.contactName}</strong> (
+                {contact.businessName || contact.contactType})
               </div>
             </div>
-
-            {balanceDue > 0 && (
-              <div className="rounded-xl bg-rose-50 border border-rose-200 p-2 text-center text-[11px] font-bold text-rose-800">
-                ⚠ {naira(balanceDue)} will be logged as outstanding debt owed by {contact.contactName}.
-              </div>
-            )}
-          </div>
-
-          {/* Payment Method & Reference */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Payment Method</label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2 text-[#0F3D24]"
-              >
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Cash">Cash Handover</option>
-                <option value="POS / Card">POS Terminal</option>
-                <option value="Cheque">Cheque</option>
-              </select>
-            </div>
-            <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Payment Reference / Receipt No</label>
-              <input
-                type="text"
-                placeholder="e.g. TRF-839218, OFFLOAD-14"
-                value={referenceNo}
-                onChange={(e) => setReferenceNo(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2 font-mono text-[#0F3D24]"
-              />
-            </div>
-          </div>
-
-          {/* Batch Sync Checkbox */}
-          {batchId && (
-            <label className="flex items-center gap-2 text-xs font-semibold text-[#0F3D24] bg-emerald-50/60 border border-emerald-200/60 p-3 rounded-xl cursor-pointer">
-              <input
-                type="checkbox"
-                checked={syncToFarmBatch}
-                onChange={(e) => setSyncToFarmBatch(e.target.checked)}
-                className="rounded accent-[#0F3D24]"
-              />
-              <span>
-                Auto-sync this {isBuyer ? "sale" : "supply"} to <strong>Farm Batch Finances</strong> (
-                {batches.find((b) => b.id === batchId)?.batchName})
-              </span>
-            </label>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-100"
+              className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-full bg-[#0F3D24] px-6 py-2.5 font-black text-white shadow-md hover:bg-[#165232] disabled:opacity-50"
-            >
-              {submitting ? "Saving Transaction..." : "Save Transaction to Ledger →"}
+              <X size={18} />
             </button>
           </div>
-        </form>
+
+          <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {editingTx &&
+              (editingTx.approvalStatus === "flagged" || editingTx.approvalStatus === "rejected") &&
+              editingTx.rejectionReason && (
+                <div
+                  className={`rounded-xl p-3 text-xs font-semibold flex items-start gap-2 ${
+                    editingTx.approvalStatus === "flagged"
+                      ? "bg-orange-50 border border-orange-200 text-orange-950"
+                      : "bg-rose-50 border border-rose-200 text-rose-900"
+                  }`}
+                >
+                  <Flag size={14} className="shrink-0 mt-0.5 text-orange-600" />
+                  <div>
+                    <span className="block text-[10px] font-extrabold uppercase">
+                      {editingTx.approvalStatus === "flagged"
+                        ? "Owner Flagged for Correction:"
+                        : "Owner Rejection Note:"}
+                    </span>
+                    {editingTx.rejectionReason}
+                  </div>
+                </div>
+              )}
+
+            {errorMsg && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-bold text-rose-700">
+                {errorMsg}
+              </div>
+            )}
+
+            {/* Transaction Type */}
+            <div>
+              <label className="block font-bold text-[#0F3D24] mb-1">Transaction Nature</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTransactionType(isBuyer ? "sale_to_contact" : "purchase_from_supplier")
+                  }
+                  className={`rounded-xl border p-2.5 font-bold transition ${
+                    transactionType === "sale_to_contact" ||
+                    transactionType === "purchase_from_supplier"
+                      ? "border-[#0F3D24] bg-[#0F3D24] text-white shadow-sm"
+                      : "border-slate-200 bg-[#FAF9F6] text-slate-700"
+                  }`}
+                >
+                  {isBuyer ? "Offload / Bird Sale" : "Stock Supply / Delivery"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setTransactionType(isBuyer ? "payment_from_contact" : "payment_to_supplier")
+                  }
+                  className={`rounded-xl border p-2.5 font-bold transition ${
+                    transactionType === "payment_from_contact" ||
+                    transactionType === "payment_to_supplier"
+                      ? "border-[#0F3D24] bg-[#0F3D24] text-white shadow-sm"
+                      : "border-slate-200 bg-[#FAF9F6] text-slate-700"
+                  }`}
+                >
+                  {isBuyer ? "Debt Payment Remittance" : "Payment Sent to Vendor"}
+                </button>
+              </div>
+            </div>
+
+            {/* Date & Batch */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Transaction Date</label>
+                <input
+                  type="date"
+                  required
+                  value={transactionDate}
+                  onChange={(e) => setTransactionDate(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Active Farm Batch *</label>
+                <select
+                  required
+                  value={batchId}
+                  onChange={(e) => setBatchId(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                >
+                  <option value="">Select active batch...</option>
+                  {activeBatches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.batchName} ({b.batchType} - {b.currentHeadcount} live)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Item Description */}
+            <div>
+              <label className="block font-bold text-[#0F3D24] mb-1">Item Description *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. 150 Live Broilers @ ₦3,800/bird (Offload to Relief Market)"
+                value={itemDescription}
+                onChange={(e) => setItemDescription(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2.5 font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+              />
+            </div>
+
+            {/* Quantity, Unit & Price */}
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Quantity</label>
+                <NumberField
+                  min={1}
+                  value={quantity}
+                  onValueChange={(n) => handleQtyPriceChange(n ?? 0, unitPrice)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
+                />
+              </div>
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Unit</label>
+                <select
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
+                >
+                  <option value="birds">birds</option>
+                  <option value="bags">bags</option>
+                  <option value="crates">crates</option>
+                  <option value="kg">kg</option>
+                  <option value="units">units</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Unit Price (₦)</label>
+                <NumberField
+                  allowDecimal
+                  min={0}
+                  value={unitPrice}
+                  onValueChange={(n) => handleQtyPriceChange(quantity, n ?? 0)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 text-[#0F3D24]"
+                />
+              </div>
+            </div>
+
+            {/* Financial Calculation Bar */}
+            <div className="rounded-2xl border border-slate-200 bg-[#FAF9F6] p-4 space-y-3">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Gross Total</div>
+                  <div className="text-base font-black text-[#0F3D24] tabular-nums">
+                    {naira(totalAmount)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Amount Paid</div>
+                  <NumberField
+                    allowDecimal
+                    min={0}
+                    value={amountPaid}
+                    onValueChange={(n) => setAmountPaid(n ?? 0)}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-center font-bold text-emerald-700"
+                  />
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold uppercase text-slate-500">Balance Debt</div>
+                  <div
+                    className={`text-base font-black tabular-nums ${
+                      balanceDue > 0 ? "text-rose-700" : "text-emerald-700"
+                    }`}
+                  >
+                    {naira(balanceDue)}
+                  </div>
+                </div>
+              </div>
+
+              {balanceDue > 0 && (
+                <div className="rounded-xl bg-rose-50 border border-rose-200 p-2 text-center text-[11px] font-bold text-rose-800">
+                  ⚠ {naira(balanceDue)} will be logged as outstanding debt owed by{" "}
+                  {contact.contactName}.
+                </div>
+              )}
+            </div>
+
+            {/* Payment Method & Reference */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">Payment Method</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2 text-[#0F3D24]"
+                >
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cash">Cash Handover</option>
+                  <option value="POS / Card">POS Terminal</option>
+                  <option value="Cheque">Cheque</option>
+                </select>
+              </div>
+              <div>
+                <label className="block font-bold text-[#0F3D24] mb-1">
+                  Payment Reference / Receipt No
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. TRF-839218, OFFLOAD-14"
+                  value={referenceNo}
+                  onChange={(e) => setReferenceNo(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3.5 py-2 font-mono text-[#0F3D24]"
+                />
+              </div>
+            </div>
+
+            {/* Batch Sync Checkbox */}
+            {!editingTx && batchId && (
+              <label className="flex items-center gap-2 text-xs font-semibold text-[#0F3D24] bg-emerald-50/60 border border-emerald-200/60 p-3 rounded-xl cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={syncToFarmBatch}
+                  onChange={(e) => setSyncToFarmBatch(e.target.checked)}
+                  className="rounded accent-[#0F3D24]"
+                />
+                <span>
+                  Auto-sync this {isBuyer ? "sale" : "supply"} to{" "}
+                  <strong>Farm Batch Finances</strong> (
+                  {batches.find((b) => b.id === batchId)?.batchName})
+                </span>
+              </label>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full px-5 py-2.5 font-bold text-slate-600 hover:bg-slate-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-full bg-[#0F3D24] px-6 py-2.5 font-black text-white shadow-md hover:bg-[#165232] disabled:opacity-50"
+              >
+                {submitting
+                  ? "Saving Transaction..."
+                  : editingTx
+                    ? role && role !== "owner"
+                      ? "Save & Resubmit for Approval →"
+                      : "Save Changes"
+                    : "Save Transaction to Ledger →"}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+
+      <TypoReviewModal
+        open={showTypoCheck}
+        title="Check Contact Transaction for Typos"
+        subtitle="Verify quantities, prices, and batch before sending to the Farm Owner."
+        isSubmitting={submitting}
+        confirmLabel={
+          editingTx ? "Confirm & Resubmit for Approval" : "Confirm & Submit for Approval"
+        }
+        onBack={() => setShowTypoCheck(false)}
+        onConfirm={executeSave}
+        fields={[
+          { label: "Contact", value: contact.contactName },
+          { label: "Nature", value: transactionType.replace(/_/g, " ") },
+          { label: "Item / Description", value: itemDescription },
+          { label: "Batch", value: batches.find((b) => b.id === batchId)?.batchName || "General" },
+          { label: "Quantity", value: `${quantity} ${unit} × ${naira(unitPrice)}` },
+          { label: "Total Amount", value: naira(totalAmount), highlight: true },
+          { label: "Amount Paid", value: naira(amountPaid) },
+          { label: "Date", value: transactionDate },
+        ]}
+      />
+    </>
   );
 }
 
@@ -1629,7 +1835,7 @@ function EditSpecialContactModal({
   const [email, setEmail] = useState(contact.email || "");
   const [locationAddress, setLocationAddress] = useState(contact.locationAddress || "");
   const [preferredPaymentTerms, setPreferredPaymentTerms] = useState(
-    contact.preferredPaymentTerms || "Bank Transfer"
+    contact.preferredPaymentTerms || "Bank Transfer",
   );
   const [status, setStatus] = useState<SpecialContactStatus>(contact.status);
   const [notes, setNotes] = useState(contact.notes || "");
@@ -1852,13 +2058,13 @@ function WhatsAppStatementModal({
     ...recentTx.map(
       (t) =>
         `• ${t.transactionDate}: ${t.itemDescription} — ${naira(t.totalAmount)} (Paid: ${naira(
-          t.amountPaid
-        )})`
+          t.amountPaid,
+        )})`,
     ),
     ``,
     hasDebt
       ? `Kindly arrange payment of the outstanding balance (*${naira(
-          contact.balanceDue
+          contact.balanceDue,
         )}*) to our official account:`
       : `Thank you for your ongoing partnership with Dignity Agro Farms!`,
     hasDebt ? `🏦 *Bank:* Moniepoint / Zenith Bank` : ``,

@@ -8,10 +8,7 @@ import { assertBatchOpen } from "./farm.functions";
 export type SpecialContactType = "bulk_buyer" | "supplier" | "offloader" | "logistics" | "other";
 export type SpecialContactStatus = "active" | "inactive" | "blacklisted";
 export type TransactionType =
-  | "sale_to_contact"
-  | "payment_from_contact"
-  | "purchase_from_supplier"
-  | "payment_to_supplier";
+  "sale_to_contact" | "payment_from_contact" | "purchase_from_supplier" | "payment_to_supplier";
 export type PaymentStatus = "paid" | "partial" | "pending" | "overdue";
 
 export interface SpecialContact {
@@ -56,6 +53,8 @@ export interface ContactTransaction {
   referenceNo: string | null;
   notes: string | null;
   recordedBy: string | null;
+  approvalStatus?: "approved" | "pending_approval" | "pending" | "flagged" | "rejected";
+  rejectionReason?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,7 +72,9 @@ export interface SpecialContactsDashboardSummary {
 
 // ─── Guard Helper ─────────────────────────────────────────────────────────────
 
-async function checkOwnerOrManager(passcode: string): Promise<{ role: AdminRole; username: string }> {
+async function checkOwnerOrManager(
+  passcode: string,
+): Promise<{ role: AdminRole; username: string }> {
   const role = await checkPasscode(passcode);
   if (role === "staff") {
     throw new Error("Access denied: Staff members cannot access Special Contacts management.");
@@ -98,7 +99,10 @@ export const adminListSpecialContacts = createServerFn({ method: "POST" })
 
     if (contactsErr) {
       // Graceful fallback if migration not run yet
-      console.warn("special_contacts table query failed (table may not exist yet):", contactsErr.message);
+      console.warn(
+        "special_contacts table query failed (table may not exist yet):",
+        contactsErr.message,
+      );
       return {
         contacts: [] as SpecialContact[],
         summary: {
@@ -161,7 +165,7 @@ export const adminListSpecialContacts = createServerFn({ method: "POST" })
       for (const t of cTx) {
         const amt = Number(t.total_amount) || 0;
         const paid = Number(t.amount_paid) || 0;
-        const bal = Number(t.balance_due) || (amt - paid);
+        const bal = Number(t.balance_due) || amt - paid;
 
         totalAmount += amt;
         totalPaid += paid;
@@ -225,7 +229,7 @@ export const adminGetContactDetail = createServerFn({ method: "POST" })
     z.object({
       passcode: z.string(),
       contactId: z.string(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     await checkOwnerOrManager(data.passcode);
@@ -261,13 +265,27 @@ export const adminGetContactDetail = createServerFn({ method: "POST" })
     const transactions: ContactTransaction[] = (txRows || []).map((t: any) => {
       const amt = Number(t.total_amount) || 0;
       const paid = Number(t.amount_paid) || 0;
-      const bal = Number(t.balance_due) ?? (amt - paid);
+      const bal = t.balance_due != null ? Number(t.balance_due) : Math.max(0, amt - paid);
 
       if (!t.approval_status || t.approval_status === "approved") {
         totalAmount += amt;
         totalPaid += paid;
         balanceDue += bal;
       }
+
+      const rawFlagPrefix = "[FLAGGED FOR CORRECTION] ";
+      const rawStatus = t.approval_status || "approved";
+      const rawReason = t.rejection_reason ?? null;
+      const isFlagged =
+        rawStatus === "flagged" ||
+        ((rawStatus === "pending_approval" || rawStatus === "pending") &&
+          typeof rawReason === "string" &&
+          rawReason.startsWith(rawFlagPrefix));
+      const approvalStatus = isFlagged ? "flagged" : rawStatus;
+      const rejectionReason =
+        typeof rawReason === "string" && rawReason.startsWith(rawFlagPrefix)
+          ? rawReason.slice(rawFlagPrefix.length)
+          : rawReason;
 
       return {
         id: t.id,
@@ -288,6 +306,8 @@ export const adminGetContactDetail = createServerFn({ method: "POST" })
         referenceNo: t.reference_no,
         notes: t.notes,
         recordedBy: t.recorded_by,
+        approvalStatus,
+        rejectionReason,
         createdAt: t.created_at,
         updatedAt: t.updated_at,
       };
@@ -349,7 +369,7 @@ export const adminCreateSpecialContact = createServerFn({ method: "POST" })
         })
         .optional()
         .nullable(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     const auth = await checkOwnerOrManager(data.passcode);
@@ -388,8 +408,7 @@ export const adminCreateSpecialContact = createServerFn({ method: "POST" })
       const paid = Number(off.amountPaid) || 0;
       const bal = Math.max(0, amt - paid);
       const pStatus = paid >= amt ? "paid" : paid > 0 ? "partial" : "pending";
-      const txType =
-        data.contactType === "supplier" ? "purchase_from_supplier" : "sale_to_contact";
+      const txType = data.contactType === "supplier" ? "purchase_from_supplier" : "sale_to_contact";
       const approvalStatus = auth.role === "owner" ? "approved" : "pending_approval";
 
       const { error: initTxErr } = await supabaseAdmin.from("contact_transactions").insert({
@@ -408,6 +427,7 @@ export const adminCreateSpecialContact = createServerFn({ method: "POST" })
         payment_status: pStatus,
         approval_status: approvalStatus,
         recorded_by: auth.username,
+        sync_to_farm: false,
       } as any);
       if (initTxErr && /approval_status/i.test(initTxErr.message)) {
         await supabaseAdmin.from("contact_transactions").insert({
@@ -425,6 +445,7 @@ export const adminCreateSpecialContact = createServerFn({ method: "POST" })
           payment_method: off.paymentMethod || "Bank Transfer",
           payment_status: pStatus,
           recorded_by: auth.username,
+          sync_to_farm: false,
         });
       }
     }
@@ -450,7 +471,7 @@ export const adminUpdateSpecialContact = createServerFn({ method: "POST" })
       preferredPaymentTerms: z.string().optional().nullable(),
       status: z.enum(["active", "inactive", "blacklisted"]),
       notes: z.string().optional().nullable(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     await checkOwnerOrManager(data.passcode);
@@ -488,7 +509,7 @@ export const adminDeleteSpecialContact = createServerFn({ method: "POST" })
     z.object({
       passcode: z.string(),
       contactId: z.string(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     await checkOwnerOrManager(data.passcode);
@@ -531,7 +552,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
       referenceNo: z.string().optional().nullable(),
       notes: z.string().optional().nullable(),
       syncToFarmBatch: z.boolean().default(true),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     const auth = await checkOwnerOrManager(data.passcode);
@@ -542,8 +563,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
     const amt = Number(data.totalAmount) || 0;
     const paid = Number(data.amountPaid) || 0;
     const bal = Math.max(0, amt - paid);
-    const pStatus: PaymentStatus =
-      paid >= amt ? "paid" : paid > 0 ? "partial" : "pending";
+    const pStatus: PaymentStatus = paid >= amt ? "paid" : paid > 0 ? "partial" : "pending";
     const approvalStatus = auth.role === "owner" ? "approved" : "pending_approval";
 
     // Insert transaction
@@ -567,6 +587,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
         notes: data.notes?.trim() || null,
         approval_status: approvalStatus,
         recorded_by: auth.username,
+        sync_to_farm: Boolean(data.syncToFarmBatch),
       } as any)
       .select("*")
       .single();
@@ -591,6 +612,7 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
           reference_no: data.referenceNo?.trim() || null,
           notes: data.notes?.trim() || null,
           recorded_by: auth.username,
+          sync_to_farm: Boolean(data.syncToFarmBatch),
         })
         .select("*")
         .single();
@@ -600,51 +622,6 @@ export const adminRecordContactTransaction = createServerFn({ method: "POST" })
 
     if (txErr) {
       throw new Error(`Failed to record transaction: ${txErr.message}`);
-    }
-
-    // If syncToFarmBatch is requested and linked to a farm batch:
-    if (data.syncToFarmBatch && data.batchId) {
-      try {
-        const { data: cRow } = await supabaseAdmin
-          .from("special_contacts")
-          .select("contact_name")
-          .eq("id", data.contactId)
-          .single();
-
-        const contactName = cRow?.contact_name || "Special Contact";
-
-        if (data.transactionType === "sale_to_contact") {
-          // Record income under farm_financials
-          await supabaseAdmin.from("farm_financials").insert({
-            batch_id: data.batchId,
-            type: "income",
-            category: "Offload Bird Sales / Bulk Sale",
-            amount: paid > 0 ? paid : amt,
-            description: `Bulk Sale to ${contactName}: ${data.itemDescription}`,
-            payment_method: data.paymentMethod || "Bank Transfer",
-            transaction_date: data.transactionDate,
-            reference_no: data.referenceNo || `OFFLOAD-${data.contactId.slice(0, 5)}`,
-            approval_status: approvalStatus,
-            recorded_by: auth.username,
-          });
-        } else if (data.transactionType === "purchase_from_supplier") {
-          // Record expense under farm_financials
-          await supabaseAdmin.from("farm_financials").insert({
-            batch_id: data.batchId,
-            type: "expense",
-            category: "Feed / DOCs / Medication",
-            amount: paid > 0 ? paid : amt,
-            description: `Supply from ${contactName}: ${data.itemDescription}`,
-            payment_method: data.paymentMethod || "Bank Transfer",
-            transaction_date: data.transactionDate,
-            reference_no: data.referenceNo || `SUPPLY-${data.contactId.slice(0, 5)}`,
-            approval_status: approvalStatus,
-            recorded_by: auth.username,
-          });
-        }
-      } catch (syncErr) {
-        console.warn("Could not auto-sync transaction to farm_financials:", syncErr);
-      }
     }
 
     return { success: true, transaction: newTx };
@@ -657,7 +634,7 @@ export const adminDeleteContactTransaction = createServerFn({ method: "POST" })
     z.object({
       passcode: z.string(),
       transactionId: z.string(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     await checkOwnerOrManager(data.passcode);
@@ -671,6 +648,85 @@ export const adminDeleteContactTransaction = createServerFn({ method: "POST" })
     if (error) {
       throw new Error(`Failed to delete transaction: ${error.message}`);
     }
+
+    return { success: true };
+  });
+
+export const adminUpdateContactTransaction = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      passcode: z.string(),
+      transactionId: z.string(),
+      batchId: z.string().uuid().optional().nullable(),
+      transactionDate: z.string(),
+      itemDescription: z.string().min(2),
+      quantity: z.number().default(1),
+      unit: z.string().default("birds"),
+      unitPrice: z.number().default(0),
+      totalAmount: z.number().min(0),
+      amountPaid: z.number().min(0),
+      paymentMethod: z.string().default("Bank Transfer"),
+      referenceNo: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const auth = await checkOwnerOrManager(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: prev, error: prevErr } = await supabaseAdmin
+      .from("contact_transactions")
+      .select("batch_id, recorded_by, approval_status")
+      .eq("id", data.transactionId)
+      .maybeSingle();
+
+    if (prevErr || !prev) throw new Error("Contact transaction not found.");
+    if (auth.role !== "owner") {
+      if ((prev as any).recorded_by?.trim().toLowerCase() !== auth.username.trim().toLowerCase()) {
+        throw new Error("You can only edit contact transactions that you recorded.");
+      }
+      if (((prev as any).approval_status ?? "approved") === "approved") {
+        throw new Error(
+          "Approved contact transactions are locked and can only be edited by the Farm Owner.",
+        );
+      }
+    }
+
+    if (data.batchId && (prev as any).batch_id !== data.batchId) {
+      await assertBatchOpen(supabaseAdmin, data.batchId);
+    }
+
+    const amt = Number(data.totalAmount) || 0;
+    const paid = Number(data.amountPaid) || 0;
+    const bal = Math.max(0, amt - paid);
+    const pStatus: PaymentStatus = paid >= amt ? "paid" : paid > 0 ? "partial" : "pending";
+
+    const updatePayload: Record<string, any> = {
+      batch_id: data.batchId ?? (prev as any).batch_id ?? null,
+      transaction_date: data.transactionDate,
+      item_description: data.itemDescription.trim(),
+      quantity: data.quantity || 1,
+      unit: data.unit || "birds",
+      unit_price: data.unitPrice || 0,
+      total_amount: amt,
+      amount_paid: paid,
+      balance_due: bal,
+      payment_method: data.paymentMethod || "Bank Transfer",
+      payment_status: pStatus,
+      reference_no: data.referenceNo?.trim() || null,
+      notes: data.notes?.trim() || null,
+    };
+
+    if (auth.role !== "owner") {
+      updatePayload.approval_status = "pending_approval";
+      updatePayload.rejection_reason = null;
+    }
+
+    const { error } = await (supabaseAdmin as any)
+      .from("contact_transactions")
+      .update(updatePayload)
+      .eq("id", data.transactionId);
+    if (error) throw new Error(`Failed to update transaction: ${error.message}`);
 
     return { success: true };
   });

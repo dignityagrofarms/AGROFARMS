@@ -8,3 +8,5 @@ Website for Dignity Agro Farms Limited — a poultry farming business based in O
 npm install
 npm run dev
 ```
+
+Current architecture, release behavior, validation, and migration notes: [RELEASE_NOTES.md](RELEASE_NOTES.md).

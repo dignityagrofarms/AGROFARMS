@@ -1,7 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { X, CheckCircle2, AlertTriangle, Loader2, Droplets, Wheat, Thermometer, Pill, HeartPulse } from "lucide-react";
+import {
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  Loader2,
+  Droplets,
+  Wheat,
+  Thermometer,
+  Pill,
+  HeartPulse,
+  Flag,
+  XCircle,
+} from "lucide-react";
 import {
   adminGetDailyLogDates,
   adminCreateDailyLog,
@@ -12,8 +24,9 @@ import {
 } from "@/lib/farm.functions";
 import type { AdminRole } from "@/lib/orders.functions";
 import { NumberField } from "@/components/ui/number-field";
+import { TypoReviewModal } from "./TypoReviewModal";
 
-const todayStr = () => new Date().toISOString().split("T")[0];
+const todayStr = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
 
 const FEED_BRAND_CHIPS = ["New Hope", "Top Feeds", "Vital Feed", "Hybrid", "Own Mix"];
 
@@ -78,15 +91,19 @@ const lastNDays = (n: number) => {
 export function DailyLogModal({
   passcode,
   role,
+  username,
   batches,
   defaultBatchId,
+  initialDate,
   onClose,
   onSaved,
 }: {
   passcode: string;
   role: AdminRole;
+  username?: string;
   batches: FarmBatch[];
   defaultBatchId?: string | null;
+  initialDate?: string | null;
   onClose: () => void;
   onSaved: (message: string) => void;
 }) {
@@ -99,11 +116,14 @@ export function DailyLogModal({
   const activeBatches = batches.filter((b) => b.status === "active");
   const selectable = activeBatches;
   const initialBatch =
-    defaultBatchId && selectable.some((b) => b.id === defaultBatchId) ? defaultBatchId : selectable[0]?.id || "";
+    defaultBatchId && selectable.some((b) => b.id === defaultBatchId)
+      ? defaultBatchId
+      : selectable[0]?.id || "";
   const [batchId, setBatchId] = useState<string>(initialBatch);
-  const [date, setDate] = useState<string>(todayStr());
+  const [date, setDate] = useState<string>(initialDate || todayStr());
   const [form, setForm] = useState<FormState>(emptyForm());
   const [error, setError] = useState<string | null>(null);
+  const [showTypoCheck, setShowTypoCheck] = useState(false);
 
   const batch = batches.find((b) => b.id === batchId);
   const isLayer = /layer|egg/i.test(batch?.batchType || "");
@@ -135,10 +155,10 @@ export function DailyLogModal({
     [logs, date],
   );
   const prevBagsUsed = prevLogWithBag
-    ? prevLogWithBag.feedBagsUsed ??
+    ? (prevLogWithBag.feedBagsUsed ??
       (prevLogWithBag.feedBagStatus === "finished"
         ? prevLogWithBag.feedBagNo || 0
-        : Math.max(0, (prevLogWithBag.feedBagNo || 1) - 1))
+        : Math.max(0, (prevLogWithBag.feedBagNo || 1) - 1)))
     : 0;
   const suggestedNextBagNo = prevLogWithBag
     ? prevLogWithBag.feedBagStatus === "finished"
@@ -169,7 +189,8 @@ export function DailyLogModal({
     setForm((f) => ({ ...f, [key]: value }));
 
   const applyBagSequence = (nextBagNoRaw: string, nextStatus: "opened" | "finished" | "") => {
-    const bagNum = nextBagNoRaw.trim() === "" ? 0 : Math.max(1, Math.round(Number(nextBagNoRaw) || 0));
+    const bagNum =
+      nextBagNoRaw.trim() === "" ? 0 : Math.max(1, Math.round(Number(nextBagNoRaw) || 0));
     const kgPerBag = feedLedger?.defaultKgPerBag || 25;
     let nextKg = form.feedConsumedKg;
     if (bagNum >= 1 && (nextStatus === "opened" || nextStatus === "finished")) {
@@ -191,9 +212,18 @@ export function DailyLogModal({
       const sick = Number(form.sickCount || 0);
       if (!batchId) throw new Error("Please select a batch.");
       if (dead < 0 || sick < 0) throw new Error("Counts cannot be negative.");
-      const bagNo = form.feedGiven && form.feedBagNo.trim() !== "" ? Math.max(1, Math.round(Number(form.feedBagNo))) : null;
-      const bagStatus = bagNo && (form.feedBagStatus === "opened" || form.feedBagStatus === "finished") ? form.feedBagStatus : bagNo ? "opened" : null;
-      const bagsUsed = bagNo && bagStatus ? (bagStatus === "finished" ? bagNo : Math.max(0, bagNo - 1)) : null;
+      const bagNo =
+        form.feedGiven && form.feedBagNo.trim() !== ""
+          ? Math.max(1, Math.round(Number(form.feedBagNo)))
+          : null;
+      const bagStatus =
+        bagNo && (form.feedBagStatus === "opened" || form.feedBagStatus === "finished")
+          ? form.feedBagStatus
+          : bagNo
+            ? "opened"
+            : null;
+      const bagsUsed =
+        bagNo && bagStatus ? (bagStatus === "finished" ? bagNo : Math.max(0, bagNo - 1)) : null;
 
       const payload = {
         passcode,
@@ -214,9 +244,11 @@ export function DailyLogModal({
         eggsCollected: Number(form.eggsCollected || 0),
         notes: form.notes || null,
       };
-      if (existing && isOwner) {
-        await updateFn({ data: { ...payload, id: existing.id } });
-        return "Daily report updated.";
+      if (existing) {
+        const res = await updateFn({ data: { ...payload, id: existing.id } });
+        return res.approvalStatus === "pending_approval"
+          ? "Daily report updated and resubmitted for Owner approval."
+          : "Daily report updated.";
       }
       const res = await createFn({ data: payload });
       return res.approvalStatus === "pending_approval"
@@ -224,17 +256,31 @@ export function DailyLogModal({
         : "Daily report saved successfully.";
     },
     onSuccess: (message) => {
+      setShowTypoCheck(false);
       qc.invalidateQueries({ queryKey: ["farm-activities"] });
       qc.invalidateQueries({ queryKey: ["farm-batches"] });
       qc.invalidateQueries({ queryKey: ["batch-report"] });
       qc.invalidateQueries({ queryKey: ["daily-logs"] });
       qc.invalidateQueries({ queryKey: ["batch-feed-ledger"] });
+      qc.invalidateQueries({ queryKey: ["my-submissions"] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals"] });
+      qc.invalidateQueries({ queryKey: ["pending-approvals-count"] });
       onSaved(message);
     },
-    onError: (e: Error) => setError(e.message),
+    onError: (e: Error) => {
+      setShowTypoCheck(false);
+      setError(e.message);
+    },
   });
 
-  const locked = Boolean(existing) && !isOwner;
+  const canEditExisting =
+    !existing ||
+    isOwner ||
+    ((existing.approvalStatus ?? "approved") !== "approved" &&
+      (!username ||
+        !existing.recordedBy ||
+        existing.recordedBy.toLowerCase() === username.toLowerCase()));
+  const locked = Boolean(existing) && !canEditExisting;
   const dead = Number(form.mortalityCount || 0);
 
   const inputCls =
@@ -246,7 +292,9 @@ export function DailyLogModal({
         <div className="flex items-center justify-between border-b pb-3">
           <div>
             <h3 className="text-lg font-bold text-[#0F3D24]">Daily Report</h3>
-            <p className="text-xs text-[#0F3D24]/60">Fill everything for the day, then save once.</p>
+            <p className="text-xs text-[#0F3D24]/60">
+              Fill everything for the day, then save once.
+            </p>
           </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={20} />
@@ -256,7 +304,11 @@ export function DailyLogModal({
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block text-xs font-bold text-[#0F3D24]">Batch *</label>
-            <select value={batchId} onChange={(e) => setBatchId(e.target.value)} className={inputCls}>
+            <select
+              value={batchId}
+              onChange={(e) => setBatchId(e.target.value)}
+              className={inputCls}
+            >
               {selectable.length === 0 && <option value="">No batches available</option>}
               {selectable.map((b) => (
                 <option key={b.id} value={b.id}>
@@ -309,20 +361,43 @@ export function DailyLogModal({
         {existing && (
           <div
             className={`mt-3 flex items-start gap-2 rounded-xl p-3 text-xs ${
-              existing.approvalStatus === "pending_approval"
-                ? "bg-amber-50 text-amber-900"
-                : "bg-emerald-50 text-emerald-900"
+              existing.approvalStatus === "flagged"
+                ? "bg-orange-50 text-orange-950 border border-orange-200"
+                : existing.approvalStatus === "rejected"
+                  ? "bg-rose-50 text-rose-900 border border-rose-200"
+                  : existing.approvalStatus === "pending_approval"
+                    ? "bg-amber-50 text-amber-900"
+                    : "bg-emerald-50 text-emerald-900"
             }`}
           >
-            <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            <span>
-              A report for this day already exists
-              {existing.approvalStatus === "pending_approval" ? " (awaiting owner approval)" : ""}
-              {existing.recordedBy ? ` — logged by ${existing.recordedBy}` : ""}.{" "}
-              {isOwner
-                ? "You can edit and update it below."
-                : "Ask the Farm Owner if it needs changes."}
-            </span>
+            {existing.approvalStatus === "flagged" ? (
+              <Flag size={14} className="mt-0.5 shrink-0 text-orange-600" />
+            ) : existing.approvalStatus === "rejected" ? (
+              <XCircle size={14} className="mt-0.5 shrink-0 text-rose-600" />
+            ) : (
+              <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+            )}
+            <div>
+              <span>
+                {existing.approvalStatus === "flagged"
+                  ? "Flagged by Owner for correction"
+                  : existing.approvalStatus === "rejected"
+                    ? "Rejected by Owner"
+                    : "A report for this day already exists"}
+                {existing.approvalStatus === "pending_approval" ? " (awaiting owner approval)" : ""}
+                {existing.recordedBy ? ` — logged by ${existing.recordedBy}` : ""}.{" "}
+                {canEditExisting
+                  ? "You can edit and resubmit it below."
+                  : "This approved log is locked; ask the Farm Owner if changes are needed."}
+              </span>
+              {(existing.approvalStatus === "flagged" || existing.approvalStatus === "rejected") &&
+                existing.rejectionReason && (
+                  <div className="mt-1 font-bold">
+                    {existing.approvalStatus === "flagged" ? "Owner Flag Note: " : "Reason: "}
+                    {existing.rejectionReason}
+                  </div>
+                )}
+            </div>
           </div>
         )}
 
@@ -344,7 +419,9 @@ export function DailyLogModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-bold text-rose-900">Dead birds (mortality)</label>
+                <label className="block text-xs font-bold text-rose-900">
+                  Dead birds (mortality)
+                </label>
                 <NumberField
                   min={0}
                   placeholder="Nil"
@@ -404,7 +481,8 @@ export function DailyLogModal({
                     <div className="flex flex-wrap items-center gap-1.5">
                       {feedLedger && feedLedger.bagsBought > 0 && (
                         <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
-                          {feedLedger.bagsBought} bought · {feedLedger.bagsInStock} left ({feedLedger.defaultKgPerBag}kg/bag)
+                          {feedLedger.bagsBought} bought · {feedLedger.bagsInStock} left (
+                          {feedLedger.defaultKgPerBag}kg/bag)
                         </span>
                       )}
                       {prevLogWithBag && (
@@ -447,15 +525,14 @@ export function DailyLogModal({
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-bold text-amber-900 mb-1">Bag Status</label>
+                      <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                        Bag Status
+                      </label>
                       <div className="grid grid-cols-2 gap-1.5">
                         <button
                           type="button"
                           onClick={() =>
-                            applyBagSequence(
-                              form.feedBagNo || String(suggestedNextBagNo),
-                              "opened",
-                            )
+                            applyBagSequence(form.feedBagNo || String(suggestedNextBagNo), "opened")
                           }
                           className={`rounded-xl py-2 text-xs font-bold border transition ${
                             form.feedBagStatus === "opened"
@@ -489,13 +566,15 @@ export function DailyLogModal({
                     feedLedger.bagsBought > 0 &&
                     Number(form.feedBagNo || 0) > feedLedger.bagsBought && (
                       <p className="text-[11px] font-semibold text-rose-700 bg-rose-50 rounded-lg px-2.5 py-1.5 border border-rose-200">
-                        Heads up: Bag #{form.feedBagNo} exceeds the {feedLedger.bagsBought} purchased bags logged under Expenses for this batch.
+                        Heads up: Bag #{form.feedBagNo} exceeds the {feedLedger.bagsBought}{" "}
+                        purchased bags logged under Expenses for this batch.
                       </p>
                     )}
 
                   {hasNewerBagLogs && (
                     <p className="text-[11px] text-amber-800 bg-amber-50 rounded-lg px-2.5 py-1.5 border border-amber-200">
-                      Note: Later dates already have Bag # logs recorded. Updating this earlier date will not overwrite newer entries.
+                      Note: Later dates already have Bag # logs recorded. Updating this earlier date
+                      will not overwrite newer entries.
                     </p>
                   )}
                 </div>
@@ -503,7 +582,10 @@ export function DailyLogModal({
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold text-amber-900">
-                      Quantity (kg) {form.feedBagNo && form.feedBagStatus ? "· Auto-calculated (editable)" : "– optional"}
+                      Quantity (kg){" "}
+                      {form.feedBagNo && form.feedBagStatus
+                        ? "· Auto-calculated (editable)"
+                        : "– optional"}
                     </label>
                     <NumberField
                       allowDecimal
@@ -515,7 +597,9 @@ export function DailyLogModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-amber-900">Feed brand / type</label>
+                    <label className="block text-xs font-bold text-amber-900">
+                      Feed brand / type
+                    </label>
                     <input
                       type="text"
                       placeholder="e.g. New Hope"
@@ -571,7 +655,9 @@ export function DailyLogModal({
 
           {isLayer && (
             <div>
-              <label className="block text-xs font-bold text-[#0F3D24]">Eggs collected (pieces)</label>
+              <label className="block text-xs font-bold text-[#0F3D24]">
+                Eggs collected (pieces)
+              </label>
               <NumberField
                 min={0}
                 value={form.eggsCollected}
@@ -610,14 +696,66 @@ export function DailyLogModal({
           <button
             type="button"
             disabled={saveMut.isPending || locked || !batchId}
-            onClick={() => saveMut.mutate()}
+            onClick={() => {
+              setError(null);
+              if (isOwner) {
+                saveMut.mutate();
+              } else {
+                setShowTypoCheck(true);
+              }
+            }}
             className="inline-flex items-center gap-2 rounded-full bg-[#0F3D24] px-6 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
           >
             {saveMut.isPending && <Loader2 size={14} className="animate-spin" />}
-            {existing && isOwner ? "Update Daily Report" : "Save Daily Report"}
+            {existing
+              ? isOwner
+                ? "Update Daily Report"
+                : "Review & Resubmit Report"
+              : isOwner
+                ? "Save Daily Report"
+                : "Review & Submit Report"}
           </button>
         </div>
       </div>
+
+      <TypoReviewModal
+        open={showTypoCheck}
+        title={existing ? "Check Updated Daily Report for Typos" : "Review Daily Report for Typos"}
+        subtitle="Check counts, feed bags/kg, batch, and notes carefully before sending to the Farm Owner for approval."
+        confirmLabel={existing ? "No Typos — Resubmit Report" : "No Typos — Submit Report"}
+        isSubmitting={saveMut.isPending}
+        onBack={() => setShowTypoCheck(false)}
+        onConfirm={() => saveMut.mutate()}
+        fields={[
+          { label: "Batch", value: batch ? `${batch.batchName} (${batch.batchType})` : batchId },
+          { label: "Report Date", value: date },
+          {
+            label: "Sick Birds",
+            value: form.sickCount || "0",
+            highlight: Number(form.sickCount || 0) > 0,
+          },
+          {
+            label: "Mortality",
+            value: form.mortalityCount || "0",
+            highlight: Number(form.mortalityCount || 0) > 0,
+          },
+          ...(form.causeOfMortality ? [{ label: "Cause", value: form.causeOfMortality }] : []),
+          {
+            label: "Feed",
+            value: form.feedGiven
+              ? `${form.feedBrand || "Given"}${form.feedBagNo ? ` · Bag #${form.feedBagNo} (${form.feedBagStatus || "opened"})` : ""}${form.feedConsumedKg ? ` · ${form.feedConsumedKg} kg` : ""}`
+              : "Not given",
+            highlight: Boolean(form.feedConsumedKg),
+          },
+          { label: "Water", value: form.waterGiven ? "Given" : "Not given" },
+          ...(form.temperature ? [{ label: "Temperature", value: form.temperature }] : []),
+          ...(form.medicationGiven ? [{ label: "Medication", value: form.medicationGiven }] : []),
+          ...(isLayer && form.eggsCollected
+            ? [{ label: "Eggs Collected", value: form.eggsCollected, highlight: true }]
+            : []),
+          ...(form.notes ? [{ label: "Notes", value: form.notes }] : []),
+        ]}
+      />
     </div>
   );
 }

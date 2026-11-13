@@ -69,8 +69,9 @@ import {
   type PartnerActivity,
   type PartnerDashboardSummary,
 } from "@/lib/partners.functions";
-import { buildChartData } from "@/lib/partner-settlement";
-import { adminListBatches } from "@/lib/farm.functions";
+import { buildChartData, computeSettlement } from "@/lib/partner-settlement";
+import { adminGetBatchReport, adminListBatches } from "@/lib/farm.functions";
+import { BatchMultiInvestorModal } from "@/components/admin/BatchMultiInvestorModal";
 import type { AdminRole } from "@/lib/orders.functions";
 import { NumberField } from "@/components/ui/number-field";
 import { PartnerCharts } from "@/components/partners/PartnerCharts";
@@ -112,6 +113,7 @@ export function PartnersManagementPanel({
   const qc = useQueryClient();
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingPartner, setEditingPartner] = useState<FarmPartner | null>(null);
   const [createdPartnerInfo, setCreatedPartnerInfo] = useState<{
@@ -241,7 +243,9 @@ export function PartnersManagementPanel({
             {selectedPartner && (
               <>
                 <span className="text-white/40 font-light">/</span>
-                <span className="text-white font-extrabold text-xl sm:text-2xl">{selectedPartner.fullName}</span>
+                <span className="text-white font-extrabold text-xl sm:text-2xl">
+                  {selectedPartner.fullName}
+                </span>
               </>
             )}
           </h2>
@@ -290,13 +294,20 @@ export function PartnersManagementPanel({
               <span>{isHiddenFromManager ? "Hidden from Manager" : "Hide from Manager"}</span>
               <span
                 className={`ml-1 rounded px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
-                  isHiddenFromManager
-                    ? "bg-[#0F3D24] text-amber-300"
-                    : "bg-white/20 text-white"
+                  isHiddenFromManager ? "bg-[#0F3D24] text-amber-300" : "bg-white/20 text-white"
                 }`}
               >
                 {isHiddenFromManager ? "Locked" : "Visible"}
               </span>
+            </button>
+          )}
+          {effectiveRole === "owner" && (
+            <button
+              type="button"
+              onClick={() => setShowBatchSplitModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white/15 border border-white/25 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-white hover:text-[#0F3D24]"
+            >
+              <Layers size={15} /> Batch Profit/Loss Split
             </button>
           )}
           {effectiveRole === "owner" && (
@@ -331,7 +342,9 @@ export function PartnersManagementPanel({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-black text-[#0F3D24]">Registered Partners Directory</h3>
+                <h3 className="text-base font-black text-[#0F3D24]">
+                  Registered Partners Directory
+                </h3>
                 {partnersQuery.isFetching && partnersQuery.data && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                     <RefreshCw size={9} className="animate-spin text-emerald-600" /> Updating...
@@ -339,7 +352,8 @@ export function PartnersManagementPanel({
                 )}
               </div>
               <p className="text-xs text-slate-500">
-                Select a partner to inspect unit economics, approve logs, sync batch records, or manage cycles.
+                Select a partner to inspect unit economics, approve logs, sync batch records, or
+                manage cycles.
               </p>
             </div>
             <div className="w-full sm:w-72">
@@ -362,7 +376,8 @@ export function PartnersManagementPanel({
                 <div>
                   <span className="font-extrabold text-amber-900">Confidential Mode Active:</span>{" "}
                   <span className="text-amber-800">
-                    The &ldquo;For Partners&rdquo; dashboard, navigation tab, and all investor information are completely hidden and blocked from the Farm Manager.
+                    The &ldquo;For Partners&rdquo; dashboard, navigation tab, and all investor
+                    information are completely hidden and blocked from the Farm Manager.
                   </span>
                 </div>
               </div>
@@ -583,6 +598,20 @@ export function PartnersManagementPanel({
             setIsAddModalOpen(false);
             qc.invalidateQueries({ queryKey: ["admin-partners"] });
             if (info) setCreatedPartnerInfo(info);
+          }}
+        />
+      )}
+
+      {/* Batch Profit/Loss Multi-Investor Split Modal */}
+      {showBatchSplitModal && effectiveRole === "owner" && (
+        <BatchMultiInvestorModal
+          passcode={passcode}
+          batches={batches}
+          partners={partners}
+          onClose={() => setShowBatchSplitModal(false)}
+          onUpdated={() => {
+            qc.invalidateQueries({ queryKey: ["admin-partners"] });
+            qc.invalidateQueries({ queryKey: ["admin-partner-detail"] });
           }}
         />
       )}
@@ -882,7 +911,10 @@ function PartnerDetailView({
               >
                 <FileDown size={13} />
                 Export Statement
-                <ChevronDown size={11} className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`} />
+                <ChevronDown
+                  size={11}
+                  className={`transition-transform ${showExportMenu ? "rotate-180" : ""}`}
+                />
               </button>
 
               {showExportMenu && (
@@ -904,7 +936,9 @@ function PartnerDetailView({
                     <Download size={13} className="text-emerald-700" />
                     <div>
                       <span className="block font-bold">PDF Statement</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Official signed & stamped</span>
+                      <span className="text-[10px] text-slate-500 font-normal">
+                        Official signed & stamped
+                      </span>
                     </div>
                   </button>
 
@@ -922,7 +956,9 @@ function PartnerDetailView({
                     <Download size={13} className="text-blue-700" />
                     <div>
                       <span className="block font-bold">CSV / Excel Ledger</span>
-                      <span className="text-[10px] text-slate-500 font-normal">Itemized transactions</span>
+                      <span className="text-[10px] text-slate-500 font-normal">
+                        Itemized transactions
+                      </span>
                     </div>
                   </button>
                 </div>
@@ -983,7 +1019,8 @@ function PartnerDetailView({
         {isViewingArchive && (
           <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-[#FAF9F6] px-4 py-2.5 text-xs">
             <span className="font-semibold text-slate-700">
-              Viewing Historical Archive: <strong className="text-[#0F3D24]">{partner.cycleName}</strong> (Settled{" "}
+              Viewing Historical Archive:{" "}
+              <strong className="text-[#0F3D24]">{partner.cycleName}</strong> (Settled{" "}
               {partner.settledAt ? new Date(partner.settledAt).toLocaleDateString("en-GB") : ""})
             </span>
             <button
@@ -1010,7 +1047,9 @@ function PartnerDetailView({
                   className="rounded-md bg-[#0F3D24]/10 border border-[#0F3D24]/20 px-2.5 py-0.5 text-[10px] font-extrabold text-[#0F3D24] tabular-nums"
                   title="Agreed initial investment divided by initial stocked bird count"
                 >
-                  Agreed Placement: {naira(Math.round(partner.initialInvestment / summary.initialStockCount))} / bird ({summary.initialStockCount.toLocaleString()} birds)
+                  Agreed Placement:{" "}
+                  {naira(Math.round(partner.initialInvestment / summary.initialStockCount))} / bird
+                  ({summary.initialStockCount.toLocaleString()} birds)
                 </span>
               )}
               {partner.batchName && (
@@ -1021,16 +1060,20 @@ function PartnerDetailView({
             </div>
             <h2 className="text-2xl font-black text-[#0F3D24]">{partner.fullName}</h2>
             <p className="text-xs text-slate-600">
-              Username: <strong className="font-mono text-[#0F3D24]">@{partner.username}</strong> · Phone:{" "}
-              {partner.phone}
+              Username: <strong className="font-mono text-[#0F3D24]">@{partner.username}</strong> ·
+              Phone: {partner.phone}
               {partner.email && ` · Email: ${partner.email}`}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 tabular-nums">
             <div className="rounded-xl bg-[#FAF9F6] px-4 py-2.5 border border-slate-200 text-right">
-              <div className="text-[10px] font-bold uppercase text-slate-500">Committed Capital</div>
-              <div className="text-lg font-black text-[#0F3D24]">{naira(partner.initialInvestment)}</div>
+              <div className="text-[10px] font-bold uppercase text-slate-500">
+                Committed Capital
+              </div>
+              <div className="text-lg font-black text-[#0F3D24]">
+                {naira(partner.initialInvestment)}
+              </div>
             </div>
             <div
               className={`rounded-xl px-4 py-2.5 border text-right ${
@@ -1406,7 +1449,9 @@ function PartnerFinancialsSubPanel({
 
         <form onSubmit={handleSubmit} className="space-y-3 text-xs">
           {/* Expense / Income / Payout Toggle */}
-          <div className={`grid ${viewerRole === "owner" ? "grid-cols-3" : "grid-cols-2"} gap-1.5 rounded-xl bg-[#FAF9F6] border border-slate-200 p-1`}>
+          <div
+            className={`grid ${viewerRole === "owner" ? "grid-cols-3" : "grid-cols-2"} gap-1.5 rounded-xl bg-[#FAF9F6] border border-slate-200 p-1`}
+          >
             <button
               type="button"
               disabled={isClosed}
@@ -1460,7 +1505,9 @@ function PartnerFinancialsSubPanel({
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-1.5">
               <div className="flex items-center justify-between text-[11px] tabular-nums">
                 <span className="font-semibold text-amber-900">Balance currently owed:</span>
-                <strong className="font-black text-amber-950">{naira(Math.max(0, s.balanceOwed))}</strong>
+                <strong className="font-black text-amber-950">
+                  {naira(Math.max(0, s.balanceOwed))}
+                </strong>
               </div>
               {s.balanceOwed > 0 && (
                 <button
@@ -1568,7 +1615,9 @@ function PartnerFinancialsSubPanel({
           </div>
 
           <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Reference / Invoice No. (Optional)</label>
+            <label className="block font-bold text-[#0F3D24] mb-1">
+              Reference / Invoice No. (Optional)
+            </label>
             <input
               type="text"
               placeholder="e.g. INV-9823412"
@@ -1640,7 +1689,8 @@ function PartnerFinancialsSubPanel({
           <div>
             <h3 className="text-base font-black text-[#0F3D24]">Itemized Investment Ledger</h3>
             <p className="text-xs text-slate-500">
-              Line-by-line expenses, sales, receipts, and payouts. Removed entries retain audit reasons.
+              Line-by-line expenses, sales, receipts, and payouts. Removed entries retain audit
+              reasons.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 tabular-nums">
@@ -1713,11 +1763,15 @@ function PartnerFinancialsSubPanel({
                           )}
                         </div>
                       </td>
-                      <td className={`py-2.5 font-bold text-[#0F3D24] ${removed ? "line-through" : ""}`}>
+                      <td
+                        className={`py-2.5 font-bold text-[#0F3D24] ${removed ? "line-through" : ""}`}
+                      >
                         {row.category}
                       </td>
                       <td className="py-2.5 text-slate-700 max-w-xs space-y-1">
-                        <span className={`block ${removed ? "line-through" : ""}`}>{row.description}</span>
+                        <span className={`block ${removed ? "line-through" : ""}`}>
+                          {row.description}
+                        </span>
                         {row.receiptUrl && (
                           <button
                             type="button"
@@ -1960,7 +2014,9 @@ function PartnerActivitiesSubPanel({
 
           {activityType === "Feeding" && (
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Feed Consumed Today (Kg)</label>
+              <label className="block font-bold text-[#0F3D24] mb-1">
+                Feed Consumed Today (Kg)
+              </label>
               <NumberField
                 allowDecimal
                 min={0}
@@ -1997,7 +2053,9 @@ function PartnerActivitiesSubPanel({
 
           {activityType === "Weight Check" && (
             <div>
-              <label className="block font-bold text-[#0F3D24] mb-1">Average Bird Weight (Kg)</label>
+              <label className="block font-bold text-[#0F3D24] mb-1">
+                Average Bird Weight (Kg)
+              </label>
               <NumberField
                 allowDecimal
                 min={0}
@@ -2010,7 +2068,9 @@ function PartnerActivitiesSubPanel({
           )}
 
           <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">Notes / Observation Details</label>
+            <label className="block font-bold text-[#0F3D24] mb-1">
+              Notes / Observation Details
+            </label>
             <textarea
               rows={3}
               placeholder="e.g. Birds are active, clean water administered, healthy feeding behavior..."
@@ -2136,7 +2196,9 @@ function PartnerActivitiesSubPanel({
                       )}
                     </div>
                     {act.notes && (
-                      <p className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}>
+                      <p
+                        className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}
+                      >
                         {act.notes}
                       </p>
                     )}
@@ -2224,7 +2286,9 @@ function PartnerCredentialsSubPanel({
   const [address, setAddress] = useState(partner.address || "");
   const [projectName, setProjectName] = useState(partner.projectName);
   const [cycleName, setCycleName] = useState(partner.cycleName);
-  const [cycleStartDate, setCycleStartDate] = useState(partner.cycleStartDate || partner.investmentDate);
+  const [cycleStartDate, setCycleStartDate] = useState(
+    partner.cycleStartDate || partner.investmentDate,
+  );
   const [cycleEndDate, setCycleEndDate] = useState(partner.cycleEndDate || "");
   const [initialInvestment, setInitialInvestment] = useState(String(partner.initialInvestment));
   const [investmentDate, setInvestmentDate] = useState(partner.investmentDate);
@@ -2232,6 +2296,10 @@ function PartnerCredentialsSubPanel({
   const [lossShare, setLossShare] = useState(String(partner.lossSharePercentage));
   const [agreedTerms, setAgreedTerms] = useState(partner.agreedTerms || "");
   const [batchId, setBatchId] = useState(partner.batchId || "");
+  const [batchAllocationPercentage, setBatchAllocationPercentage] = useState(
+    String(partner.batchAllocationPercentage ?? 100),
+  );
+  const [autoSyncBatch, setAutoSyncBatch] = useState(partner.autoSyncBatch !== false);
   const [status, setStatus] = useState<FarmPartner["status"]>(partner.status);
   const [amendReason, setAmendReason] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -2242,7 +2310,8 @@ function PartnerCredentialsSubPanel({
   const [resetting, setResetting] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const portalUrl = typeof window !== "undefined" ? `${window.location.origin}/for-partners` : "/for-partners";
+  const portalUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/for-partners` : "/for-partners";
 
   const termsChanged =
     Number(profitShare) !== partner.profitSharePercentage ||
@@ -2271,6 +2340,11 @@ function PartnerCredentialsSubPanel({
           cycleStartDate,
           cycleEndDate: cycleEndDate || null,
           batchId: batchId || null,
+          batchAllocationPercentage: Math.min(
+            100,
+            Math.max(1, Number(batchAllocationPercentage) || 100),
+          ),
+          autoSyncBatch,
           status,
           amendReason: amendReason.trim() || null,
         },
@@ -2394,7 +2468,9 @@ function PartnerCredentialsSubPanel({
             />
           </div>
           <div>
-            <label className="block font-bold text-emerald-800 mb-1">Partner Profit Share (%)</label>
+            <label className="block font-bold text-emerald-800 mb-1">
+              Partner Profit Share (%)
+            </label>
             <NumberField
               allowDecimal
               required
@@ -2464,6 +2540,30 @@ function PartnerCredentialsSubPanel({
                 </option>
               ))}
             </select>
+            {batchId && (
+              <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl bg-[#F7F5F0] px-3 py-2 text-[11px]">
+                <label className="flex items-center gap-1.5 font-semibold text-[#0F3D24] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoSyncBatch}
+                    onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-[#0F3D24]"
+                  />
+                  Auto-sync batch P&amp;L
+                </label>
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-600 font-semibold">Pool %:</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={batchAllocationPercentage}
+                    onChange={(e) => setBatchAllocationPercentage(e.target.value)}
+                    className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -2496,7 +2596,9 @@ function PartnerCredentialsSubPanel({
         {editMsg && (
           <div
             className={`rounded-xl p-2.5 text-xs font-semibold ${
-              editMsg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+              editMsg.includes("successfully")
+                ? "bg-emerald-50 text-emerald-800"
+                : "bg-rose-50 text-rose-800"
             }`}
           >
             {editMsg}
@@ -2521,7 +2623,8 @@ function PartnerCredentialsSubPanel({
             </span>
             <h3 className="text-base font-black text-[#0F3D24]">Portal Access Info</h3>
             <p className="text-xs text-slate-500">
-              Share these login credentials with {partner.fullName} so they can access their Partners Account.
+              Share these login credentials with {partner.fullName} so they can access their
+              Partners Account.
             </p>
           </div>
 
@@ -2536,7 +2639,9 @@ function PartnerCredentialsSubPanel({
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-600">Account Status:</span>
-              <span className={`font-bold ${partner.active ? "text-emerald-700" : "text-rose-700"}`}>
+              <span
+                className={`font-bold ${partner.active ? "text-emerald-700" : "text-rose-700"}`}
+              >
                 {partner.active ? "Active & Authorized" : "Deactivated / Locked"}
               </span>
             </div>
@@ -2570,7 +2675,10 @@ function PartnerCredentialsSubPanel({
           </div>
 
           {/* Reset Password Form */}
-          <form onSubmit={handleResetPasscode} className="space-y-3 pt-3 border-t border-slate-100 text-xs">
+          <form
+            onSubmit={handleResetPasscode}
+            className="space-y-3 pt-3 border-t border-slate-100 text-xs"
+          >
             <label className="block font-bold text-[#0F3D24]">Reset Partner Password</label>
             <div className="flex gap-2">
               <input
@@ -2591,7 +2699,9 @@ function PartnerCredentialsSubPanel({
             {resetMsg && (
               <div
                 className={`rounded-xl p-2.5 text-xs font-semibold ${
-                  resetMsg.includes("successfully") ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800"
+                  resetMsg.includes("successfully")
+                    ? "bg-emerald-50 text-emerald-800"
+                    : "bg-rose-50 text-rose-800"
                 }`}
               >
                 {resetMsg}
@@ -2639,6 +2749,7 @@ function AddPartnerModal({
   onSuccess: (info?: CreatedPartnerInfo) => void;
 }) {
   const createPartnerFn = useServerFn(adminCreatePartner);
+  const getBatchReportFn = useServerFn(adminGetBatchReport);
 
   const today = new Date().toISOString().slice(0, 10);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
@@ -2660,10 +2771,12 @@ function AddPartnerModal({
   const [cycleStartDate, setCycleStartDate] = useState(today);
   const [cycleEndDate, setCycleEndDate] = useState("");
   const [batchId, setBatchId] = useState<string>("");
+  const [batchAllocationPercentage, setBatchAllocationPercentage] = useState("100");
+  const [autoSyncBatch, setAutoSyncBatch] = useState(true);
 
   // Step 3: Sharing Matrix
-  const [profitSharePercentage, setProfitSharePercentage] = useState("70");
-  const [lossSharePercentage, setLossSharePercentage] = useState("100");
+  const [profitSharePercentage, setProfitSharePercentage] = useState("30");
+  const [lossSharePercentage, setLossSharePercentage] = useState("30");
   const [simMode, setSimMode] = useState<"profit" | "loss">("profit");
 
   // Step 4: Terms & Review
@@ -2674,7 +2787,29 @@ function AddPartnerModal({
 
   const pPct = Math.min(100, Math.max(0, Number(profitSharePercentage) || 0));
   const lPct = Math.min(100, Math.max(0, Number(lossSharePercentage) || 0));
+  const poolPct = Math.min(100, Math.max(1, Number(batchAllocationPercentage) || 100));
   const numCapital = Number(initialInvestment) || 0;
+
+  const selectedBatchReportQuery = useQuery({
+    queryKey: ["partner-onboard-batch-preview", passcode, batchId],
+    queryFn: () => getBatchReportFn({ data: { passcode, batchId } }),
+    enabled: Boolean(passcode && batchId),
+    refetchOnWindowFocus: false,
+  });
+
+  const liveBatchPreviewSettlement = selectedBatchReportQuery.data
+    ? computeSettlement(
+        {
+          initialInvestment: numCapital,
+          profitSharePercentage: pPct,
+          lossSharePercentage: lPct,
+        },
+        [
+          { type: "income", amount: selectedBatchReportQuery.data.totalIncome * (poolPct / 100) },
+          { type: "expense", amount: selectedBatchReportQuery.data.totalExpense * (poolPct / 100) },
+        ],
+      )
+    : null;
 
   // Helpers
   const handleAutoSuggestUsername = () => {
@@ -2768,6 +2903,8 @@ function AddPartnerModal({
           lossSharePercentage: lPct,
           agreedTerms: customClauses.trim() || null,
           batchId: batchId || null,
+          batchAllocationPercentage: poolPct,
+          autoSyncBatch,
           username: username.trim().toLowerCase(),
           password: password.trim(),
         },
@@ -2875,7 +3012,9 @@ function AddPartnerModal({
             <div className="space-y-4">
               <div className="rounded-2xl bg-[#0F3D24]/5 border border-[#0F3D24]/10 p-3 flex items-center gap-2 text-slate-700">
                 <User size={16} className="text-[#3F8F3F] shrink-0" />
-                <span>Enter the partner's legal identity and set their login credentials for the portal.</span>
+                <span>
+                  Enter the partner's legal identity and set their login credentials for the portal.
+                </span>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -2906,7 +3045,9 @@ function AddPartnerModal({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block font-bold text-[#0F3D24] mb-1">Email Address (Optional)</label>
+                  <label className="block font-bold text-[#0F3D24] mb-1">
+                    Email Address (Optional)
+                  </label>
                   <input
                     type="email"
                     placeholder="partner@example.com"
@@ -2916,7 +3057,9 @@ function AddPartnerModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#0F3D24] mb-1">Residential / Office Address</label>
+                  <label className="block font-bold text-[#0F3D24] mb-1">
+                    Residential / Office Address
+                  </label>
                   <input
                     type="text"
                     placeholder="e.g. Plot 14 Ikenegbu Layout, Owerri"
@@ -2959,12 +3102,16 @@ function AddPartnerModal({
                       required
                       placeholder="e.g. emeka_okafor"
                       value={username}
-                      onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))}
+                      onChange={(e) =>
+                        setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ""))
+                      }
                       className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 font-mono font-bold text-[#0F3D24] outline-none focus:border-[#3F8F3F]"
                     />
                   </div>
                   <div>
-                    <label className="block font-bold text-[#0F3D24] mb-1">Account Password *</label>
+                    <label className="block font-bold text-[#0F3D24] mb-1">
+                      Account Password *
+                    </label>
                     <div className="relative">
                       <input
                         type={showPassword ? "text" : "password"}
@@ -2992,9 +3139,13 @@ function AddPartnerModal({
           {step === 2 && (
             <div className="space-y-4">
               <div className="rounded-2xl border border-emerald-300 bg-emerald-50/70 p-4 space-y-1">
-                <label className="block font-black text-emerald-950 text-sm">Capital Invested by Partner (₦) *</label>
+                <label className="block font-black text-emerald-950 text-sm">
+                  Capital Invested by Partner (₦) *
+                </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-3 text-lg font-black text-emerald-800">₦</span>
+                  <span className="absolute left-3.5 top-3 text-lg font-black text-emerald-800">
+                    ₦
+                  </span>
                   <NumberField
                     allowDecimal
                     required
@@ -3014,7 +3165,9 @@ function AddPartnerModal({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="block font-bold text-[#0F3D24] mb-1">Investment / Payment Date *</label>
+                  <label className="block font-bold text-[#0F3D24] mb-1">
+                    Investment / Payment Date *
+                  </label>
                   <input
                     type="date"
                     required
@@ -3027,19 +3180,56 @@ function AddPartnerModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#0F3D24] mb-1">Link to Farm Pen Batch</label>
+                  <label className="block font-bold text-[#0F3D24] mb-1">
+                    Link to Farm Pen Batch
+                  </label>
                   <select
                     value={batchId}
-                    onChange={(e) => setBatchId(e.target.value)}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setBatchId(nextId);
+                      const matched = batches.find((b) => b.id === nextId);
+                      if (matched?.startDate) {
+                        setCycleStartDate(matched.startDate);
+                      }
+                      if (matched?.batchName) {
+                        setCycleName(matched.batchName);
+                      }
+                    }}
                     className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/50 px-3.5 py-2 font-medium text-[#0F3D24]"
                   >
                     <option value="">Independent slot (No batch linked)</option>
                     {batches.map((b) => (
                       <option key={b.id} value={b.id}>
-                        {b.batchName} ({b.batchType} · {b.currentHeadcount} birds)
+                        {b.batchName} ({b.batchType} · {b.currentHeadcount} birds ·{" "}
+                        {b.status === "active" ? "Active" : "Closed"})
                       </option>
                     ))}
                   </select>
+                  {batchId && (
+                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50/70 border border-emerald-200 px-3 py-2 text-[11px]">
+                      <label className="flex items-center gap-1.5 font-bold text-emerald-950 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={autoSyncBatch}
+                          onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                          className="h-3.5 w-3.5 accent-[#0F3D24]"
+                        />
+                        Auto-calculate Profit/Loss from batch ledger
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <span className="text-emerald-900 font-semibold">Batch Pool %:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={batchAllocationPercentage}
+                          onChange={(e) => setBatchAllocationPercentage(e.target.value)}
+                          className="w-16 rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -3065,7 +3255,9 @@ function AddPartnerModal({
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-[#0F3D24] mb-1">Target End / Harvest Date</label>
+                  <label className="block font-bold text-[#0F3D24] mb-1">
+                    Target End / Harvest Date
+                  </label>
                   <input
                     type="date"
                     value={cycleEndDate}
@@ -3119,7 +3311,7 @@ function AddPartnerModal({
                   </div>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 space-y-3">
                   <div className="rounded-2xl bg-white p-4 border border-emerald-200 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <label className="font-extrabold text-emerald-950 text-sm">
@@ -3142,6 +3334,33 @@ function AddPartnerModal({
                       <span>100%</span>
                     </div>
                   </div>
+
+                  <div className="rounded-2xl bg-white p-4 border border-rose-200 space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="font-extrabold text-rose-950 text-sm">
+                        Partner Loss Share (%)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setLossSharePercentage(profitSharePercentage)}
+                          className="rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-800 ring-1 ring-rose-200 hover:bg-rose-100"
+                        >
+                          Match Profit % ({pPct}%)
+                        </button>
+                        <span className="text-xl font-black text-rose-800">{lPct}%</span>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="1"
+                      value={lPct}
+                      onChange={(e) => setLossSharePercentage(e.target.value)}
+                      className="w-full accent-rose-600"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -3149,36 +3368,102 @@ function AddPartnerModal({
               <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2 text-xs">
                 <div className="flex items-center gap-2 font-black text-[#0F3D24]">
                   <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0" />
-                  <span>Downside Risk & Capital Protection Terms</span>
+                  <span>Downside Risk &amp; Capital Protection Terms</span>
                 </div>
                 <p className="text-slate-600 leading-relaxed">
-                  As requested by Dignity Agro Farms co-financing policy, downside operational risk and capital protection are governed strictly by Section 4 of the legal <strong>Partnership Agreement</strong>. Partner liability is strictly capped at their initial deposited capital (<strong>{naira(numCapital)}</strong>), with zero negative liability.
+                  Under Section 4 of the <strong>Partnership Agreement</strong>, Partner loss
+                  responsibility is calculated at <strong>{lPct}%</strong> of any batch loss and is
+                  strictly capped at their committed capital (<strong>{naira(numCapital)}</strong>),
+                  with zero negative liability.
                 </p>
               </div>
 
-              {/* Live Profit Simulation */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
-                <span className="font-extrabold text-[#0F3D24] text-xs block">
-                  Projected Return on ₦1,000,000 Net Cycle Profit
-                </span>
-                <div className="rounded-xl bg-emerald-50/70 p-3.5 border border-emerald-200 space-y-2 text-xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-emerald-950 font-bold">
-                      Partner Receives ({pPct}% of Profit):
+              {/* Live Batch Calculation OR Sample Simulation */}
+              {batchId && liveBatchPreviewSettlement && selectedBatchReportQuery.data ? (
+                <div className="rounded-2xl border border-[#0F3D24]/20 bg-[#0F3D24] p-4 text-white space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-extrabold text-[#A2E0A2] text-xs uppercase tracking-wider">
+                      Live Batch Outcome Preview · {selectedBatchReportQuery.data.batch.batchName}
                     </span>
-                    <strong className="text-base font-black text-emerald-900">
-                      {naira(1_000_000 * (pPct / 100))}
-                    </strong>
+                    <span className="rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold">
+                      {liveBatchPreviewSettlement.result === "profit"
+                        ? "PROFIT"
+                        : liveBatchPreviewSettlement.result === "loss"
+                          ? "LOSS"
+                          : "BREAKEVEN"}
+                    </span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-emerald-800">
-                    <span>Farm Retained Share ({100 - pPct}%):</span>
-                    <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>
+                  <div className="grid grid-cols-3 gap-2 text-xs tabular-nums">
+                    <div className="rounded-xl bg-white/10 p-2.5">
+                      <span className="text-[10px] text-white/70 block">Batch Revenue</span>
+                      <strong className="font-bold text-[#A2E0A2]">
+                        {naira(liveBatchPreviewSettlement.totalIncome)}
+                      </strong>
+                    </div>
+                    <div className="rounded-xl bg-white/10 p-2.5">
+                      <span className="text-[10px] text-white/70 block">Batch Expenses</span>
+                      <strong className="font-bold text-rose-300">
+                        {naira(liveBatchPreviewSettlement.totalExpenses)}
+                      </strong>
+                    </div>
+                    <div className="rounded-xl bg-white/10 p-2.5">
+                      <span className="text-[10px] text-white/70 block">Batch Net</span>
+                      <strong
+                        className={`font-black ${liveBatchPreviewSettlement.net >= 0 ? "text-[#A2E0A2]" : "text-rose-300"}`}
+                      >
+                        {signedNaira(liveBatchPreviewSettlement.net)}
+                      </strong>
+                    </div>
                   </div>
-                  <p className="text-[10px] text-emerald-900/80 pt-1 border-t border-emerald-200/60">
-                    Total Estimated Return: Capital ({naira(numCapital)}) + Profit ({naira(1_000_000 * (pPct / 100))}) = <strong>{naira(numCapital + 1_000_000 * (pPct / 100))}</strong>.
-                  </p>
+                  <div className="rounded-xl bg-white/15 p-3 space-y-1.5 text-xs tabular-nums">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/85">
+                        Partner Share (
+                        {liveBatchPreviewSettlement.result === "loss"
+                          ? `${lPct}% Loss`
+                          : `${pPct}% Profit`}
+                        ):
+                      </span>
+                      <strong
+                        className={`text-sm font-black ${liveBatchPreviewSettlement.partnerSignedResult >= 0 ? "text-[#A2E0A2]" : "text-rose-300"}`}
+                      >
+                        {signedNaira(liveBatchPreviewSettlement.partnerSignedResult)}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-white/15 pt-1.5">
+                      <span className="font-bold">Total Settlement Due (Capital ± Share):</span>
+                      <strong className="text-base font-black text-white">
+                        {naira(liveBatchPreviewSettlement.payoutDue)}
+                      </strong>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2">
+                  <span className="font-extrabold text-[#0F3D24] text-xs block">
+                    Projected Return on ₦1,000,000 Net Cycle Profit
+                  </span>
+                  <div className="rounded-xl bg-emerald-50/70 p-3.5 border border-emerald-200 space-y-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-emerald-950 font-bold">
+                        Partner Receives ({pPct}% of Profit):
+                      </span>
+                      <strong className="text-base font-black text-emerald-900">
+                        {naira(1_000_000 * (pPct / 100))}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-emerald-800">
+                      <span>Farm Retained Share ({100 - pPct}%):</span>
+                      <strong>{naira(1_000_000 * ((100 - pPct) / 100))}</strong>
+                    </div>
+                    <p className="text-[10px] text-emerald-900/80 pt-1 border-t border-emerald-200/60">
+                      Total Estimated Return: Capital ({naira(numCapital)}) + Profit (
+                      {naira(1_000_000 * (pPct / 100))}) ={" "}
+                      <strong>{naira(numCapital + 1_000_000 * (pPct / 100))}</strong>.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -3208,7 +3493,9 @@ function AddPartnerModal({
                   <div>
                     <span className="text-white/70 block text-[10px]">Agreed Sharing Ratio:</span>
                     <strong className="text-white">{pPct}% Profit Share</strong>
-                    <div className="text-white/70 text-[10px]">Downside protection in Agreement</div>
+                    <div className="text-white/70 text-[10px]">
+                      Downside protection in Agreement
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3230,7 +3517,9 @@ function AddPartnerModal({
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] text-slate-600 flex items-start gap-2">
                 <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0 mt-0.5" />
                 <span>
-                  The standard 7-clause Dignity Agro Farms Partnership Agreement will be automatically generated with these parameters. The partner will be prompted to read and digitally sign it upon logging in to the portal.
+                  The standard 7-clause Dignity Agro Farms Partnership Agreement will be
+                  automatically generated with these parameters. The partner will be prompted to
+                  read and digitally sign it upon logging in to the portal.
                 </span>
               </div>
             </div>
@@ -3305,7 +3594,10 @@ function CreatedPartnerSuccessModal({
   onOpenWorkspace: (id: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const portalUrl = typeof window !== "undefined" ? `${window.location.origin}/for-partners` : "https://dignityagrofarms.com/for-partners";
+  const portalUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/for-partners`
+      : "https://dignityagrofarms.com/for-partners";
 
   const welcomeMessage = `🌱 *DIGNITY AGRO FARMS — PARTNERSHIP PORTAL ACCESS*
 Dear ${info.fullName},
@@ -3355,7 +3647,12 @@ Please sign in to read and digitally sign your Partnership Terms & Conditions.`;
           </div>
           <div className="flex items-center justify-between pt-1">
             <span className="text-slate-500 font-medium">Portal URL:</span>
-            <a href={portalUrl} target="_blank" rel="noreferrer" className="text-[#3F8F3F] font-bold underline truncate max-w-[200px]">
+            <a
+              href={portalUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[#3F8F3F] font-bold underline truncate max-w-[200px]"
+            >
               {portalUrl}
             </a>
           </div>
@@ -3438,7 +3735,9 @@ export function EditPartnerModal({
   const [isActive, setIsActive] = useState<boolean>(partner.active);
 
   // Capital & Cycle fields
-  const [initialInvestment, setInitialInvestment] = useState(String(partner.initialInvestment || 0));
+  const [initialInvestment, setInitialInvestment] = useState(
+    String(partner.initialInvestment || 0),
+  );
   const [investmentDate, setInvestmentDate] = useState(
     partner.investmentDate || new Date().toISOString().slice(0, 10),
   );
@@ -3449,6 +3748,10 @@ export function EditPartnerModal({
   );
   const [cycleEndDate, setCycleEndDate] = useState(partner.cycleEndDate || "");
   const [batchId, setBatchId] = useState(partner.batchId || "");
+  const [batchAllocationPercentage, setBatchAllocationPercentage] = useState(
+    String(partner.batchAllocationPercentage ?? 100),
+  );
+  const [autoSyncBatch, setAutoSyncBatch] = useState(partner.autoSyncBatch !== false);
 
   // Sharing Matrix
   const [profitShare, setProfitShare] = useState(String(partner.profitSharePercentage ?? 70));
@@ -3521,8 +3824,14 @@ export function EditPartnerModal({
           cycleStartDate,
           cycleEndDate: cycleEndDate || null,
           batchId: batchId || null,
+          batchAllocationPercentage: Math.min(
+            100,
+            Math.max(1, Number(batchAllocationPercentage) || 100),
+          ),
+          autoSyncBatch,
           status,
-          amendReason: amendReason.trim() || (termsChanged ? "Amended details and terms by farm owner" : null),
+          amendReason:
+            amendReason.trim() || (termsChanged ? "Amended details and terms by farm owner" : null),
           newPassword: newPassword.trim() || null,
         },
       });
@@ -3675,7 +3984,9 @@ export function EditPartnerModal({
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-[#0F3D24]">Full Legal / Business Name *</label>
+                  <label className="block font-bold text-[#0F3D24]">
+                    Full Legal / Business Name *
+                  </label>
                   <div className="relative">
                     <User size={14} className="absolute left-3 top-3 text-slate-400" />
                     <input
@@ -3690,7 +4001,9 @@ export function EditPartnerModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-[#0F3D24]">Phone Number (WhatsApp) *</label>
+                  <label className="block font-bold text-[#0F3D24]">
+                    Phone Number (WhatsApp) *
+                  </label>
                   <div className="relative">
                     <Phone size={14} className="absolute left-3 top-3 text-slate-400" />
                     <input
@@ -3721,7 +4034,9 @@ export function EditPartnerModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-[#0F3D24]">Contact / Residential Address</label>
+                  <label className="block font-bold text-[#0F3D24]">
+                    Contact / Residential Address
+                  </label>
                   <div className="relative">
                     <MapPin size={14} className="absolute left-3 top-3 text-slate-400" />
                     <input
@@ -3770,7 +4085,9 @@ export function EditPartnerModal({
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-[#0F3D24]">Committed Investment Capital (₦) *</label>
+                  <label className="block font-bold text-[#0F3D24]">
+                    Committed Investment Capital (₦) *
+                  </label>
                   <div className="relative">
                     <span className="absolute left-3 top-2.5 text-slate-500 font-bold">₦</span>
                     <NumberField
@@ -3789,7 +4106,9 @@ export function EditPartnerModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-[#0F3D24]">Investment Capital Deposit Date *</label>
+                  <label className="block font-bold text-[#0F3D24]">
+                    Investment Capital Deposit Date *
+                  </label>
                   <div className="relative">
                     <Calendar size={14} className="absolute left-3 top-3 text-slate-400" />
                     <input
@@ -3842,7 +4161,9 @@ export function EditPartnerModal({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block font-bold text-[#0F3D24]">Cycle Target End Date (Optional)</label>
+                  <label className="block font-bold text-[#0F3D24]">
+                    Cycle Target End Date (Optional)
+                  </label>
                   <input
                     type="date"
                     value={cycleEndDate}
@@ -3853,7 +4174,9 @@ export function EditPartnerModal({
               </div>
 
               <div className="space-y-1.5">
-                <label className="block font-bold text-[#0F3D24]">Linked Farm Production Batch</label>
+                <label className="block font-bold text-[#0F3D24]">
+                  Linked Farm Production Batch
+                </label>
                 <select
                   value={batchId}
                   onChange={(e) => setBatchId(e.target.value)}
@@ -3862,12 +4185,38 @@ export function EditPartnerModal({
                   <option value="">No Batch Linked (Standalone Flock)</option>
                   {batches.map((b) => (
                     <option key={b.id} value={b.id}>
-                      {b.batch_name} ({b.breed || "Broilers"} · {b.initial_chicks_count ?? b.current_chicks_count ?? 0} birds · Status: {b.status})
+                      {b.batchName || b.batch_name} ({b.batchType || b.breed || "Broilers"} ·{" "}
+                      {b.initialHeadcount ?? b.initial_chicks_count ?? 0} birds · {b.status})
                     </option>
                   ))}
                 </select>
+                {batchId && (
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#F7F5F0] px-3 py-2 text-[11px]">
+                    <label className="flex items-center gap-1.5 font-bold text-[#0F3D24] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoSyncBatch}
+                        onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                        className="h-3.5 w-3.5 accent-[#0F3D24]"
+                      />
+                      Auto-calculate Profit/Loss from batch ledger
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-slate-600 font-semibold">Batch Pool %:</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={batchAllocationPercentage}
+                        onChange={(e) => setBatchAllocationPercentage(e.target.value)}
+                        className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
+                      />
+                    </div>
+                  </div>
+                )}
                 <p className="text-[10px] text-slate-500">
-                  Linking a batch allows 1-click proportional syncing of farm operational expenses and bird sales receipts into this partner's ledger.
+                  Linking a batch automatically syncs approved farm operational expenses and bird
+                  sales receipts into this partner&apos;s profit/loss ledger.
                 </p>
               </div>
             </div>
@@ -3893,7 +4242,8 @@ export function EditPartnerModal({
                   className="w-full accent-[#0F3D24]"
                 />
                 <div className="text-[10px] text-emerald-900/80">
-                  Farm retains remaining <strong>{100 - (Number(profitShare) || 0)}%</strong> of net profits.
+                  Farm retains remaining <strong>{100 - (Number(profitShare) || 0)}%</strong> of net
+                  profits.
                 </div>
               </div>
 
@@ -3901,12 +4251,16 @@ export function EditPartnerModal({
                 <ShieldCheck size={16} className="text-[#3F8F3F] shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-[#0F3D24] block">Downside Capital Protection Rule</strong>
-                  Under Section 4 of the legal Partnership Agreement, partner loss is strictly capped at their initial committed capital ({naira(Number(initialInvestment) || 0)}). Partners never owe the farm out-of-pocket money.
+                  Under Section 4 of the legal Partnership Agreement, partner loss is strictly
+                  capped at their initial committed capital ({naira(Number(initialInvestment) || 0)}
+                  ). Partners never owe the farm out-of-pocket money.
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="block font-bold text-[#0F3D24]">Agreed Partnership Terms / Specific Clauses</label>
+                <label className="block font-bold text-[#0F3D24]">
+                  Agreed Partnership Terms / Specific Clauses
+                </label>
                 <textarea
                   rows={3}
                   placeholder="e.g. Broiler cycle lasts 6 weeks. Mortality above 7% triggers mutual review."
@@ -3950,14 +4304,20 @@ export function EditPartnerModal({
                       }}
                       className="text-slate-400 hover:text-[#0F3D24] p-1"
                     >
-                      {copiedUrl ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                      {copiedUrl ? (
+                        <Check size={13} className="text-emerald-600" />
+                      ) : (
+                        <Copy size={13} />
+                      )}
                     </button>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                   <span className="text-slate-600">Username:</span>
-                  <span className="font-mono font-extrabold text-[#0F3D24] text-sm">@{partner.username}</span>
+                  <span className="font-mono font-extrabold text-[#0F3D24] text-sm">
+                    @{partner.username}
+                  </span>
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
@@ -4024,7 +4384,8 @@ export function EditPartnerModal({
                       Permanently Delete Partner Account & Records
                     </h4>
                     <p className="mt-1 text-xs text-rose-900/80 leading-relaxed">
-                      You are about to permanently delete <strong>{partner.fullName}</strong> (@{partner.username}). This will completely erase:
+                      You are about to permanently delete <strong>{partner.fullName}</strong> (@
+                      {partner.username}). This will completely erase:
                     </p>
                     <ul className="mt-2 list-disc list-inside text-xs text-rose-950 space-y-1 font-medium">
                       <li>Their partner profile, contact data, and portal credentials.</li>

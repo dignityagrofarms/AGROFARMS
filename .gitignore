@@ -67,3 +67,7 @@ dist-ssr
 *.sln
 *.sw?
 supabase/.temp/
+
+# Operational test fixtures and private release snapshots
+!tests/**/*.sql
+.private-backups/
