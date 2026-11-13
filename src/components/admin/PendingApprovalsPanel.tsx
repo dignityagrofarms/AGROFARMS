@@ -57,6 +57,7 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
   const deleteRejectedFn = useServerFn(adminDeleteRejectedRecord);
   const queryClient = useQueryClient();
 
+  const [screen, setScreen] = useState<"pending" | "history">("pending");
   const [queueView, setQueueView] = useState<"pending" | "approved" | "rejected" | "all">(
     "pending",
   );
@@ -90,12 +91,14 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
   const rejectedQuery = useQuery({
     queryKey: ["rejected-approvals", passcode],
     queryFn: () => listRejectedFn({ data: { passcode } }),
-    enabled: role === "owner" && Boolean(passcode),
+    enabled: role === "owner" && Boolean(passcode) && queueView === "rejected",
     refetchOnWindowFocus: false,
     placeholderData: keepPreviousData,
   });
 
   const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["record-history"] });
+    queryClient.invalidateQueries({ queryKey: ["submission-changes"] });
     queryClient.invalidateQueries({ queryKey: ["approval-history"] });
     queryClient.invalidateQueries({ queryKey: ["pending-approvals"] });
     queryClient.invalidateQueries({ queryKey: ["pending-approvals-count"] });
@@ -419,9 +422,42 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
     );
   };
 
+  const reviewTabs = (
+    <div role="tablist" aria-label="Submission views" className="flex gap-2">
+      <button
+        role="tab"
+        aria-selected={screen === "pending"}
+        onClick={() => setScreen("pending")}
+        className={`min-h-11 rounded-full border border-emerald-900 px-4 py-2 text-sm font-semibold ${screen === "pending" ? "bg-emerald-900 text-white" : "bg-white text-emerald-900"}`}
+      >
+        Pending Review
+        {pendingQuery.error && !pendingQuery.data
+          ? " — unavailable"
+          : pendingQuery.isLoading
+            ? "…"
+            : ` (${pendingTotalCount})`}
+      </button>
+      <button
+        role="tab"
+        aria-selected={screen === "history"}
+        onClick={() => setScreen("history")}
+        className={`min-h-11 rounded-full border border-emerald-900 px-4 py-2 text-sm font-semibold ${screen === "history" ? "bg-emerald-900 text-white" : "bg-white text-emerald-900"}`}
+      >
+        History
+      </button>
+    </div>
+  );
+  if (screen === "history")
+    return (
+      <div className="min-w-0 space-y-4">
+        {reviewTabs}
+        <RecordHistoryPanel passcode={passcode} owner />
+      </div>
+    );
+
   return (
     <div
-      className={`mb-8 rounded-3xl p-6 border shadow-sm space-y-4 ${
+      className={`mb-8 min-w-0 rounded-3xl p-3 sm:p-6 border shadow-sm space-y-4 ${
         queueView === "rejected"
           ? "bg-rose-50/50 border-rose-200/80"
           : "bg-amber-50/70 border-amber-200/80"
@@ -439,51 +475,21 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
             {queueView === "rejected"
               ? `Rejected History (${rejectedTotalCount})`
               : queueView === "pending"
-                ? `Submission reviews — ${pendingTotalCount} awaiting your decision`
+                ? pendingQuery.isLoading
+                  ? "Loading requests…"
+                  : pendingQuery.error && !pendingQuery.data
+                    ? "Requests unavailable"
+                    : `Submission reviews — ${pendingTotalCount} awaiting your decision`
                 : `${queueView === "approved" ? "Approved submissions" : "All submissions"} (${totalCount})`}
           </h2>
           <p className="mt-0.5 text-xs text-[#0F3D24]/70">
             {queueView === "rejected"
               ? "Recover accidentally rejected entries with Re-Approve, or permanently delete test/duplicate rows."
-              : "The pending count shows only requests awaiting review. Saved and previously reviewed records remain in the history below."}
+              : "The pending count shows only requests awaiting review. Saved and previously reviewed records are in the History tab."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-full bg-white p-1 ring-1 ring-slate-200 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setQueueView("pending")}
-              className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
-                queueView === "pending"
-                  ? "bg-[#0F3D24] text-white"
-                  : "text-slate-600 hover:text-[#0F3D24]"
-              }`}
-            >
-              Pending Review ({pendingTotalCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setQueueView("rejected")}
-              className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
-                queueView === "rejected"
-                  ? "bg-rose-700 text-white"
-                  : "text-rose-700 hover:bg-rose-50"
-              }`}
-            >
-              Rejected History ({rejectedTotalCount})
-            </button>
-          </div>
-          <select
-            aria-label="Approval status"
-            value={queueView}
-            onChange={(e) => setQueueView(e.target.value as typeof queueView)}
-            className="rounded-xl border p-2 text-sm"
-          >
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="all">All</option>
-          </select>
+          {reviewTabs}
           {queueView === "pending" && unflaggedPendingCount > 0 && (
             <button
               type="button"
@@ -635,7 +641,6 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
           {(historyQuery.error || pendingQuery.error || rejectedQuery.error)?.message}
         </p>
       )}
-      <RecordHistoryPanel passcode={passcode} owner />
       {(
         queueView === "approved" || queueView === "all"
           ? historyQuery.isLoading
@@ -661,7 +666,10 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
           No records match this submitter filter.
         </div>
       ) : (
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
+          <p className="text-xs text-slate-500 sm:hidden">
+            Swipe each table sideways to see all columns and actions.
+          </p>
           {/* Financial Entries */}
           {financials.length > 0 && (
             <div className="space-y-2">
@@ -670,7 +678,7 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
                 {financials.length})
               </h3>
               <div className="overflow-x-auto rounded-2xl bg-white border border-amber-200/60">
-                <table className="w-full text-left text-xs">
+                <table className="w-full min-w-[620px] text-left text-xs">
                   <thead className="bg-[#F7F5F0] text-[#0F3D24]/80 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-3">Type &amp; Category</th>
@@ -751,7 +759,7 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
                 ({activities.length})
               </h3>
               <div className="overflow-x-auto rounded-2xl bg-white border border-amber-200/60">
-                <table className="w-full text-left text-xs">
+                <table className="w-full min-w-[620px] text-left text-xs">
                   <thead className="bg-[#F7F5F0] text-[#0F3D24]/80 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-3">Activity Type</th>
@@ -837,7 +845,7 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
                 {contactTransactions.length})
               </h3>
               <div className="overflow-x-auto rounded-2xl bg-white border border-amber-200/60">
-                <table className="w-full text-left text-xs">
+                <table className="w-full min-w-[620px] text-left text-xs">
                   <thead className="bg-[#F7F5F0] text-[#0F3D24]/80 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-3">Contact &amp; Type</th>
@@ -915,7 +923,7 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
                 {financialPayments.length})
               </h3>
               <div className="overflow-x-auto rounded-2xl bg-white border border-amber-200/60">
-                <table className="w-full text-left text-xs">
+                <table className="w-full min-w-[620px] text-left text-xs">
                   <thead className="bg-[#F7F5F0] text-[#0F3D24]/80 font-bold uppercase tracking-wider text-[10px]">
                     <tr>
                       <th className="p-3">Party &amp; Type</th>
@@ -1227,7 +1235,7 @@ export function MySubmissionsPanel({
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[620px] text-left text-xs">
             <thead className="bg-[#F7F5F0] text-[#0F3D24]/80 font-bold uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="p-3">Entry</th>

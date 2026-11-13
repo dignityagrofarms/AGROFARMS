@@ -500,6 +500,22 @@ function AdminOrders() {
   ).length;
 
   const [showNotificationsMenu, setShowNotificationsMenu] = useState(false);
+  useEffect(() => {
+    if (!showNotificationsMenu) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!(event.target as Element)?.closest("[data-notification-menu]"))
+        setShowNotificationsMenu(false);
+    };
+    const key = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowNotificationsMenu(false);
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", key);
+    };
+  }, [showNotificationsMenu]);
   const [showOwnerArrivalModal, setShowOwnerArrivalModal] = useState(false);
   const [showStaffArrivalModal, setShowStaffArrivalModal] = useState(false);
   const [quickEditFin, setQuickEditFin] = useState<FarmFinancial | null>(null);
@@ -1225,11 +1241,12 @@ function AdminOrders() {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
         {/* Top Header */}
         <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white/80 px-4 shadow-sm backdrop-blur-md md:px-8 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button
+              aria-label="Open navigation"
               onClick={() => setIsMobileMenuOpen(true)}
               className="mr-2 text-gray-500 hover:text-[#0F3D24] md:hidden"
             >
@@ -1278,6 +1295,8 @@ function AdminOrders() {
                 <button
                   type="button"
                   onClick={() => setShowNotificationsMenu((v) => !v)}
+                  data-notification-menu
+                  aria-expanded={showNotificationsMenu}
                   title="Pending Approvals & Staff/Manager Notifications"
                   className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full border transition cursor-pointer ${
                     totalOwnerNotificationsCount > 0
@@ -1297,7 +1316,12 @@ function AdminOrders() {
                 </button>
 
                 {showNotificationsMenu && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/15 z-50 overflow-hidden">
+                  <div
+                    data-notification-menu
+                    role="region"
+                    aria-label="Notifications"
+                    className="fixed inset-x-3 top-20 max-h-[calc(100dvh-6rem)] flex flex-col sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/15 z-50 overflow-hidden"
+                  >
                     <div className="flex items-center justify-between bg-[#0F3D24] px-4 py-3 text-white">
                       <div>
                         <h4 className="text-xs font-extrabold uppercase tracking-wider">
@@ -1312,13 +1336,14 @@ function AdminOrders() {
                       <button
                         type="button"
                         onClick={() => setShowNotificationsMenu(false)}
-                        className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                        aria-label="Close notifications"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
                       >
                         <X size={14} />
                       </button>
                     </div>
 
-                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                    <div className="min-h-0 max-h-[60dvh] sm:max-h-80 overflow-y-auto overscroll-contain divide-y divide-gray-100">
                       {totalOwnerNotificationsCount === 0 ? (
                         <div className="p-6 text-center text-xs text-gray-500">
                           <CheckCircle2 size={22} className="mx-auto mb-1 text-emerald-600" />
@@ -1409,7 +1434,7 @@ function AdminOrders() {
                             setActiveTab("approvals");
                             setShowNotificationsMenu(false);
                           }}
-                          className="w-full rounded-full bg-[#0F3D24] py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
+                          className="w-full min-h-11 rounded-full bg-[#0F3D24] py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
                         >
                           Open Approvals Queue ({pendingApprovalsCount})
                         </button>
@@ -1424,6 +1449,8 @@ function AdminOrders() {
                 <button
                   type="button"
                   onClick={() => setShowNotificationsMenu((v) => !v)}
+                  data-notification-menu
+                  aria-expanded={showNotificationsMenu}
                   title="Flagged & Submission Notifications"
                   className={`relative inline-flex items-center justify-center w-9 h-9 rounded-full border transition cursor-pointer ${
                     myFlaggedItems.length > 0
@@ -1442,7 +1469,12 @@ function AdminOrders() {
                 </button>
 
                 {showNotificationsMenu && (
-                  <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/15 z-50 overflow-hidden">
+                  <div
+                    data-notification-menu
+                    role="region"
+                    aria-label="Notifications"
+                    className="fixed inset-x-3 top-20 max-h-[calc(100dvh-6rem)] flex flex-col sm:absolute sm:inset-x-auto sm:top-auto sm:right-0 sm:mt-2 sm:w-96 rounded-2xl bg-white shadow-2xl ring-1 ring-[#0F3D24]/15 z-50 overflow-hidden"
+                  >
                     <div className="flex items-center justify-between bg-[#0F3D24] px-4 py-3 text-white">
                       <div>
                         <h4 className="text-xs font-extrabold uppercase tracking-wider">
@@ -1459,13 +1491,14 @@ function AdminOrders() {
                       <button
                         type="button"
                         onClick={() => setShowNotificationsMenu(false)}
-                        className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                        aria-label="Close notifications"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
                       >
                         <X size={14} />
                       </button>
                     </div>
 
-                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
+                    <div className="min-h-0 max-h-[60dvh] sm:max-h-80 overflow-y-auto overscroll-contain divide-y divide-gray-100">
                       {myFlaggedOrRejectedItems.length === 0 ? (
                         <div className="p-6 text-center text-xs text-gray-500">
                           <CheckCircle2 size={22} className="mx-auto mb-1 text-emerald-600" />
@@ -1525,7 +1558,7 @@ function AdminOrders() {
                           setActiveTab("approvals");
                           setShowNotificationsMenu(false);
                         }}
-                        className="w-full rounded-full bg-[#0F3D24] py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
+                        className="w-full min-h-11 rounded-full bg-[#0F3D24] py-2 text-xs font-bold text-white hover:bg-[#165232] transition"
                       >
                         Open My Submissions ({myPendingOrRejectedCount})
                       </button>
@@ -2116,7 +2149,8 @@ function AdminOrders() {
                 <button
                   type="button"
                   onClick={() => setShowOwnerArrivalModal(false)}
-                  className="rounded-full p-1 text-white/70 hover:bg-white/10 hover:text-white"
+                  aria-label="Close notifications"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
                 >
                   <X size={18} />
                 </button>

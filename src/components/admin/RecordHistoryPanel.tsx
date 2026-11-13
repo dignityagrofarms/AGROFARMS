@@ -1,7 +1,179 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { adminApproveStaffRecord, adminDeleteRejectedRecord } from "@/lib/farm.functions";
+import { Fragment, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { listRecordHistory } from "@/lib/audit.functions";
+import { listRecordHistory, getSubmissionChanges, type HistoryEvent } from "@/lib/audit.functions";
+const labels: Record<string, string> = {
+  farm_financials: "Financial record",
+  farm_activities: "Farm report",
+  contact_transactions: "Customer / supplier",
+  farm_financial_payments: "Payment",
+};
+const statuses: Record<string, string> = {
+  approved: "Approved",
+  pending: "Pending review",
+  pending_approval: "Pending review",
+  flagged: "Needs correction",
+  rejected: "Rejected",
+  removed: "Removed",
+};
+const fields: Record<string, string> = {
+  amount: "Amount",
+  amount_paid: "Amount paid",
+  total_amount: "Total amount",
+  birds_sold: "Birds sold",
+  mortality_count: "Birds lost",
+  feed_bags: "Feed bags",
+  feed_consumed_kg: "Feed used (kg)",
+  description: "Description",
+  item_description: "Description",
+  rejection_reason: "Review note",
+  approval_status: "Status",
+};
+function display(key: string, value: unknown): string {
+  if (value === undefined || value === null) return "Not recorded";
+  if (key === "approval_status") return statuses[String(value)] || "Not recorded";
+  return key.includes("amount")
+    ? new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(Number(value))
+    : String(value);
+}
+function Changes({
+  passcode,
+  event,
+  owner,
+}: {
+  passcode: string;
+  event: HistoryEvent;
+  owner: boolean;
+}) {
+  const approve = useServerFn(adminApproveStaffRecord);
+  const remove = useServerFn(adminDeleteRejectedRecord);
+  const cache = useQueryClient();
+  const action = useMutation({
+    mutationFn: async (mode: "approve" | "remove") => {
+      const targetType = (
+        {
+          farm_financials: "financial",
+          farm_activities: "activity",
+          contact_transactions: "contact_tx",
+          farm_financial_payments: "fin_payment",
+        } as const
+      )[
+        event.source_table as
+          "farm_financials" | "farm_activities" | "contact_transactions" | "farm_financial_payments"
+      ];
+      const input = { data: { passcode, id: event.source_id, targetType } };
+      if (mode === "approve") await approve(input);
+      else await remove(input);
+    },
+    onSuccess: () => {
+      cache.invalidateQueries({ queryKey: ["record-history"] });
+      cache.invalidateQueries({ queryKey: ["submission-changes"] });
+      cache.invalidateQueries({ queryKey: ["pending-approvals"] });
+      cache.invalidateQueries({ queryKey: ["pending-approvals-count"] });
+      for (const key of [
+        "farm-financials",
+        "farm-batches",
+        "batch-report",
+        "special-contacts",
+        "debtors-creditors",
+        "my-submissions",
+      ])
+        cache.invalidateQueries({ queryKey: [key] });
+    },
+  });
+  const load = useServerFn(getSubmissionChanges);
+  const query = useQuery({
+    queryKey: ["submission-changes", passcode, event.source_table, event.source_id],
+    queryFn: () =>
+      load({
+        data: {
+          passcode,
+          sourceId: event.source_id,
+          sourceTable: event.source_table as
+            | "farm_financials"
+            | "farm_activities"
+            | "contact_transactions"
+            | "farm_financial_payments",
+        },
+      }),
+  });
+  return (
+    <div className="space-y-3 p-3 text-sm">
+      <h4 className="font-semibold">Saved changes</h4>
+      {owner && event.current_status === "rejected" && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            disabled={action.isPending}
+            className="min-h-11 rounded-lg bg-emerald-900 px-3 text-white disabled:opacity-50"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Approve this rejected submission and restore it to the farm records?",
+                )
+              )
+                action.mutate("approve");
+            }}
+          >
+            Re-approve
+          </button>
+          <button
+            disabled={action.isPending}
+            className="min-h-11 rounded-lg border border-red-300 px-3 text-red-700 disabled:opacity-50"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Remove this rejected record? Its saved history will remain available.",
+                )
+              )
+                action.mutate("remove");
+            }}
+          >
+            Remove rejected record
+          </button>
+        </div>
+      )}
+      {action.error && (
+        <p role="alert" className="text-red-700">
+          {action.error.message}
+        </p>
+      )}
+
+      {query.isLoading && <p>Loading changes…</p>}
+      {query.error && <p role="alert">{query.error.message}</p>}
+      {query.data?.map((change) => (
+        <div key={change.id} className="border-l-2 border-emerald-200 pl-3">
+          <p className="font-medium">
+            {new Date(change.created_at).toLocaleString("en-GB", { timeZone: "Africa/Lagos" })} ·{" "}
+            {change.action === "legacy_snapshot"
+              ? "Earlier record retained"
+              : change.action === "delete"
+                ? "Record removed"
+                : statuses[change.action] || "Record updated"}
+          </p>
+          <p className="text-xs text-slate-500">
+            {change.actor_name?.includes("maintenance")
+              ? "Owner-authorised system maintenance"
+              : change.actor_name || "Reviewer not recorded for this earlier entry"}
+          </p>
+          {Object.entries(fields)
+            .filter(([key]) =>
+              change.before_data
+                ? JSON.stringify(change.before_data[key]) !==
+                  JSON.stringify(change.after_data?.[key])
+                : change.after_data?.[key] != null,
+            )
+            .map(([key, label]) => (
+              <p key={key}>
+                {label}: {change.before_data ? `${display(key, change.before_data[key])} → ` : ""}
+                {display(key, (change.after_data || change.before_data)?.[key])}
+              </p>
+            ))}
+        </div>
+      ))}
+    </div>
+  );
+}
 export function RecordHistoryPanel({
   passcode,
   owner = false,
@@ -15,8 +187,9 @@ export function RecordHistoryPanel({
   const [to, setTo] = useState("");
   const [submitter, setSubmitter] = useState("");
   const [status, setStatus] = useState<
-    "all" | "approved" | "rejected" | "pending_approval" | "flagged"
+    "all" | "approved" | "rejected" | "pending_approval" | "flagged" | "removed"
   >("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["record-history", passcode, page, from, to, status, submitter],
     queryFn: () =>
@@ -33,18 +206,19 @@ export function RecordHistoryPanel({
     refetchInterval: 20000,
   });
   return (
-    <section className="my-5 rounded-2xl border bg-white p-4 space-y-3">
-      <h3 className="font-bold">
-        {owner ? "Permanent record and decision history" : "My permanent submission history"}
+    <section className="min-w-0 rounded-2xl border bg-white p-3 sm:p-5 space-y-4">
+      <h3 className="font-bold text-emerald-950">
+        {owner ? "Submission history" : "My submission history"}
       </h3>
       <p className="text-xs text-slate-600">
-        Creation, changes and review decisions remain here after a record is revised or removed.
-        Dates use Africa/Lagos. Earlier decisions may have no recorded reviewer.
+        One row per record, showing its latest status. Open details to see earlier changes. Dates
+        use Africa/Lagos.
       </p>
-      <div className="flex flex-wrap gap-3 text-sm">
-        <label>
-          From{" "}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+        <label className="min-w-0">
+          From
           <input
+            className="block min-h-11 w-full min-w-0 rounded-lg border p-2"
             type="date"
             value={from}
             onChange={(e) => {
@@ -53,9 +227,10 @@ export function RecordHistoryPanel({
             }}
           />
         </label>
-        <label>
-          To{" "}
+        <label className="min-w-0">
+          To
           <input
+            className="block min-h-11 w-full min-w-0 rounded-lg border p-2"
             type="date"
             value={to}
             onChange={(e) => {
@@ -64,202 +239,150 @@ export function RecordHistoryPanel({
             }}
           />
         </label>
-        <select
-          aria-label="History status"
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as typeof status);
-            setPage(0);
-          }}
-        >
-          <option value="all">All statuses</option>
-          <option value="pending_approval">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="flagged">Flagged</option>
-        </select>
-        {owner && (
-          <input
-            aria-label="Submitter username"
-            value={submitter}
+        <label>
+          Status
+          <select
+            aria-label="History status"
+            className="block min-h-11 w-full rounded-lg border p-2"
+            value={status}
             onChange={(e) => {
-              setSubmitter(e.target.value);
+              setStatus(e.target.value as typeof status);
               setPage(0);
             }}
-            placeholder="Submitter username"
-            className="border rounded px-2"
-          />
+          >
+            <option value="all">All statuses</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="pending_approval">Pending review</option>
+            <option value="flagged">Needs correction</option>
+            <option value="removed">Removed</option>
+          </select>
+        </label>
+        {owner && (
+          <label>
+            Recorded by
+            <input
+              aria-label="Submitter username"
+              className="block min-h-11 w-full rounded-lg border p-2"
+              placeholder="Staff username"
+              value={submitter}
+              onChange={(e) => {
+                setSubmitter(e.target.value);
+                setPage(0);
+              }}
+            />
+          </label>
         )}
       </div>
-      {query.error && (
+      {query.error ? (
         <p role="alert" className="text-red-700">
           {query.error.message}
         </p>
-      )}
-      {query.isLoading ? (
-        <p>Loading history…</p>
+      ) : query.isLoading ? (
+        <p role="status">Loading history…</p>
       ) : (
-        <div className="space-y-3">
-          <p className="text-sm font-semibold text-emerald-900">
-            {query.data?.total ?? 0} saved history entries matching these filters
+        <>
+          <p className="text-sm font-semibold">
+            {query.data?.total ?? 0} history records matching these filters
           </p>
-          {query.data?.rows.map((event) => {
-            const record = event.after_data || event.before_data || {};
-            const labels: Record<string, string> = {
-              farm_financials: "Financial record",
-              farm_activities: "Daily farm report",
-              contact_transactions: "Customer / supplier transaction",
-              farm_financial_payments: "Follow-up payment",
-            };
-            const actions: Record<string, string> = {
-              insert: "Submitted",
-              update: "Updated",
-              delete: "Removed",
-              approved: "Approved",
-              rejected: "Rejected",
-              flagged: "Returned for correction",
-              pending_approval: "Submitted for approval",
-              pending: "Awaiting approval",
-              legacy_snapshot: "Earlier record retained",
-            };
-            const statuses: Record<string, string> = {
-              approved: "Approved",
-              pending: "Pending review",
-              pending_approval: "Pending review",
-              flagged: "Needs correction",
-              rejected: "Rejected",
-            };
-            const maintenance = event.actor_name?.includes("maintenance");
-            const person = record.recorded_by_name || event.recorded_by || "Submitter not recorded";
-            const fields: Array<[string, string]> = [
-              ["amount", "Amount"],
-              ["amount_paid", "Amount paid"],
-              ["total_amount", "Total amount"],
-              ["mortality_count", "Birds lost"],
-              ["birds_sold", "Birds sold"],
-              ["feed_bags", "Feed bags"],
-              ["feed_consumed_kg", "Feed used (kg)"],
-              ["activity_date", "Report date"],
-              ["transaction_date", "Transaction date"],
-              ["payment_date", "Payment date"],
-              ["description", "Description"],
-              ["item_description", "Description"],
-              ["rejection_reason", "Review note"],
-            ];
-            const value = (key: string, raw: unknown) =>
-              raw === null || raw === undefined
-                ? "Not recorded"
-                : key.includes("amount")
-                  ? new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(
-                      Number(raw),
-                    )
-                  : String(raw ?? "Not recorded");
-            return (
-              <article
-                key={event.id}
-                className="rounded-xl border border-slate-200 p-4 text-sm space-y-3"
-              >
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div>
-                    <h4 className="font-bold text-emerald-950">
-                      {String(
-                        record.description ||
-                          record.item_description ||
-                          record.activity_type ||
-                          labels[event.source_table] ||
-                          "Farm record",
+          <p className="text-xs text-slate-500 sm:hidden">
+            Swipe the table sideways to see all columns.
+          </p>
+          <div
+            role="region"
+            aria-label="Submission history table"
+            tabIndex={0}
+            className="max-w-full overflow-x-auto rounded-xl border"
+          >
+            <table className="w-full min-w-[620px] text-left text-sm">
+              <thead className="bg-emerald-50">
+                <tr>
+                  {["Date", "Record", "Submitted by", "Status", "Actions"].map((label) => (
+                    <th key={label} className="p-3">
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {query.data?.rows.map((event) => {
+                  const record = event.after_data || event.before_data || {};
+                  const key = event.source_table + event.source_id;
+                  const date =
+                    record.transaction_date ||
+                    record.activity_date ||
+                    record.payment_date ||
+                    record.created_at ||
+                    event.created_at;
+                  return (
+                    <Fragment key={key}>
+                      <tr className="border-t align-top">
+                        <td className="p-3 whitespace-nowrap">
+                          {new Date(String(date)).toLocaleDateString("en-GB", {
+                            timeZone: "Africa/Lagos",
+                          })}
+                        </td>
+                        <td className="p-3 min-w-48 max-w-80 break-words">
+                          <p className="font-semibold">
+                            {String(
+                              record.description ||
+                                record.item_description ||
+                                record.activity_type ||
+                                labels[event.source_table],
+                            )}
+                          </p>
+                          <p className="text-xs text-slate-500">{labels[event.source_table]}</p>
+                          {record.amount != null || record.total_amount != null ? (
+                            <p>{display("amount", record.amount ?? record.total_amount)}</p>
+                          ) : null}
+                        </td>
+                        <td className="p-3">
+                          {String(record.recorded_by_name || event.recorded_by || "Not recorded")}
+                        </td>
+                        <td className="p-3">
+                          <span className="inline-block rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold">
+                            {statuses[event.current_status || String(record.approval_status)] ||
+                              "Not recorded"}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          <button
+                            aria-expanded={expanded === key}
+                            onClick={() => setExpanded(expanded === key ? null : key)}
+                            className="min-h-11 rounded-lg border px-3 text-emerald-900"
+                          >
+                            {expanded === key ? "Close details" : "View details"}
+                          </button>
+                        </td>
+                      </tr>
+                      {expanded === key && (
+                        <tr>
+                          <td colSpan={5}>
+                            <Changes passcode={passcode} event={event} owner={owner} />
+                          </td>
+                        </tr>
                       )}
-                    </h4>
-                    <p className="text-xs text-slate-500">
-                      {labels[event.source_table] || "Farm record"} ·{" "}
-                      {new Date(event.created_at).toLocaleString("en-GB", {
-                        timeZone: "Africa/Lagos",
-                      })}
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-900">
-                    {statuses[String(record.approval_status)] ||
-                      (event.action === "delete" ? "Removed" : "Status not recorded")}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-x-6 gap-y-2">
-                  <p>
-                    <span className="text-slate-500">Recorded by: </span>
-                    {String(person)}
-                  </p>
-                  <p>
-                    <span className="text-slate-500">Action: </span>
-                    {actions[event.action] || "Record changed"}
-                  </p>
-                  <p>
-                    <span className="text-slate-500">Reviewed / updated by: </span>
-                    {maintenance
-                      ? "System maintenance (owner authorised)"
-                      : event.actor_name || "Not recorded for this earlier entry"}
-                  </p>
-                </div>
-                <dl className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  {fields
-                    .filter(
-                      ([key]) =>
-                        record[key] !== undefined &&
-                        record[key] !== null &&
-                        !["description", "item_description", "rejection_reason"].includes(key),
-                    )
-                    .map(([key, label]) => (
-                      <div key={key}>
-                        <dt className="text-xs text-slate-500">{label}</dt>
-                        <dd className="font-medium">{value(key, record[key])}</dd>
-                      </div>
-                    ))}
-                </dl>
-                {record.rejection_reason && (
-                  <p className="rounded bg-amber-50 p-2">
-                    Review note: {String(record.rejection_reason)}
-                  </p>
-                )}
-                {event.before_data && event.after_data && (
-                  <details>
-                    <summary className="cursor-pointer font-semibold text-emerald-800">
-                      See what changed
-                    </summary>
-                    <dl className="mt-2 space-y-2">
-                      {fields
-                        .filter(
-                          ([key]) =>
-                            JSON.stringify(event.before_data?.[key]) !==
-                            JSON.stringify(event.after_data?.[key]),
-                        )
-                        .map(([key, label]) => (
-                          <div key={key}>
-                            <dt className="font-semibold">{label}</dt>
-                            <dd>
-                              Previously: {value(key, event.before_data?.[key])} → Now:{" "}
-                              {value(key, event.after_data?.[key])}
-                            </dd>
-                          </div>
-                        ))}
-                    </dl>
-                  </details>
-                )}
-              </article>
-            );
-          })}
-          {!query.data?.rows.length && !query.error && (
-            <p className="py-3">No history matches these filters.</p>
-          )}
-        </div>
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {!query.data?.rows.length && <p>No history matches these filters.</p>}
+        </>
       )}
-
-      <div className="flex items-center gap-3 text-sm">
-        <button disabled={page === 0} onClick={() => setPage(page - 1)}>
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <button
+          className="min-h-11 rounded-lg border px-3 disabled:opacity-40"
+          disabled={page === 0 || query.isLoading}
+          onClick={() => setPage(page - 1)}
+        >
           Previous
         </button>
-        <span>
-          Page {page + 1} · {query.data?.total || 0} saved history entries
-        </span>
+        <span>Page {page + 1}</span>
         <button
-          disabled={!query.data || (page + 1) * 50 >= query.data.total}
+          className="min-h-11 rounded-lg border px-3 disabled:opacity-40"
+          disabled={!query.data || query.isLoading || (page + 1) * 25 >= query.data.total}
           onClick={() => setPage(page + 1)}
         >
           Next
