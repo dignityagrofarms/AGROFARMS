@@ -94,6 +94,7 @@ export interface FarmPartner {
   batchId: string | null;
   batchName?: string | null;
   batchAllocationPercentage: number;
+  allocatedBirds?: number | null;
   autoSyncBatch: boolean;
   status: "active" | "matured" | "completed" | "paused";
   active: boolean;
@@ -188,6 +189,8 @@ export interface PartnerActivity {
 }
 
 export interface PartnerDashboardData {
+  batchSales?: { date: string; birds: number }[];
+  batchProgress?: { initialBirds: number; birdsSold: number; mortality: number; remaining: number };
   partner: FarmPartner;
   financials: PartnerFinancial[];
   activities: PartnerActivity[];
@@ -205,6 +208,7 @@ export async function checkOwnerOrManager(
     throw new Error("Access denied. Partner operations are restricted to Owner and Manager only.");
   }
   if (role === "manager") {
+    await (await import("./financial-access.server")).requireFinancialAccess(value);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: settingRow } = await supabaseAdmin
       .from("app_settings")
@@ -527,6 +531,7 @@ function mapPartner(p: any, finRows: any[], actRows: any[] = []): FarmPartner {
     batchId: p.batch_id,
     batchName: p.farm_batches?.batch_name ?? null,
     batchAllocationPercentage: Number(p.batch_allocation_percentage ?? 100),
+    allocatedBirds: p.allocated_birds == null ? null : Number(p.allocated_birds),
     autoSyncBatch: p.auto_sync_batch !== false,
     status: p.status,
     active: Boolean(p.active),
@@ -744,17 +749,7 @@ async function computePartnerBatchFeedStats(
   syncedFinancials: PartnerFinancial[] = [],
 ) {
   if (!partner.batchId) return null;
-  let pct = 100;
-  for (const f of syncedFinancials) {
-    if (f.referenceNo?.startsWith("BATCH-SYNC-")) {
-      const m = (f.description || "").match(/\((\d+(?:\.\d+)?)%\s*batch share\)/i);
-      if (m) {
-        pct = Number(m[1]);
-        break;
-      }
-    }
-  }
-  const ratio = Math.max(0.01, Math.min(1, pct / 100));
+  const ratio = Math.max(0, Math.min(1, partner.batchAllocationPercentage / 100));
 
   const [{ data: finRows }, { data: actRows }] = await Promise.all([
     supabaseAdmin
@@ -942,8 +937,8 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
       cycle_end_date: data.cycleEndDate || null,
       cycle_status: "open",
       batch_id: data.batchId || null,
-      batch_allocation_percentage: data.batchAllocationPercentage ?? 100,
-      auto_sync_batch: data.autoSyncBatch ?? true,
+      batch_allocation_percentage: 0,
+      auto_sync_batch: false,
       status: "active",
       active: true,
     };
@@ -976,17 +971,6 @@ export const adminCreatePartner = createServerFn({ method: "POST" })
     }
 
     if (!insertedId) throw new Error(lastError?.message || "Failed to create partner account");
-
-    if (data.batchId && data.autoSyncBatch !== false) {
-      await syncBatchTransactionsForPartner(supabaseAdmin, insertedId, cred.username || "owner", {
-        role: "owner",
-        allocationPercentage: data.batchAllocationPercentage ?? 100,
-        syncFinancials: true,
-        syncActivities: true,
-      }).catch((err) => {
-        console.warn("[adminCreatePartner] initial batch auto-sync warning:", err?.message || err);
-      });
-    }
 
     return { ok: true, partnerId: insertedId };
   });
@@ -1061,6 +1045,16 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
       .single();
     if (cErr || !current) throw new Error("Partner record not found.");
 
+    if (
+      current.allocated_birds &&
+      (data.batchId !== current.batch_id ||
+        data.initialInvestment !== Number(current.initial_investment) ||
+        data.profitSharePercentage !== Number(current.profit_share_percentage) ||
+        data.lossSharePercentage !== Number(current.loss_share_percentage))
+    )
+      throw new Error(
+        "Use Allocate Partners to change birds or capital. Open a new cycle before changing batches.",
+      );
     if (data.cycleEndDate && data.cycleEndDate < data.cycleStartDate) {
       throw new Error("Cycle end date cannot be before the start date.");
     }
@@ -1110,10 +1104,9 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
       cycle_start_date: data.cycleStartDate,
       cycle_end_date: data.cycleEndDate || null,
       batch_id: data.batchId || null,
-      ...(data.batchAllocationPercentage !== undefined
-        ? { batch_allocation_percentage: data.batchAllocationPercentage }
+      ...(data.batchId !== current.batch_id
+        ? { allocated_birds: null, batch_allocation_percentage: 0, auto_sync_batch: false }
         : {}),
-      ...(data.autoSyncBatch !== undefined ? { auto_sync_batch: data.autoSyncBatch } : {}),
       status: data.status,
       terms_history: auditLog,
       updated_at: new Date().toISOString(),
@@ -1150,7 +1143,7 @@ export const adminUpdatePartner = createServerFn({ method: "POST" })
 
     if (!updated) throw new Error(lastError?.message || "Failed to update partner details");
 
-    if (data.batchId && data.autoSyncBatch !== false && current.cycle_status !== "closed") {
+    if (data.batchId && current.allocated_birds && current.cycle_status !== "closed") {
       await syncBatchTransactionsForPartner(
         supabaseAdmin,
         data.partnerId,
@@ -1377,6 +1370,9 @@ export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
       cycle_start_date: data.newCycleStartDate,
       cycle_end_date: data.newCycleEndDate || null,
       batch_id: data.newBatchId || null,
+      allocated_birds: null,
+      batch_allocation_percentage: 0,
+      auto_sync_batch: false,
       cycle_status: "open",
       status: "active",
       settled_at: null,
@@ -1468,9 +1464,15 @@ export const adminDeletePartner = createServerFn({ method: "POST" })
       .eq("partner_id", data.partnerId)
       .limit(1);
     if (agreementError) throw new Error("Could not check retained agreements. Please retry.");
-    if (agreements?.length)
+    const { data: birdAllocations, error: birdError } = await agreementDb
+      .from("batch_bird_allocations")
+      .select("id")
+      .eq("partner_id", data.partnerId)
+      .limit(1);
+    if (birdError) throw new Error("Could not check retained bird allocations");
+    if (agreements?.length || birdAllocations?.length)
       throw new Error(
-        "This partner has a retained official agreement. Deactivate the account instead of deleting its records.",
+        "This partner has retained agreements or bird allocations. Deactivate the account instead of deleting its records.",
       );
 
     // Clean up all related financial entries and activity logs first
@@ -1869,7 +1871,7 @@ export async function syncBatchTransactionsForPartner(
 }> {
   const { error } = await supabaseAdmin.rpc("reconcile_partner_batch", {
     partner_id_input: partnerId,
-    allocation_input: options.allocationPercentage ?? null,
+    allocation_input: null,
   });
   if (error) throw new Error(`Partner reconciliation failed: ${error.message}`);
   const commerce = await supabaseAdmin.rpc("reconcile_partner_commerce", {
@@ -1915,7 +1917,7 @@ export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
       .object({
         passcode: z.string().min(1),
         partnerId: z.string().uuid(),
-        allocationPercentage: z.number().min(1).max(100).default(100),
+        allocationPercentage: z.number().min(0).max(100).optional(),
         syncFinancials: z.boolean().default(true),
         syncActivities: z.boolean().default(true),
       })
@@ -1925,12 +1927,13 @@ export const adminSyncBatchToPartner = createServerFn({ method: "POST" })
     const { role, username } = await checkOwnerOrManager(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Persist chosen allocation percentage on the partner record when column exists
-    await supabaseAdmin
+    const { data: allocation } = await (supabaseAdmin as any)
       .from("farm_partners")
-      .update({ batch_allocation_percentage: data.allocationPercentage } as any)
-      .eq("id", data.partnerId);
-
+      .select("allocated_birds")
+      .eq("id", data.partnerId)
+      .single();
+    if (!allocation?.allocated_birds)
+      throw new Error("Use Allocate Partners to confirm birds and investment before syncing");
     const res = await syncBatchTransactionsForPartner(supabaseAdmin, data.partnerId, username, {
       role,
       allocationPercentage: data.allocationPercentage,
@@ -1956,6 +1959,17 @@ export interface BatchInvestorSummary {
   totalExpense: number;
   netProfit: number;
   totalCommittedCapital: number;
+  initialBirds: number;
+  reservedBirds: number;
+  unresolvedHistoricalAllocation: boolean;
+  historicalAllocations: {
+    partnerId: string;
+    fullName: string;
+    investment: number;
+    cycleName: string;
+  }[];
+  fundingPerBird: number | null;
+  allocationRevision: number;
   totalAllocatedProfitPct: number;
   farmRetainedProfitPct: number;
   investors: Array<{
@@ -1966,6 +1980,7 @@ export interface BatchInvestorSummary {
     profitSharePercentage: number;
     lossSharePercentage: number;
     batchAllocationPercentage: number;
+    allocatedBirds: number | null;
     autoSyncBatch: boolean;
     cycleStatus: "open" | "closed";
     settlement: Settlement;
@@ -1996,16 +2011,17 @@ export const adminGetBatchInvestors = createServerFn({ method: "POST" })
 
     if (bErr || !batchRow) throw new Error("Batch not found.");
 
-    let totalIncome = 0;
-    let totalExpense = 0;
-    for (const f of finRows || []) {
-      if (f.approval_status && f.approval_status !== "approved") continue;
-      if (f.type === "income") {
-        totalIncome += Number(f.amount_paid ?? f.amount ?? 0);
-      } else {
-        totalExpense += Number(f.amount || 0);
-      }
-    }
+    const { loadReceiptReport } = await import("./report.functions");
+    const receiptReport = await loadReceiptReport({
+      passcode: data.passcode,
+      batchId: data.batchId,
+    });
+    const totalIncome = receiptReport.rows
+      .filter((f) => f.type === "income")
+      .reduce((n, f) => n + f.amount, 0);
+    const totalExpense = receiptReport.rows
+      .filter((f) => f.type === "expense")
+      .reduce((n, f) => n + f.amount, 0);
     const netProfit = totalIncome - totalExpense;
 
     const partnerIds = (partnerRows || []).map((p: any) => p.id);
@@ -2020,6 +2036,11 @@ export const adminGetBatchInvestors = createServerFn({ method: "POST" })
       finByPartner.set(pf.partner_id, list);
     }
 
+    const { data: retainedAllocations, error: retainedError } = await (supabaseAdmin as any)
+      .from("batch_bird_allocations")
+      .select("partner_id,birds,closed_at,cycle_name")
+      .eq("batch_id", data.batchId);
+    if (retainedError) throw new Error("Could not load retained bird allocations");
     const investors = (partnerRows || []).map((p: any) => {
       const mapped = mapPartner(p, finByPartner.get(p.id) || [], []);
       return {
@@ -2030,6 +2051,7 @@ export const adminGetBatchInvestors = createServerFn({ method: "POST" })
         profitSharePercentage: mapped.profitSharePercentage,
         lossSharePercentage: mapped.lossSharePercentage,
         batchAllocationPercentage: mapped.batchAllocationPercentage,
+        allocatedBirds: mapped.allocatedBirds ?? null,
         autoSyncBatch: mapped.autoSyncBatch,
         cycleStatus: mapped.cycleStatus,
         settlement: mapped.settlement,
@@ -2038,7 +2060,12 @@ export const adminGetBatchInvestors = createServerFn({ method: "POST" })
 
     const totalCommittedCapital = investors.reduce((s, inv) => s + inv.initialInvestment, 0);
     const totalAllocatedProfitPct =
-      Math.round(investors.reduce((s, inv) => s + inv.profitSharePercentage, 0) * 100) / 100;
+      Math.round(
+        investors.reduce(
+          (s, inv) => s + (inv.profitSharePercentage * inv.batchAllocationPercentage) / 100,
+          0,
+        ) * 100,
+      ) / 100;
 
     return {
       batchId: batchRow.id,
@@ -2050,42 +2077,113 @@ export const adminGetBatchInvestors = createServerFn({ method: "POST" })
       totalExpense,
       netProfit,
       totalCommittedCapital,
+      initialBirds: batchRow.initial_headcount,
+      reservedBirds: (retainedAllocations || [])
+        .filter(
+          (a: any) =>
+            a.closed_at ||
+            !(partnerRows || []).some(
+              (p: any) => p.id === a.partner_id && p.active && p.cycle_status === "open",
+            ),
+        )
+        .reduce((n: number, a: any) => n + Number(a.birds), 0),
+      unresolvedHistoricalAllocation: (partnerRows || []).some(
+        (p: any) =>
+          (!p.active || p.cycle_status === "closed") &&
+          !p.allocated_birds &&
+          p.initial_investment > 0 &&
+          !(retainedAllocations || []).some(
+            (h: any) => h.partner_id === p.id && h.cycle_name === p.cycle_name,
+          ),
+      ),
+      historicalAllocations: (partnerRows || [])
+        .filter(
+          (p: any) =>
+            (!p.active || p.cycle_status === "closed") &&
+            !p.allocated_birds &&
+            p.initial_investment > 0 &&
+            !(retainedAllocations || []).some(
+              (h: any) => h.partner_id === p.id && h.cycle_name === p.cycle_name,
+            ),
+        )
+        .map((p: any) => ({
+          partnerId: p.id,
+          fullName: p.full_name,
+          investment: Number(p.initial_investment),
+          cycleName: p.cycle_name,
+        })),
+      fundingPerBird:
+        (batchRow as any).funding_per_bird == null
+          ? null
+          : Number((batchRow as any).funding_per_bird),
+      allocationRevision: Number((batchRow as any).allocation_revision || 0),
       totalAllocatedProfitPct,
       farmRetainedProfitPct: Math.max(0, Math.round((100 - totalAllocatedProfitPct) * 100) / 100),
-      investors,
+      investors: investors.filter((inv) =>
+        (partnerRows || []).some(
+          (p: any) => p.id === inv.partnerId && p.active && p.cycle_status !== "closed",
+        ),
+      ),
     };
   });
 
 export const adminAllocateBatchInvestors = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .inputValidator((input: unknown) =>
     z
       .object({
         passcode: z.string().min(1),
         batchId: z.string().uuid(),
-        allocations: z.array(
-          z.object({
-            partnerId: z.string().uuid(),
-            initialInvestment: z.number().min(0),
-            profitSharePercentage: pct,
-            lossSharePercentage: pct,
-            batchAllocationPercentage: pct.min(1).default(100),
-            autoSyncBatch: z.boolean().default(true),
-          }),
-        ),
+        fundingPerBird: z.number().positive().max(1e10),
+        revision: z.number().int().min(0),
+        allocations: z
+          .array(
+            z.object({
+              partnerId: z.string().uuid(),
+              birds: z.number().int().positive(),
+              profitSharePercentage: pct,
+              lossSharePercentage: pct,
+            }),
+          )
+          .min(1),
       })
-      .parse(data),
+      .parse(input),
   )
   .handler(async ({ data }) => {
     await checkOwner(data.passcode);
-    const cred = parseAdminCredential(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
     const { error } = await (supabaseAdmin as any).rpc("allocate_batch_investors", {
       batch_id_input: data.batchId,
+      funding_input: data.fundingPerBird,
       allocations_input: data.allocations,
+      revision_input: data.revision,
     });
     if (error) throw new Error(error.message);
     return { ok: true, count: data.allocations.length };
+  });
+
+export const adminConfirmHistoricalBirds = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        passcode: z.string(),
+        batchId: z.string().uuid(),
+        partnerId: z.string().uuid(),
+        birds: z.number().int().positive(),
+        revision: z.number().int().min(0),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any).rpc("confirm_historical_birds", {
+      batch_input: data.batchId,
+      partner_input: data.partnerId,
+      birds_input: data.birds,
+      revision_input: data.revision,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 // ─── Partner Portal Server Functions (Strict Multi-Tenant Isolation) ──────────
@@ -2165,40 +2263,51 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
       (a: PartnerActivity) => a.approvalStatus === "approved",
     );
 
-    const MASK = "Farm Management";
-    const maskedPartner: FarmPartner = {
-      ...partner,
-      auditLog: partner.auditLog.map((e) => ({
-        ...e,
-        by: e.kind === "agreement_signed" || e.kind === "payout_election" ? e.by : MASK,
-      })),
-    };
-    const maskedFin = approvedFinancials.map((f: PartnerFinancial) => ({
-      ...f,
-      recordedBy: f.recordedBy ? MASK : null,
-      removedBy: f.removedBy ? MASK : null,
-      approvedBy: f.approvedBy ? MASK : null,
-    }));
-    const maskedAct = approvedActivities.map((a: PartnerActivity) => ({
-      ...a,
-      recordedBy: a.recordedBy ? MASK : null,
-      removedBy: a.removedBy ? MASK : null,
-      approvedBy: a.approvedBy ? MASK : null,
-    }));
-
-    const computed = buildSummaryAndCharts(
-      approvedFinancials,
-      approvedActivities,
-      partner.initialInvestment,
-    );
+    const { partnerProfileView, partnerFinancialView, partnerActivityView } =
+      await import("./partner-privacy");
+    const maskedPartner = partnerProfileView(partner);
+    const maskedFin = approvedFinancials.map(partnerFinancialView);
+    const maskedAct = approvedActivities.map(partnerActivityView);
+    const computed = buildSummaryAndCharts(maskedFin, maskedAct, partner.initialInvestment);
     const feedBagStats = await computePartnerBatchFeedStats(
       supabaseAdmin,
       partner,
       approvedFinancials,
     ).catch(() => null);
 
+    let batchSales: PartnerDashboardData["batchSales"];
+    let batchProgress: PartnerDashboardData["batchProgress"];
+    if (partner.batchId) {
+      const { data: sales, error: salesError } = await (supabaseAdmin as any).rpc(
+        "partner_batch_sales",
+        { batch_input: partner.batchId },
+      );
+      if (salesError) throw new Error("Sales progress is temporarily unavailable");
+      batchSales = (sales || []).map((row: any) => ({
+        date: row.sale_date,
+        birds: Number(row.birds),
+      }));
+      const [{ data: batch }, { data: stats, error: stockError }] = await Promise.all([
+        supabaseAdmin
+          .from("farm_batches")
+          .select("initial_headcount")
+          .eq("id", partner.batchId)
+          .single(),
+        (supabaseAdmin as any).rpc("batch_stock_summary", { batch_ids: [partner.batchId] }),
+      ]);
+      if (stockError) throw new Error("Batch stock progress is temporarily unavailable");
+      if (batch && stats?.[0])
+        batchProgress = {
+          initialBirds: Number(batch.initial_headcount),
+          birdsSold: Number(stats[0].total_birds_sold),
+          mortality: Number(stats[0].total_mortality),
+          remaining: Number(stats[0].live_birds),
+        };
+    }
     return {
       partner: maskedPartner,
+      batchProgress,
+      batchSales,
       financials: maskedFin,
       activities: maskedAct,
       summary: { ...computed.summary, feedBagStats },

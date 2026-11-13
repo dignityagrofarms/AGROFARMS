@@ -40,8 +40,10 @@ function DealForm({
     salesWindow: "",
     durationWeeks: "6",
     capital: String(partner.initialInvestment || ""),
-    birds: "",
-    unitFunding: "",
+    birds: partner.allocatedBirds ? String(partner.allocatedBirds) : "",
+    unitFunding: partner.allocatedBirds
+      ? (partner.initialInvestment / partner.allocatedBirds).toFixed(2)
+      : "",
     partnerProfit: String(partner.profitSharePercentage),
     representative: "Ihemegbulem Chukwuebuka Gerald",
     companyAddress: "No. 9 Oduobi Crescent, Ikenegbu, Owerri, Imo State, Nigeria",

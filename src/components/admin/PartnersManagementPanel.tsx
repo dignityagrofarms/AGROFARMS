@@ -307,7 +307,7 @@ export function PartnersManagementPanel({
               onClick={() => setShowBatchSplitModal(true)}
               className="inline-flex items-center gap-2 rounded-xl bg-white/15 border border-white/25 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-white hover:text-[#0F3D24]"
             >
-              <Layers size={15} /> Batch Profit/Loss Split
+              <Layers size={15} /> Allocate Partners
             </button>
           )}
           {effectiveRole === "owner" && (
@@ -2440,6 +2440,12 @@ function PartnerCredentialsSubPanel({
           </h3>
         </div>
 
+        {partner.allocatedBirds && (
+          <p className="rounded-lg bg-emerald-50 p-3 text-sm">
+            Bird allocation, capital and profit/loss terms are managed together in Allocate
+            Partners.
+          </p>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Full Name *</label>
@@ -2470,6 +2476,7 @@ function PartnerCredentialsSubPanel({
               allowDecimal
               required
               min={0}
+              disabled={!!partner.allocatedBirds}
               value={initialInvestment}
               onValueChange={(_, raw) => setInitialInvestment(raw)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 font-bold text-[#0F3D24]"
@@ -2484,6 +2491,7 @@ function PartnerCredentialsSubPanel({
               required
               min={0}
               max={100}
+              disabled={!!partner.allocatedBirds}
               value={profitShare}
               onValueChange={(_, raw) => setProfitShare(raw)}
               className="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2 font-black text-emerald-900"
@@ -2537,6 +2545,7 @@ function PartnerCredentialsSubPanel({
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Linked Farm Batch</label>
             <select
+              disabled={!!partner.allocatedBirds}
               value={batchId}
               onChange={(e) => setBatchId(e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-medium text-[#0F3D24]"
@@ -2554,21 +2563,15 @@ function PartnerCredentialsSubPanel({
                   <input
                     type="checkbox"
                     checked={autoSyncBatch}
-                    onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                    disabled
+                    readOnly
                     className="h-3.5 w-3.5 accent-[#0F3D24]"
                   />
                   Auto-sync batch P&amp;L
                 </label>
                 <div className="flex items-center gap-1">
-                  <span className="text-slate-600 font-semibold">Pool %:</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={batchAllocationPercentage}
-                    onChange={(e) => setBatchAllocationPercentage(e.target.value)}
-                    className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
-                  />
+                  <span className="text-slate-600 font-semibold">Ownership:</span>
+                  <span className="text-xs">Calculated in Allocate Partners</span>
                 </div>
               </div>
             )}
@@ -3220,21 +3223,15 @@ function AddPartnerModal({
                         <input
                           type="checkbox"
                           checked={autoSyncBatch}
-                          onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                          disabled
+                          readOnly
                           className="h-3.5 w-3.5 accent-[#0F3D24]"
                         />
                         Auto-calculate Profit/Loss from batch ledger
                       </label>
                       <div className="flex items-center gap-1">
-                        <span className="text-emerald-900 font-semibold">Batch Pool %:</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={batchAllocationPercentage}
-                          onChange={(e) => setBatchAllocationPercentage(e.target.value)}
-                          className="w-16 rounded-lg border border-emerald-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
-                        />
+                        <span className="text-emerald-900 font-semibold">Ownership:</span>
+                        <span className="text-xs">Calculated in Allocate Partners</span>
                       </div>
                     </div>
                   )}
@@ -4103,6 +4100,7 @@ export function EditPartnerModal({
                       min={0}
                       required
                       placeholder="e.g. 500000"
+                      disabled={!!partner.allocatedBirds}
                       value={initialInvestment}
                       onValueChange={(_, raw) => setInitialInvestment(raw)}
                       className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-[#0F3D24] font-mono font-bold outline-none focus:border-[#0F3D24]"
@@ -4186,6 +4184,7 @@ export function EditPartnerModal({
                   Linked Farm Production Batch
                 </label>
                 <select
+                  disabled={!!partner.allocatedBirds}
                   value={batchId}
                   onChange={(e) => setBatchId(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
@@ -4204,27 +4203,21 @@ export function EditPartnerModal({
                       <input
                         type="checkbox"
                         checked={autoSyncBatch}
-                        onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                        disabled
+                        readOnly
                         className="h-3.5 w-3.5 accent-[#0F3D24]"
                       />
                       Auto-calculate Profit/Loss from batch ledger
                     </label>
                     <div className="flex items-center gap-1">
-                      <span className="text-slate-600 font-semibold">Batch Pool %:</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={batchAllocationPercentage}
-                        onChange={(e) => setBatchAllocationPercentage(e.target.value)}
-                        className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
-                      />
+                      <span className="text-slate-600 font-semibold">Ownership:</span>
+                      <span className="text-xs">Calculated in Allocate Partners</span>
                     </div>
                   </div>
                 )}
                 <p className="text-[10px] text-slate-500">
-                  Linking a batch automatically syncs approved farm operational expenses and bird
-                  sales receipts into this partner&apos;s profit/loss ledger.
+                  After linking, use Allocate Partners to confirm birds and capital and enable
+                  automatic synchronization.
                 </p>
               </div>
             </div>
@@ -4245,6 +4238,7 @@ export function EditPartnerModal({
                   min="0"
                   max="100"
                   step="1"
+                  disabled={!!partner.allocatedBirds}
                   value={profitShare}
                   onChange={(e) => setProfitShare(e.target.value)}
                   className="w-full accent-[#0F3D24]"

@@ -35,12 +35,13 @@ import {
 } from "@/lib/orders.functions";
 
 interface StaffTasksPanelProps {
+  hideFinancials?: boolean;
   passcode: string;
   role: "owner" | "manager" | "staff";
   username: string;
 }
 
-export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelProps) {
+export function StaffTasksPanel({ passcode, role, username, hideFinancials = false }: StaffTasksPanelProps) {
   const qc = useQueryClient();
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"tasks" | "payroll" | "leave" | "attendance">("tasks");
 
@@ -91,13 +92,13 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
   const usersQuery = useQuery({
     queryKey: ["admin-user-accounts", passcode],
     queryFn: () => listUsersFn({ data: { passcode } }),
-    enabled: role === "owner" || role === "manager",
+    enabled: !hideFinancials && (role === "owner" || role === "manager"),
   });
 
   const payrollQuery = useQuery({
     queryKey: ["staff-my-payroll", passcode, username],
     queryFn: () => listPayrollFn({ data: { passcode, username: username || undefined } }),
-    enabled: activeWorkspaceTab === "payroll",
+    enabled: !hideFinancials && activeWorkspaceTab === "payroll",
   });
 
   const leaveQuery = useQuery({
@@ -238,6 +239,7 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
             <CheckSquare size={13} /> Tasks ({pendingTasks.length})
           </button>
 
+          {!hideFinancials && (
           <button
             onClick={() => setActiveWorkspaceTab("payroll")}
             className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold transition ${
@@ -253,6 +255,7 @@ export function StaffTasksPanel({ passcode, role, username }: StaffTasksPanelPro
               </span>
             )}
           </button>
+          )}
 
           <button
             onClick={() => setActiveWorkspaceTab("leave")}

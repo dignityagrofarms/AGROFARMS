@@ -18,6 +18,8 @@ export type FarmBatch = {
   closedAt?: string | null;
   closedBy?: string | null;
   showFinancialsToStaff: boolean;
+  fundingPerBird?: number | null;
+  allocationRevision?: number;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -367,7 +369,8 @@ const createActivitySchema = baseAuthSchema.extend({
 });
 
 export async function assertFinancialRead(passcode: string, batchId?: string | null) {
-  const role = await checkPasscode(passcode);
+  const { requireFinancialAccess } = await import("./financial-access.server");
+  const { role } = await requireFinancialAccess(passcode);
   if (role !== "staff") return;
   if (!batchId) throw new Error("Financial reports require Owner or Manager access.");
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -709,6 +712,8 @@ export const adminListBatches = createServerFn({ method: "POST" })
         closedAt: r.closed_at ?? null,
         closedBy: r.closed_by ?? null,
         showFinancialsToStaff: Boolean(r.show_financials_to_staff),
+        fundingPerBird: r.funding_per_bird == null ? null : Number(r.funding_per_bird),
+        allocationRevision: Number(r.allocation_revision || 0),
         notes: r.notes ?? null,
         createdAt: r.created_at,
         updatedAt: r.updated_at,
@@ -939,7 +944,8 @@ export const adminListFinancials = createServerFn({ method: "POST" })
       .parse(data),
   )
   .handler(async ({ data }): Promise<FarmFinancial[]> => {
-    const role = await checkPasscode(data.passcode);
+    const { requireFinancialAccess } = await import("./financial-access.server");
+    const { role } = await requireFinancialAccess(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     let visibleStaffBatchIds: string[] | null = null;
@@ -1606,6 +1612,7 @@ export const adminGetBatchReport = createServerFn({ method: "POST" })
     z.object({ passcode: z.string(), batchId: z.string().uuid() }).parse(data),
   )
   .handler(async ({ data }): Promise<BatchReport | null> => {
+    await assertFinancialRead(data.passcode, data.batchId);
     const role = await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 

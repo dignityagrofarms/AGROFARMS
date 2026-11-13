@@ -1050,7 +1050,7 @@ function extractAndStripPlacedBy(
 
 export const adminListOrders = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => adminListSchema.parse(data))
-  .handler(async ({ data }): Promise<{ orders: AdminOrder[]; role: AdminRole }> => {
+  .handler(async ({ data }): Promise<{ orders: AdminOrder[]; role: AdminRole; financialsRestricted?: boolean }> => {
     const role = await checkPasscode(data.passcode);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let q = supabaseAdmin.from("orders").select("*");

@@ -1,3 +1,5 @@
+import { getFinancialAccess } from "@/lib/financial-access.functions";
+import { OperationalWorkspace } from "@/components/admin/OperationalWorkspace";
 import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -450,7 +452,39 @@ function AdminOrders() {
     placeholderData: keepPreviousData,
   });
 
-  const role = (query.data?.role as AdminRole) || "owner";
+  const getAccessFn = useServerFn(getFinancialAccess);
+  const accessQuery = useQuery({
+    queryKey: ["financial-access", passcode],
+    queryFn: () => getAccessFn({ data: { passcode: passcode! } }),
+    enabled: !!passcode,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+  const previousAccess = useRef<boolean | null>(null);
+  useEffect(() => {
+    const permitted =
+      accessQuery.isError || query.data?.financialsRestricted
+        ? false
+        : accessQuery.data?.canViewFinancials;
+    if (permitted === undefined) return;
+    if (query.data?.financialsRestricted && accessQuery.data?.canViewFinancials)
+      qc.setQueryData<typeof accessQuery.data>(["financial-access", passcode], (old) =>
+        old ? { ...old, canViewFinancials: false } : old,
+      );
+    if (previousAccess.current === true && !permitted) {
+      qc.cancelQueries({ predicate: (q) => q.queryKey[0] !== "financial-access" });
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== "financial-access" });
+    }
+    previousAccess.current = permitted;
+  }, [
+    accessQuery.data?.canViewFinancials,
+    accessQuery.isError,
+    query.data?.financialsRestricted,
+    passcode,
+    qc,
+  ]);
+  const role = (accessQuery.data?.role as AdminRole) || (query.data?.role as AdminRole) || "staff";
 
   const getPartnerSettingsFn = useServerFn(adminGetPartnerSettings);
   const partnerSettingsQuery = useQuery({
@@ -891,6 +925,32 @@ function AdminOrders() {
       />
     );
   }
+
+  if (!accessQuery.data || accessQuery.isError)
+    return (
+      <main className="p-6">
+        <p>
+          {accessQuery.error
+            ? "Access settings are unavailable. Please retry."
+            : "Checking access…"}
+        </p>
+        <button className="min-h-11 underline" onClick={() => accessQuery.refetch()}>
+          Retry
+        </button>
+        <button className="ml-4 min-h-11 underline" onClick={signOut}>
+          Sign out
+        </button>
+      </main>
+    );
+  if (!accessQuery.data.canViewFinancials || query.data?.financialsRestricted)
+    return (
+      <OperationalWorkspace
+        passcode={passcode}
+        role={role}
+        username={currentUsername}
+        onSignOut={signOut}
+      />
+    );
 
   const awaitingApprovalOrdersCount = (query.data?.orders || []).filter(
     (o) =>

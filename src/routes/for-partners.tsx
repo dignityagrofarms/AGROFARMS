@@ -1,3 +1,4 @@
+import { buildChartData } from "@/lib/partner-settlement";
 import { OfficialAgreementPanel } from "@/components/agreements/OfficialAgreementPanel";
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -429,13 +430,25 @@ function PartnersAccountPortal({
     );
   }
 
-  const { partner, financials, activities, charts, summary } = dashboardQuery.data;
+  const {
+    partner,
+    financials: currentFinancials,
+    activities: currentActivities,
+    charts: currentCharts,
+    summary: currentSummary,
+  } = dashboardQuery.data;
 
   // Multi-cycle resolution: check if partner selected an archived cycle
   const activeArchive = partner.archivedCycles?.find((c) => c.cycleId === selectedCycleId);
+  const financials = activeArchive?.financials || currentFinancials;
+  const activities = activeArchive?.activities || currentActivities;
+  const summary = activeArchive?.summary || currentSummary;
+  const charts = activeArchive ? buildChartData(financials, activities) : currentCharts;
   const displayPartner = activeArchive
     ? {
         ...partner,
+        batchId: activeArchive.batchId,
+        batchName: activeArchive.batchName,
         cycleName: activeArchive.cycleName,
         projectName: activeArchive.projectName,
         cycleStartDate: activeArchive.cycleStartDate || partner.cycleStartDate,
@@ -600,6 +613,65 @@ function PartnersAccountPortal({
       {/* 1b. Biological & Unit Economics Strip (Cost per bird, FCR, Break-even price) */}
       <UnitEconomicsStrip partner={displayPartner} summary={summary} />
 
+      {!activeArchive && (
+        <section className="space-y-3 rounded-xl border bg-white p-4">
+          <h3 className="font-bold">Your batch allocation</h3>
+          {partner.allocatedBirds ? (
+            <p>
+              {partner.allocatedBirds} birds allocated ·{" "}
+              {partner.batchAllocationPercentage.toFixed(4)}% ownership · ₦
+              {partner.initialInvestment.toLocaleString("en-NG")} invested
+            </p>
+          ) : (
+            <p>The owner must confirm your allocation in Allocate Partners.</p>
+          )}
+          {dashboardQuery.data.batchProgress && (
+            <>
+              <p className="text-sm font-semibold">Whole-batch progress</p>
+              <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                {[
+                  ["Initial birds", dashboardQuery.data.batchProgress.initialBirds],
+                  ["Birds sold", dashboardQuery.data.batchProgress.birdsSold],
+                  ["Mortality", dashboardQuery.data.batchProgress.mortality],
+                  ["Birds remaining", dashboardQuery.data.batchProgress.remaining],
+                ].map(([label, value]) => (
+                  <p key={label} className="rounded-lg bg-slate-50 p-3">
+                    {label}
+                    <strong className="block">{value}</strong>
+                  </p>
+                ))}
+              </div>
+              <p className="text-xs">
+                Stock counts describe the whole pooled batch. Your financial records show your
+                allocated share; customer details are private.
+              </p>
+            </>
+          )}
+          {!!dashboardQuery.data.batchSales?.length && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <caption className="text-left py-2 font-semibold">
+                  Recorded sales — whole batch, grouped by record date
+                </caption>
+                <thead>
+                  <tr>
+                    <th className="p-2">Date</th>
+                    <th className="p-2">Birds sold / offloaded</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboardQuery.data.batchSales.map((s) => (
+                    <tr className="border-t" key={s.date}>
+                      <td className="p-2">{s.date}</td>
+                      <td className="p-2">{s.birds}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
       <OfficialAgreementPanel partner={displayPartner} token={session.token} />
       {(displayPartner.agreementSigned || displayPartner.agreementDocumentUrl) && (
         <details className="rounded-xl border bg-white p-4">

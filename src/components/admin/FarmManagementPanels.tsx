@@ -1,3 +1,5 @@
+import { BatchMultiInvestorModal } from "./BatchMultiInvestorModal";
+import { adminListPartners } from "@/lib/partners.functions";
 import { adminReceiptReport } from "@/lib/report.functions";
 import { completedBatchWeeks } from "@/lib/batch-age";
 import React, { useState, useMemo } from "react";
@@ -138,6 +140,13 @@ export function BatchFinancialsPanel({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [selectedStaffReportBatchId, setSelectedStaffReportBatchId] = useState<string>("");
   const [showCostFormulaInfo, setShowCostFormulaInfo] = useState(false);
+  const [showAllocation, setShowAllocation] = useState(false);
+  const listAllocationPartners = useServerFn(adminListPartners);
+  const allocationPartners = useQuery({
+    queryKey: ["allocation-partners", passcode],
+    queryFn: () => listAllocationPartners({ data: { passcode } }),
+    enabled: showAllocation && role === "owner",
+  });
 
   const listMySubmissionsFn = useServerFn(adminListMySubmissions);
   const dismissMySubFn = useServerFn(adminDismissMySubmission);
@@ -1374,6 +1383,28 @@ export function BatchFinancialsPanel({
           Receipt report unavailable: {receiptReport.error.message}
         </p>
       )}
+      {showAllocation && role === "owner" && (
+        <>
+          <button className="min-h-11 underline" onClick={() => setShowAllocation(false)}>
+            Close allocation workspace
+          </button>
+          {allocationPartners.isLoading && <p>Loading partners…</p>}
+          {allocationPartners.error && <p role="alert">{allocationPartners.error.message}</p>}
+          {allocationPartners.data && (
+            <BatchMultiInvestorModal
+              passcode={passcode}
+              batches={batchesQuery.data || []}
+              partners={allocationPartners.data}
+              initialBatchId={selectedBatchId !== "all" ? selectedBatchId : undefined}
+              onClose={() => setShowAllocation(false)}
+              onUpdated={() => {
+                queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
+                queryClient.invalidateQueries({ queryKey: ["allocation-partners"] });
+              }}
+            />
+          )}
+        </>
+      )}
       {/* Top Header & Quick Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
         <div>
@@ -1388,6 +1419,14 @@ export function BatchFinancialsPanel({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {role === "owner" && (
+            <button
+              className="min-h-11 rounded-full border px-4 text-sm font-semibold"
+              onClick={() => setShowAllocation(true)}
+            >
+              Allocate Partners
+            </button>
+          )}
           {role === "owner" && (
             <button
               onClick={() => setShowBatchModal(true)}
@@ -1824,8 +1863,14 @@ export function BatchFinancialsPanel({
                       <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">
                         Mortality Count
                       </span>
-                      <p className="text-base font-black text-rose-600">
-                        {b.initialHeadcount - b.currentHeadcount}
+                      <p className="text-base font-black text-rose-600">{b.totalMortality ?? 0}</p>
+                    </div>
+                    <div className="text-center sm:text-left pl-4">
+                      <span className="text-[10px] uppercase font-extrabold text-[#0F3D24]/60">
+                        Birds Sold
+                      </span>
+                      <p className="text-base font-black text-emerald-700">
+                        {b.totalBirdsSold ?? 0}
                       </p>
                     </div>
                   </div>

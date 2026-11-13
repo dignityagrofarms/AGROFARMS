@@ -1,3 +1,4 @@
+import { FinancialVisibilityControls } from "@/components/admin/FinancialVisibilityControls";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -218,6 +219,7 @@ function UserAccountsPage() {
     <SiteLayout>
       <div className="min-h-screen bg-[#FDFBF7] py-8 text-[#0F3D24]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
+          {role === "owner" && verifyQuery.isSuccess && <FinancialVisibilityControls passcode={passcode}/>}
           {/* Top Bar Header */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
             <div className="flex items-center space-x-4">

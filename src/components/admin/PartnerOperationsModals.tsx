@@ -786,7 +786,7 @@ export function BatchSyncModal({
         data: {
           passcode,
           partnerId: partner.id,
-          allocationPercentage: Number(allocationPct) || 100,
+          allocationPercentage: partner.batchAllocationPercentage,
           syncFinancials,
           syncActivities,
         },
@@ -849,23 +849,7 @@ export function BatchSyncModal({
             re-typing. Previously synced entries are automatically skipped.
           </p>
 
-          <div>
-            <label className="block font-bold text-[#0F3D24] mb-1">
-              Partner Share of Batch (%)
-            </label>
-            <NumberField
-              allowDecimal
-              min={1}
-              max={100}
-              required
-              value={allocationPct}
-              onValueChange={(_, raw) => setAllocationPct(raw)}
-              className="w-full rounded-xl border border-slate-200 bg-[#FAF9F6] px-3 py-2 font-black text-[#0F3D24] tabular-nums outline-none focus:border-[#0F3D24]"
-            />
-            <span className="mt-1 block text-[11px] text-slate-500">
-              Use 100% if this partner funds the entire batch, or a proportional share (e.g. 50%) if co-funded.
-            </span>
-          </div>
+          <p className="rounded-lg border p-3">Ownership: {partner.allocatedBirds ? `${partner.allocatedBirds} allocated birds · ${partner.batchAllocationPercentage.toFixed(4)}%` : "Awaiting confirmation in Allocate Partners"}. Synchronization uses the saved allocation; manual percentages cannot override it.</p>
 
           <div className="space-y-2 rounded-xl border border-slate-200 bg-[#FAF9F6] p-3">
             <label className="flex items-center gap-2 font-semibold text-[#0F3D24] cursor-pointer">
