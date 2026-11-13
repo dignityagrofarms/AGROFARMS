@@ -438,12 +438,14 @@ export function PendingApprovalsPanel({ passcode, role, username }: PendingAppro
             />
             {queueView === "rejected"
               ? `Rejected History (${rejectedTotalCount})`
-              : `Pending Staff & Manager Approvals (${pendingTotalCount})`}
+              : queueView === "pending"
+                ? `Submission reviews — ${pendingTotalCount} awaiting your decision`
+                : `${queueView === "approved" ? "Approved submissions" : "All submissions"} (${totalCount})`}
           </h2>
           <p className="mt-0.5 text-xs text-[#0F3D24]/70">
             {queueView === "rejected"
               ? "Recover accidentally rejected entries with Re-Approve, or permanently delete test/duplicate rows."
-              : "Pending & flagged entries remain 100% excluded from live farm totals until you click Approve."}
+              : "The pending count shows only requests awaiting review. Saved and previously reviewed records remain in the history below."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
