@@ -4295,7 +4295,7 @@ export function DailyActivitiesPanel({
   onNavigateToApprovals?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("active");
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [showDailyLogModal, setShowDailyLogModal] = useState(false);
   const [showActivityImportModal, setShowActivityImportModal] = useState(false);
@@ -4326,7 +4326,8 @@ export function DailyActivitiesPanel({
       listActivitiesFn({
         data: {
           passcode,
-          batchId: selectedBatchId === "all" ? null : selectedBatchId,
+          batchId:
+            selectedBatchId === "all" || selectedBatchId === "active" ? null : selectedBatchId,
           includeOwnPending: role !== "owner",
         },
       }),
@@ -4406,15 +4407,65 @@ export function DailyActivitiesPanel({
 
   const batches = batchesQuery.data || [];
   const activeActBatches = useMemo(() => batches.filter((b) => b.status === "active"), [batches]);
+  const closedActBatches = useMemo(() => batches.filter((b) => b.status !== "active"), [batches]);
+  const activeBatchIdSet = useMemo(
+    () => new Set(activeActBatches.map((b) => b.id)),
+    [activeActBatches],
+  );
+  const selectedBatchObj = useMemo(
+    () =>
+      selectedBatchId !== "all" && selectedBatchId !== "active"
+        ? batches.find((b) => b.id === selectedBatchId) ?? null
+        : null,
+    [batches, selectedBatchId],
+  );
+  const isViewingClosedHistory =
+    selectedBatchId === "all" || Boolean(selectedBatchObj && selectedBatchObj.status !== "active");
+
   const activities = activitiesQuery.data || [];
 
-  const filteredActivities = activities.filter((a) => {
+  const batchScopedActivities = useMemo(() => {
+    if (selectedBatchId === "active") {
+      return activities.filter((a) => Boolean(a.batchId && activeBatchIdSet.has(a.batchId)));
+    }
+    if (selectedBatchId === "all") {
+      return activities;
+    }
+    return activities.filter((a) => a.batchId === selectedBatchId);
+  }, [activities, selectedBatchId, activeBatchIdSet]);
+
+  const batchSelectOptions = (
+    <>
+      <option value="active">All Active Batches ({activeActBatches.length}) — Default</option>
+      {activeActBatches.length > 0 && (
+        <optgroup label="Active Batches">
+          {activeActBatches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.batchName} ({b.batchType}) — {b.currentHeadcount.toLocaleString()} live birds
+            </option>
+          ))}
+        </optgroup>
+      )}
+      {closedActBatches.length > 0 && (
+        <optgroup label="Closed / Historical Batches">
+          {closedActBatches.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.batchName} ({b.batchType}) — CLOSED
+            </option>
+          ))}
+        </optgroup>
+      )}
+      <option value="all">All Batches (Include Closed History)</option>
+    </>
+  );
+
+  const filteredActivities = batchScopedActivities.filter((a) => {
     if (typeFilter !== "all" && a.activityType !== typeFilter) return false;
     return true;
   });
 
-  // Calculate cumulative stats from APPROVED activities only (never count pending/rejected items)
-  const approvedActivities = activities.filter(
+  // Calculate cumulative stats from APPROVED activities in the selected batch scope only
+  const approvedActivities = batchScopedActivities.filter(
     (a) => !a.approvalStatus || a.approvalStatus === "approved",
   );
   const totalMortality = approvedActivities.reduce((sum, a) => sum + a.mortalityCount, 0);
@@ -4447,10 +4498,9 @@ export function DailyActivitiesPanel({
           </button>
           <button
             onClick={() => {
-              const preferred =
-                selectedBatchId !== "all" && activeActBatches.some((b) => b.id === selectedBatchId)
-                  ? selectedBatchId
-                  : activeActBatches[0]?.id || "";
+              const preferred = activeActBatches.some((b) => b.id === selectedBatchId)
+                ? selectedBatchId
+                : activeActBatches[0]?.id || "";
               setActForm((prev) => ({ ...prev, batchId: preferred }));
               setShowActivityModal(true);
             }}
@@ -4503,6 +4553,70 @@ export function DailyActivitiesPanel({
         </div>
       )}
 
+      {/* Prominent Batch Selector Bar */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/10">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Layers size={18} className="shrink-0 text-[#0F3D24]/70" />
+            <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">
+              Select Batch:
+            </span>
+          </div>
+          <select
+            aria-label="Select Daily Reports Batch"
+            value={selectedBatchId}
+            onChange={(e) => setSelectedBatchId(e.target.value)}
+            className="min-h-10 w-full min-w-0 max-w-full rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-2 text-xs font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] sm:w-auto"
+          >
+            {batchSelectOptions}
+          </select>
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ${
+              isViewingClosedHistory
+                ? "bg-amber-100 text-amber-900"
+                : "bg-emerald-100 text-emerald-800"
+            }`}
+          >
+            {selectedBatchId === "active"
+              ? "Active Batches Only"
+              : selectedBatchId === "all"
+                ? "All Batches (Active + Closed)"
+                : selectedBatchObj?.status === "active"
+                  ? "Active Batch"
+                  : "Closed Batch (Historical View)"}
+          </span>
+        </div>
+
+        {closedActBatches.length > 0 && selectedBatchId === "active" && (
+          <span className="text-xs text-[#0F3D24]/60">
+            {closedActBatches.length} closed{" "}
+            {closedActBatches.length === 1 ? "batch" : "batches"} hidden by default — use the
+            dropdown to review history.
+          </span>
+        )}
+      </div>
+
+      {/* Closed / Historical Batch Banner */}
+      {isViewingClosedHistory && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-xs font-semibold text-amber-950 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <Info size={17} className="shrink-0 text-amber-700" />
+            <span>
+              {selectedBatchObj
+                ? `Viewing historical daily reports for closed batch "${selectedBatchObj.batchName}". New daily logs should still be recorded under active batches.`
+                : "Viewing daily reports across all batches, including closed historical batches."}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedBatchId("active")}
+            className="cursor-pointer rounded-full bg-[#0F3D24] px-4 py-1.5 text-xs font-bold text-white transition hover:bg-[#165232]"
+          >
+            Return to Active Batches
+          </button>
+        </div>
+      )}
+
       {/* KPI Overview */}
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5 border-l-4 border-rose-500">
@@ -4542,16 +4656,12 @@ export function DailyActivitiesPanel({
             Filter Batch:
           </span>
           <select
+            aria-label="Filter Daily Reports Batch"
             value={selectedBatchId}
             onChange={(e) => setSelectedBatchId(e.target.value)}
             className="rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none"
           >
-            <option value="all">All Batches</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.batchName} ({b.batchType}){b.status !== "active" ? " (Closed)" : ""}
-              </option>
-            ))}
+            {batchSelectOptions}
           </select>
 
           <select
@@ -4576,11 +4686,25 @@ export function DailyActivitiesPanel({
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
         <h3 className="text-lg font-bold text-[#0F3D24] pb-4">Activity Log Timeline</h3>
 
-        {activitiesQuery.isLoading ? (
+        {activitiesQuery.isLoading || (selectedBatchId === "active" && batchesQuery.isLoading) ? (
           <div className="py-8 text-center text-sm text-[#0F3D24]/60">Loading activity logs...</div>
         ) : filteredActivities.length === 0 ? (
-          <div className="py-8 text-center text-sm text-[#0F3D24]/60">
-            No farm activities recorded yet.
+          <div className="space-y-2 py-8 text-center text-sm text-[#0F3D24]/60">
+            <p>
+              {selectedBatchId === "active"
+                ? "No farm activities recorded for active batches yet."
+                : "No farm activities match the selected batch or filter."}
+            </p>
+            {selectedBatchId === "active" &&
+              activities.length > 0 &&
+              closedActBatches.length > 0 && (
+                <p className="text-xs text-[#0F3D24]/50">
+                  Historical reports from closed batches ({closedActBatches.length}) are hidden by
+                  default. Use the{" "}
+                  <span className="font-semibold text-[#0F3D24]">Select Batch</span> dropdown above
+                  to inspect closed batch logs.
+                </p>
+              )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -4988,9 +5112,9 @@ export function DailyActivitiesPanel({
           defaultBatchId={
             editingDailyLog
               ? editingDailyLog.batchId
-              : selectedBatchId === "all"
-                ? null
-                : selectedBatchId
+              : activeActBatches.some((b) => b.id === selectedBatchId)
+                ? selectedBatchId
+                : null
           }
           initialDate={editingDailyLog?.date || null}
           onClose={() => {
@@ -5011,7 +5135,9 @@ export function DailyActivitiesPanel({
           onClose={() => setShowActivityImportModal(false)}
           passcode={passcode}
           batches={batches}
-          defaultBatchId={selectedBatchId === "all" ? null : selectedBatchId}
+          defaultBatchId={
+            activeActBatches.some((b) => b.id === selectedBatchId) ? selectedBatchId : null
+          }
           onSuccess={() => {
             queryClient.invalidateQueries({ queryKey: ["farm-activities"] });
             queryClient.invalidateQueries({ queryKey: ["farm-batches"] });
