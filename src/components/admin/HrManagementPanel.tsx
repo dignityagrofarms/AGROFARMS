@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -59,6 +59,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("all");
+  const [todayShiftFilter, setTodayShiftFilter] = useState<"all" | "active" | "absent">("all");
   const [attDateFilter, setAttDateFilter] = useState("");
   const [attSearch, setAttSearch] = useState("");
 
@@ -312,11 +313,22 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const payrollList = payrollQuery.data || [];
   const leaveList = leaveQuery.data || [];
 
-  // Metrics
-  const totalStaffCount = staffList.length;
+  // Metrics & Today Attendance Mapping
+  const staffEmployees = staffList.filter((s) => s.role !== "owner");
+  const totalStaffCount = staffEmployees.length;
   const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
-  const presentTodayCount = attendanceList.filter((a: any) => a.attendanceDate === todayStr && a.status === "present").length;
-  const suspendedCount = staffList.filter((s: any) => s.status === "suspended").length;
+
+  const todayAttMap = useMemo<Map<string, any>>(() => {
+    return new Map(
+      attendanceList
+        .filter((a: any) => a.attendanceDate === todayStr && a.status === "present")
+        .map((a: any) => [String(a.username || "").toLowerCase(), a]),
+    );
+  }, [attendanceList, todayStr]);
+
+  const presentTodayCount = staffEmployees.filter((s: any) => todayAttMap.has(s.username.toLowerCase())).length;
+  const absentTodayCount = Math.max(0, totalStaffCount - presentTodayCount);
+  const suspendedCount = staffEmployees.filter((s: any) => s.status === "suspended").length;
   const pendingPayrollCount = payrollList.filter((p: any) => p.status === "pending_signature").length;
   const pendingLeaveCount = leaveList.filter((l: any) => l.status === "pending").length;
   const attendancePercentage = totalStaffCount > 0 ? Math.round((presentTodayCount / totalStaffCount) * 100) : 100;
@@ -328,7 +340,14 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
       s.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.phone || "").includes(searchTerm);
     const matchesDept = selectedDept === "all" || s.department === selectedDept;
-    return matchesSearch && matchesDept;
+    const isClockedIn = todayAttMap.has(s.username.toLowerCase());
+    const matchesShift =
+      todayShiftFilter === "all"
+        ? true
+        : todayShiftFilter === "active"
+          ? isClockedIn
+          : !isClockedIn && s.role !== "owner";
+    return matchesSearch && matchesDept && matchesShift;
   });
 
   const isOwner = role === "owner";
@@ -400,16 +419,31 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             <span className="text-[10px] text-[#0F3D24]/60 font-medium">Active farm employees</span>
           </div>
 
-          <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5">
+          <button
+            type="button"
+            onClick={() => setSubTab("attendance")}
+            className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5 text-left hover:bg-emerald-50/70 hover:ring-emerald-300 transition group cursor-pointer"
+          >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#0F3D24]/70">Present Today</span>
+              <span className="text-xs font-semibold text-[#0F3D24]/70 group-hover:text-emerald-900">
+                Present Today
+              </span>
               <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700">
                 <UserCheck size={18} />
               </div>
             </div>
-            <p className="mt-2 text-2xl font-black text-[#0F3D24]">{presentTodayCount}</p>
-            <span className="text-[10px] text-emerald-700 font-bold">{attendancePercentage}% attendance rate</span>
-          </div>
+            <p className="mt-2 text-2xl font-black text-[#0F3D24]">
+              {presentTodayCount} <span className="text-sm font-semibold text-[#0F3D24]/60">/ {totalStaffCount}</span>
+            </p>
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-[10px] text-emerald-700 font-bold">
+                {attendancePercentage}% attendance rate
+              </span>
+              <span className="text-[10px] font-bold text-[#3F8F3F] group-hover:underline flex items-center gap-0.5">
+                View Log <ChevronRight size={11} />
+              </span>
+            </div>
+          </button>
 
           <div className="rounded-2xl bg-[#F7F5F0] p-4 ring-1 ring-[#0F3D24]/5">
             <div className="flex items-center justify-between">
@@ -520,6 +554,46 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
             </div>
           </div>
 
+          {/* Quick Shift Attendance Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#0F3D24]/10">
+            <span className="text-[11px] font-bold text-[#0F3D24]/70 mr-1">Today&apos;s Shift:</span>
+            <button
+              type="button"
+              onClick={() => setTodayShiftFilter("all")}
+              className={`rounded-full px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                todayShiftFilter === "all"
+                  ? "bg-[#0F3D24] text-white shadow-xs"
+                  : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              All Team ({staffList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTodayShiftFilter("active")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                todayShiftFilter === "active"
+                  ? "bg-emerald-700 text-white shadow-xs"
+                  : "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200 hover:bg-emerald-100"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              Active / Clocked In ({presentTodayCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setTodayShiftFilter("absent")}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                todayShiftFilter === "absent"
+                  ? "bg-amber-700 text-white shadow-xs"
+                  : "bg-amber-50 text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+              }`}
+            >
+              <span className="h-2 w-2 rounded-full bg-amber-400" />
+              Not Clocked In ({absentTodayCount})
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-[#0F3D24]">
               <thead className="bg-[#F7F5F0] text-[10px] font-extrabold uppercase tracking-wider text-[#0F3D24]/60">
@@ -527,13 +601,21 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                   <th className="p-3">Staff Name / Username</th>
                   <th className="p-3">Role</th>
                   <th className="p-3">Department</th>
-                  <th className="p-3">Phone & Address</th>
-                  <th className="p-3">Status</th>
+                  <th className="p-3">Phone &amp; Address</th>
+                  <th className="p-3">Today&apos;s Shift</th>
+                  <th className="p-3">Account Status</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#0F3D24]/5 font-medium">
-                {filteredStaff.map((staff) => (
+                {filteredStaff.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-xs text-[#0F3D24]/60">
+                      No staff members match the selected filter.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStaff.map((staff) => (
                   <tr key={staff.id} className="hover:bg-[#F7F5F0]/50 transition">
                     <td className="p-3">
                       <div className="flex items-center gap-3">
@@ -555,6 +637,38 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                     <td className="p-3">
                       <p className="font-mono text-xs">{staff.phone || "No Phone"}</p>
                       <p className="text-[10px] text-[#0F3D24]/60 truncate max-w-[150px]">{staff.address || "Owerri, Imo State"}</p>
+                    </td>
+                    <td className="p-3 whitespace-nowrap">
+                      {staff.role === "owner" ? (
+                        <span className="text-[10px] font-bold text-[#0F3D24]/40 uppercase tracking-wider">
+                          Owner (Exempt)
+                        </span>
+                      ) : todayAttMap.has(staff.username.toLowerCase()) ? (
+                        (() => {
+                          const att: any = todayAttMap.get(staff.username.toLowerCase());
+                          const timeStr = att?.clockInTime
+                            ? new Date(att.clockInTime).toLocaleTimeString("en-NG", {
+                                timeZone: "Africa/Lagos",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : null;
+                          return (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-900 ring-1 ring-emerald-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                              Active {timeStr ? `· In at ${timeStr}` : "· Clocked In"}
+                            </span>
+                          );
+                        })()
+                      ) : staff.status === "on_leave" ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-[10px] font-bold text-blue-800 ring-1 ring-blue-300">
+                          On Leave
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-900 ring-1 ring-amber-300">
+                          Not Clocked In
+                        </span>
+                      )}
                     </td>
                     <td className="p-3">
                       <span
@@ -640,7 +754,8 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                       )}
                     </td>
                   </tr>
-                ))}
+                ))
+              )}
               </tbody>
             </table>
           </div>
@@ -759,7 +874,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
 
       {/* 4. Attendance Register Sub-Tab */}
       {subTab === "attendance" && (() => {
-        const staffAccountsOnly = staffList.filter((s) => s.role === "staff");
+        const staffAccountsOnly = staffList.filter((s) => s.role !== "owner");
         const todayAttMap = new Map(
           attendanceList
             .filter((a: any) => a.attendanceDate === todayStr)
