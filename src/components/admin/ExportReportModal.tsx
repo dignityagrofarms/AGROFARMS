@@ -79,8 +79,8 @@ export function ExportReportModal({
 
   // Filter transactions by date range and batch
   const filteredFinancials = financials.filter((t) => {
-    if (batchId !== "all" && t.batchName && selectedBatchObj && !t.batchName.includes(selectedBatchObj.batchName)) {
-      if (t.id && !t.id.includes(batchId)) return false;
+    if (batchId !== "all") {
+      if (t.batchId !== batchId) return false;
     }
 
     if (!t.transactionDate) return true;
@@ -108,8 +108,8 @@ export function ExportReportModal({
 
   // Filter activities by date range and batch
   const filteredActivities = activities.filter((a) => {
-    if (batchId !== "all" && a.batchName && selectedBatchObj && !a.batchName.includes(selectedBatchObj.batchName)) {
-      if (a.id && !a.id.includes(batchId)) return false;
+    if (batchId !== "all") {
+      if (a.batchId !== batchId) return false;
     }
 
     if (!a.activityDate) return true;

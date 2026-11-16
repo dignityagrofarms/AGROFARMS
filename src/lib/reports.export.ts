@@ -4,6 +4,7 @@ import { toPng } from "html-to-image";
 
 export interface ReportTransaction {
   id: string;
+  batchId?: string | null;
   transactionDate: string;
   type: "income" | "expense";
   category: string;
@@ -16,6 +17,7 @@ export interface ReportTransaction {
 
 export interface ReportActivity {
   id: string;
+  batchId?: string | null;
   activityDate: string;
   activityType: string;
   batchName?: string;
@@ -23,6 +25,19 @@ export interface ReportActivity {
   notes?: string;
   cost?: number;
   loggedBy?: string;
+  sickCount?: number;
+  mortalityCount?: number;
+  causeOfMortality?: string | null;
+  feedConsumedKg?: number;
+  feedGiven?: boolean | null;
+  feedBrand?: string | null;
+  feedBagNo?: number | null;
+  feedBagStatus?: "opened" | "finished" | string | null;
+  feedBagsUsed?: number | null;
+  waterGiven?: boolean | null;
+  temperature?: string | null;
+  medicationGiven?: string | null;
+  eggsCollected?: number;
 }
 
 export interface ExportReportOptions {
@@ -125,17 +140,31 @@ export function generateCSVReport(options: ExportReportOptions) {
   if (options.includeActivities) {
     lines.push("");
     lines.push(`"=== DAILY FARM ACTIVITIES LOG ==="`);
-    lines.push("Date,Activity Type,Batch,Description,Cost (NGN),Notes");
+    lines.push(
+      "Date,Batch,Activity Type,Sick Count,Mortality / Dead,Cause of Mortality,Feed Consumed (kg),Feed Brand & Bag #,Water,Temperature,Medication,Logged By,Notes"
+    );
     options.activities.forEach((a) => {
-      const desc = `"${(a.description || "").replace(/"/g, '""')}"`;
-      const notes = `"${(a.notes || "").replace(/"/g, '""')}"`;
+      const feedBagInfo = [
+        a.feedBrand,
+        a.feedBagNo ? `Bag #${a.feedBagNo} (${a.feedBagStatus || "opened"})` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const notes = `"${(a.notes || a.description || "").replace(/"/g, '""')}"`;
       lines.push(
         [
           a.activityDate ? a.activityDate.split("T")[0] : "",
-          a.activityType || "General",
-          a.batchName || "",
-          desc,
-          a.cost || 0,
+          `"${(a.batchName || "").replace(/"/g, '""')}"`,
+          `"${(a.activityType || "General").replace(/"/g, '""')}"`,
+          a.sickCount || 0,
+          a.mortalityCount || 0,
+          `"${(a.causeOfMortality || "").replace(/"/g, '""')}"`,
+          a.feedConsumedKg || 0,
+          `"${feedBagInfo.replace(/"/g, '""')}"`,
+          a.waterGiven ? "Yes" : "—",
+          `"${(a.temperature || "—").replace(/"/g, '""')}"`,
+          `"${(a.medicationGiven || "—").replace(/"/g, '""')}"`,
+          `"${(a.loggedBy || "—").replace(/"/g, '""')}"`,
           notes,
         ].join(",")
       );
@@ -232,27 +261,48 @@ export function generateExcelReport(options: ExportReportOptions) {
 
   // 3. Farm Activities Log Sheet
   if (options.includeActivities) {
-    const actHeader = ["Date", "Activity Type", "Batch", "Description", "Cost (NGN)", "Notes"];
-    const actRows = options.activities.map((a) => [
-      a.activityDate ? a.activityDate.split("T")[0] : "",
-      a.activityType || "General",
-      a.batchName || "",
-      a.description || "",
-      a.cost || 0,
-      a.notes || "",
-    ]);
+    const actHeader = [
+      "Date",
+      "Batch",
+      "Activity Type",
+      "Sick Count",
+      "Mortality / Dead",
+      "Cause of Mortality",
+      "Feed Consumed (kg)",
+      "Feed Brand & Bag #",
+      "Water Given",
+      "Temperature",
+      "Medication Given",
+      "Logged By",
+      "Notes",
+    ];
+    const actRows = options.activities.map((a) => {
+      const feedBagInfo = [
+        a.feedBrand,
+        a.feedBagNo ? `Bag #${a.feedBagNo} (${a.feedBagStatus || "opened"})` : "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      return [
+        a.activityDate ? a.activityDate.split("T")[0] : "",
+        a.batchName || "N/A",
+        a.activityType || "General",
+        a.sickCount || 0,
+        a.mortalityCount || 0,
+        a.causeOfMortality || "—",
+        a.feedConsumedKg || 0,
+        feedBagInfo || "—",
+        a.waterGiven ? "Yes" : "—",
+        a.temperature || "—",
+        a.medicationGiven || "—",
+        a.loggedBy || "—",
+        a.notes || a.description || "—",
+      ];
+    });
     const allActData = [actHeader, ...actRows];
     const actSheet = XLSX.utils.aoa_to_sheet(allActData);
     actSheet["!views"] = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
     autoFitColumns(actSheet, allActData);
-
-    // Format Cost column (Column E / index 4)
-    for (let r = 1; r < allActData.length; r++) {
-      const cellAddr = XLSX.utils.encode_cell({ r, c: 4 });
-      if (actSheet[cellAddr] && typeof actSheet[cellAddr].v === "number") {
-        actSheet[cellAddr].z = '"₦"#,##0.00';
-      }
-    }
 
     XLSX.utils.book_append_sheet(wb, actSheet, "Farm Activities");
   }
@@ -300,7 +350,7 @@ export async function generatePDFReport(options: ExportReportOptions) {
       .join("")}</colgroup>${inner}</table>`;
 
   const finCols = [12, 9, 14, 14, 24, 13, 14];
-  const actCols = [13, 15, 17, 33, 22];
+  const actCols = [12, 13, 13, 13, 18, 11, 20];
 
   const finHead = tableWrap(
     finCols,
@@ -310,9 +360,9 @@ export async function generatePDFReport(options: ExportReportOptions) {
   );
   const actHead = tableWrap(
     actCols,
-    `<thead><tr style="background-color: #0F3D24; color: #ffffff;">${th("Date")}${th("Activity")}${th("Batch")}${th(
-      "Description"
-    )}${th("Notes")}</tr></thead>`
+    `<thead><tr style="background-color: #0F3D24; color: #ffffff;">${th("Date")}${th("Batch")}${th(
+      "Activity"
+    )}${th("Sick / Dead")}${th("Feed &amp; Bag #")}${th("Water / Temp")}${th("Medication &amp; Notes")}</tr></thead>`
   );
   const sectionTitle = (text: string, cont = false) =>
     `<h2 style="font-size: 14px; font-weight: 700; color: #0F3D24; margin: 0; padding: 0 0 6px 0; border-bottom: 2px solid #3F8F3F;">${text}${
@@ -460,17 +510,62 @@ export async function generatePDFReport(options: ExportReportOptions) {
       sets: "act",
     });
     options.activities.forEach((a, idx) => {
-      const costNote = a.cost ? `Cost: ${formatNaira(Number(a.cost))}` : "";
-      const notes = [a.notes, costNote].filter(Boolean).join(" | ") || "-";
+      const sick = a.sickCount ? `Sick: ${a.sickCount}` : "";
+      const dead = a.mortalityCount
+        ? `<span style="color: #991B1B; font-weight: 700;">Dead: ${a.mortalityCount}</span>`
+        : "";
+      const cause = a.causeOfMortality
+        ? `<div style="font-size: 9px; color: #991B1B;">(${esc(a.causeOfMortality)})</div>`
+        : "";
+      const sickDead = [sick, dead, cause].filter(Boolean).join("<br/>") || "Nil";
+
+      const feedBags =
+        a.feedBagNo && a.feedBagStatus
+          ? `Bag #${a.feedBagNo} (${a.feedBagStatus === "finished" ? "Finished" : "Opened"})`
+          : "";
+      const feedBrand = a.feedGiven === false ? "Not given" : a.feedBrand || "";
+      const feedKg = a.feedConsumedKg ? `${a.feedConsumedKg} kg` : "";
+      const feedText = [feedBrand, feedBags, feedKg].filter(Boolean).join("<br/>") || "—";
+
+      const water = a.waterGiven
+        ? '<span style="color: #0369A1; font-weight: 700;">Water ✓</span>'
+        : "";
+      const temp = a.temperature ? `Temp: ${esc(a.temperature)}` : "";
+      const waterTemp = [water, temp].filter(Boolean).join("<br/>") || "—";
+
+      const med = a.medicationGiven
+        ? `<div style="font-weight: 600; color: #581C87;">Med: ${esc(a.medicationGiven)}</div>`
+        : "";
+      const eggs = a.eggsCollected
+        ? `<div style="font-weight: 600; color: #047857;">Eggs: ${a.eggsCollected}</div>`
+        : "";
+      const notes = a.notes || a.description || "";
+      const cost = a.cost
+        ? `<div style="font-size: 10px; color: #166534; font-weight: 700;">Cost: ${formatNaira(
+            Number(a.cost)
+          )}</div>`
+        : "";
+      const logged = a.loggedBy
+        ? `<div style="font-size: 9px; color: #6B7280;">By: ${esc(a.loggedBy)}</div>`
+        : "";
+      const notesText =
+        [med, eggs, notes ? `<div>${esc(notes)}</div>` : "", cost, logged]
+          .filter(Boolean)
+          .join("") || "—";
+
       raw.push({
         html: tableWrap(
           actCols,
-          `<tr style="background-color: ${idx % 2 === 0 ? "#ffffff" : "#F7F5F0"}; border-bottom: 1px solid #E5E7EB;">
+          `<tr style="background-color: ${
+            idx % 2 === 0 ? "#ffffff" : "#F7F5F0"
+          }; border-bottom: 1px solid #E5E7EB;">
             ${td(esc(dateOnly(a.activityDate)))}
-            ${td(esc(a.activityType || "General"), "font-weight: 600; color: #0F3D24;")}
             ${td(esc(a.batchName || "N/A"))}
-            ${td(esc(a.description || ""))}
-            ${td(esc(notes))}
+            ${td(esc(a.activityType || "General"), "font-weight: 600; color: #0F3D24;")}
+            ${td(sickDead)}
+            ${td(feedText)}
+            ${td(waterTemp)}
+            ${td(notesText)}
           </tr>`
         ),
         repeat: actRepeat,

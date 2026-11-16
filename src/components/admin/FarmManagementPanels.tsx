@@ -2410,6 +2410,132 @@ export function BatchFinancialsPanel({
                   )}
                 </div>
               </div>
+
+              {/* Batch Daily Farm Activities Table */}
+              <div className="mt-6 border-t border-white/10 pt-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Activity size={16} className="text-[#A2E0A2]" />
+                    <h4 className="text-sm font-bold text-white/90">
+                      Farm Daily Activities &amp; Flock Logs ({reportQuery.data.activities.length}):
+                    </h4>
+                  </div>
+                  <span className="text-xs text-white/70">
+                    Mortality:{" "}
+                    <strong className="text-rose-300">
+                      {reportQuery.data.totalMortality} birds
+                    </strong>{" "}
+                    • Feed:{" "}
+                    <strong className="text-amber-200">
+                      {reportQuery.data.totalFeedConsumedKg} kg
+                    </strong>
+                  </span>
+                </div>
+
+                {reportQuery.data.activities.length === 0 ? (
+                  <p className="text-xs text-white/60 py-2">
+                    No approved daily activities logged for this batch yet.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-2xl bg-white/5 border border-white/10">
+                    <table className="w-full min-w-[700px] border-collapse text-left text-xs text-white">
+                      <thead>
+                        <tr className="border-b border-white/10 bg-black/20 text-[11px] font-bold uppercase tracking-wider text-white/70">
+                          <th className="px-3 py-2.5">Date</th>
+                          <th className="px-3 py-2.5">Activity</th>
+                          <th className="px-3 py-2.5">Sick</th>
+                          <th className="px-3 py-2.5">Dead</th>
+                          <th className="px-3 py-2.5">Feed &amp; Bag #</th>
+                          <th className="px-3 py-2.5 text-center">Water</th>
+                          <th className="px-3 py-2.5">Temp</th>
+                          <th className="px-3 py-2.5">Medication / Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/10">
+                        {reportQuery.data.activities.map((act) => (
+                          <tr key={act.id} className="hover:bg-white/10 transition align-top">
+                            <td className="px-3 py-2.5 font-bold whitespace-nowrap">
+                              {act.activityDate}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-semibold">
+                                {act.activityType}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              {act.sickCount ? (
+                                <span className="rounded bg-orange-500/20 px-1.5 py-0.5 font-bold text-orange-200">
+                                  {act.sickCount}
+                                </span>
+                              ) : (
+                                <span className="text-white/40">Nil</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap">
+                              {act.mortalityCount > 0 ? (
+                                <div>
+                                  <span className="rounded bg-rose-500/30 px-1.5 py-0.5 font-bold text-rose-200">
+                                    {act.mortalityCount}
+                                  </span>
+                                  {act.causeOfMortality && (
+                                    <div className="text-[10px] text-rose-300">
+                                      {act.causeOfMortality}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-white/40">Nil</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              {act.feedGiven === false ? (
+                                <span className="text-white/40">Not given</span>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {act.feedBrand && <div>{act.feedBrand}</div>}
+                                  {act.feedBagNo && (
+                                    <div className="text-[10px] text-amber-200">
+                                      Bag #{act.feedBagNo} ({act.feedBagStatus || "opened"})
+                                    </div>
+                                  )}
+                                  {act.feedConsumedKg > 0 && (
+                                    <div className="text-[10px] text-white/70">
+                                      {act.feedConsumedKg} kg
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 text-center whitespace-nowrap">
+                              {act.waterGiven ? (
+                                <span className="font-bold text-sky-300">✓</span>
+                              ) : (
+                                <span className="text-white/40">—</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5 whitespace-nowrap text-white/80">
+                              {act.temperature || "—"}
+                            </td>
+                            <td className="px-3 py-2.5 max-w-[200px] text-white/80">
+                              {act.medicationGiven && (
+                                <div className="font-semibold text-purple-200">
+                                  💉 {act.medicationGiven}
+                                </div>
+                              )}
+                              {act.notes && (
+                                <div className="italic text-white/70">"{act.notes}"</div>
+                              )}
+                              {!act.medicationGiven && !act.notes && (
+                                <span className="text-white/40">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -3246,6 +3372,7 @@ export function BatchFinancialsPanel({
         selectedBatchId={selectedBatchId}
         financials={allFinancials.map((f) => ({
           id: f.id,
+          batchId: f.batchId,
           transactionDate: f.transactionDate,
           type: f.type,
           category: f.category,
@@ -3257,12 +3384,26 @@ export function BatchFinancialsPanel({
         }))}
         activities={(activitiesQuery.data || []).map((a) => ({
           id: a.id,
+          batchId: a.batchId,
           activityDate: a.activityDate,
           activityType: a.activityType,
           batchName: a.batchName || undefined,
           description: a.notes || a.activityType,
           notes: a.notes || undefined,
-          loggedBy: a.recordedBy || undefined,
+          loggedBy: a.recordedByName || a.recordedBy || undefined,
+          sickCount: a.sickCount,
+          mortalityCount: a.mortalityCount,
+          causeOfMortality: a.causeOfMortality,
+          feedConsumedKg: a.feedConsumedKg,
+          feedGiven: a.feedGiven,
+          feedBrand: a.feedBrand,
+          feedBagNo: a.feedBagNo,
+          feedBagStatus: a.feedBagStatus,
+          feedBagsUsed: a.feedBagsUsed,
+          waterGiven: a.waterGiven,
+          temperature: a.temperature,
+          medicationGiven: a.medicationGiven,
+          eggsCollected: a.eggsCollected,
         }))}
         totalIncome={totalIncome}
         totalExpense={totalExpense}

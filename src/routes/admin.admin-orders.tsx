@@ -656,7 +656,6 @@ function AdminOrders() {
     if (role === "staff") {
       if (
         [
-          "orders",
           "december",
           "clients",
           "complaints",
@@ -975,17 +974,6 @@ function AdminOrders() {
     );
   }
 
-  if (!accessQuery.data.canViewFinancials || query.data?.financialsRestricted)
-    return (
-      <OperationalWorkspace
-        passcode={passcode}
-        role={role}
-        username={currentUsername}
-        clockInTime={accessQuery.data.clockInTime}
-        onSignOut={signOut}
-      />
-    );
-
   const awaitingApprovalOrdersCount = (query.data?.orders || []).filter(
     (o) =>
       o.paymentStatus === "submitted" ||
@@ -1057,31 +1045,34 @@ function AdminOrders() {
               </h3>
             )}
             <ul className="space-y-1">
+              <li>
+                <button
+                  onClick={() => {
+                    setActiveTab("orders");
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && (
+                      <span>{role === "staff" ? "Customer Orders" : "Orders & Reports"}</span>
+                    )}
+                  </div>
+                  {awaitingApprovalOrdersCount > 0 &&
+                    (role === "owner" || role === "manager") &&
+                    (!isSidebarCollapsed ? (
+                      <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        {awaitingApprovalOrdersCount}
+                      </span>
+                    ) : (
+                      <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
+                    ))}
+                </button>
+              </li>
               {(role === "owner" || role === "manager") && (
                 <>
-                  <li>
-                    <button
-                      onClick={() => {
-                        setActiveTab("orders");
-                        setIsMobileMenuOpen(false);
-                      }}
-                      className={`relative w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-medium text-sm transition-all whitespace-nowrap ${activeTab === "orders" ? "bg-[#3F8F3F]/20 text-white border border-[#3F8F3F]/30 shadow-[0_0_15px_rgba(63,143,63,0.15)]" : "text-white/70 hover:bg-white/5"}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText size={18} className="shrink-0" />
-                        {!isSidebarCollapsed && <span>Orders & Reports</span>}
-                      </div>
-                      {awaitingApprovalOrdersCount > 0 &&
-                        (!isSidebarCollapsed ? (
-                          <span className="flex items-center gap-1 bg-red-500 text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-xs">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-                            {awaitingApprovalOrdersCount}
-                          </span>
-                        ) : (
-                          <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-[#0F3D24] animate-pulse" />
-                        ))}
-                    </button>
-                  </li>
                   <li>
                     <button
                       onClick={() => {
@@ -1354,6 +1345,12 @@ function AdminOrders() {
           </div>
 
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
+            {role === "staff" && accessQuery.data?.clockInTime && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-300 px-2.5 sm:px-3 py-1 text-xs font-bold shadow-xs">
+                <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="hidden sm:inline">Shift Active ·</span> Clocked in at {accessQuery.data.clockInTime}
+              </span>
+            )}
             {/* Top Plus (+) Button to Place Order for Owner, Manager & Staff */}
             <button
               type="button"
