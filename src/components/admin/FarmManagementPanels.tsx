@@ -49,6 +49,8 @@ import {
   EyeOff,
   Info,
   Flag,
+  Table2,
+  ArrowUpDown,
 } from "lucide-react";
 import { FinanceSalesChart } from "./FinanceSalesChart";
 import { ExportReportModal } from "./ExportReportModal";
@@ -4306,6 +4308,8 @@ export function DailyActivitiesPanel({
   } | null>(null);
   const [pendingActTypoConfirm, setPendingActTypoConfirm] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"table" | "card">("table");
+  const [dateSortOrder, setDateSortOrder] = useState<"desc" | "asc">("desc");
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const listBatchesFn = useServerFn(adminListBatches);
@@ -4463,6 +4467,94 @@ export function DailyActivitiesPanel({
     if (typeFilter !== "all" && a.activityType !== typeFilter) return false;
     return true;
   });
+
+  const sortedActivities = useMemo(() => {
+    const dir = dateSortOrder === "asc" ? 1 : -1;
+    return [...filteredActivities].sort((a, b) => {
+      const dateCmp = a.activityDate.localeCompare(b.activityDate);
+      if (dateCmp !== 0) return dateCmp * dir;
+      return a.createdAt.localeCompare(b.createdAt) * dir;
+    });
+  }, [filteredActivities, dateSortOrder]);
+
+  const handleEditActivity = (act: FarmActivity) => {
+    if (act.activityType === "Daily Log") {
+      setEditingDailyLog({
+        batchId: act.batchId ?? null,
+        date: act.activityDate,
+      });
+    } else {
+      setEditingActivity(act);
+    }
+  };
+
+  const renderApprovalBadge = (act: FarmActivity) => {
+    if (
+      act.approvalStatus === "pending_approval" ||
+      (act.approvalStatus as any) === "pending"
+    ) {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
+          <Clock size={10} /> Pending Owner Approval
+        </span>
+      );
+    }
+    if (act.approvalStatus === "flagged") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[10px] font-bold text-orange-800">
+          <Flag size={10} /> Flagged · Edit Needed
+        </span>
+      );
+    }
+    if (act.approvalStatus === "rejected") {
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
+          <XCircle size={10} /> Rejected
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const renderActivityActions = (act: FarmActivity) => (
+    <div className="flex items-center gap-1.5 shrink-0">
+      {role !== "owner" && act.approvalStatus !== "approved" && (
+        <button
+          type="button"
+          onClick={() => handleEditActivity(act)}
+          className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold transition ${
+            act.approvalStatus === "flagged" || act.approvalStatus === "rejected"
+              ? "bg-orange-600 text-white hover:bg-orange-700"
+              : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+          }`}
+        >
+          <Pencil size={11} /> Edit &amp; Resubmit
+        </button>
+      )}
+      {role === "owner" && (
+        <>
+          <button
+            type="button"
+            onClick={() => handleEditActivity(act)}
+            className="p-1 text-[#3F8F3F] hover:text-[#0F3D24] transition"
+            title="Edit activity"
+          >
+            <Pencil size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("Delete this activity log?")) deleteActMut.mutate(act.id);
+            }}
+            className="p-1 text-rose-600 hover:text-rose-800 transition"
+            title="Delete record"
+          >
+            <Trash2 size={16} />
+          </button>
+        </>
+      )}
+    </div>
+  );
 
   // Calculate cumulative stats from APPROVED activities in the selected batch scope only
   const approvedActivities = batchScopedActivities.filter(
@@ -4684,11 +4776,57 @@ export function DailyActivitiesPanel({
 
       {/* Activity Timeline List */}
       <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
-        <h3 className="text-lg font-bold text-[#0F3D24] pb-4">Activity Log Timeline</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
+          <div className="flex items-center gap-2.5">
+            <h3 className="text-lg font-bold text-[#0F3D24]">Activity Log Timeline</h3>
+            <span className="rounded-full bg-[#F7F5F0] px-2.5 py-0.5 text-xs font-bold text-[#0F3D24]/70">
+              {sortedActivities.length} {sortedActivities.length === 1 ? "record" : "records"}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDateSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24]/80 hover:bg-[#F7F5F0] transition"
+              title="Toggle chronological sort order"
+            >
+              <ArrowUpDown size={13} />
+              Date: {dateSortOrder === "desc" ? "Newest First" : "Oldest First"}
+            </button>
+
+            <div className="flex items-center gap-1 rounded-2xl bg-[#F7F5F0] p-1 border border-[#0F3D24]/10">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                  viewMode === "table"
+                    ? "bg-[#0F3D24] text-white shadow-xs"
+                    : "text-[#0F3D24]/70 hover:bg-white/70"
+                }`}
+                title="Table View"
+              >
+                <Table2 size={15} /> Table View
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("card")}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                  viewMode === "card"
+                    ? "bg-[#0F3D24] text-white shadow-xs"
+                    : "text-[#0F3D24]/70 hover:bg-white/70"
+                }`}
+                title="Card View"
+              >
+                <LayoutGrid size={15} /> Card View
+              </button>
+            </div>
+          </div>
+        </div>
 
         {activitiesQuery.isLoading || (selectedBatchId === "active" && batchesQuery.isLoading) ? (
           <div className="py-8 text-center text-sm text-[#0F3D24]/60">Loading activity logs...</div>
-        ) : filteredActivities.length === 0 ? (
+        ) : sortedActivities.length === 0 ? (
           <div className="space-y-2 py-8 text-center text-sm text-[#0F3D24]/60">
             <p>
               {selectedBatchId === "active"
@@ -4706,9 +4844,169 @@ export function DailyActivitiesPanel({
                 </p>
               )}
           </div>
+        ) : viewMode === "table" ? (
+          <div className="overflow-x-auto rounded-2xl border border-[#0F3D24]/10">
+            <table className="w-full min-w-[980px] border-collapse text-left text-xs">
+              <thead>
+                <tr className="border-b border-[#0F3D24]/10 bg-[#F7F5F0] text-[11px] font-bold uppercase tracking-wider text-[#0F3D24]/70">
+                  <th className="px-3 py-3 whitespace-nowrap">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setDateSortOrder((prev) => (prev === "desc" ? "asc" : "desc"))
+                      }
+                      className="inline-flex items-center gap-1 hover:text-[#0F3D24]"
+                    >
+                      Date <ArrowUpDown size={11} />
+                    </button>
+                  </th>
+                  <th className="px-3 py-3 whitespace-nowrap">Batch</th>
+                  <th className="px-3 py-3 whitespace-nowrap">Sick</th>
+                  <th className="px-3 py-3 whitespace-nowrap">Dead / Mortality</th>
+                  <th className="px-3 py-3 whitespace-nowrap">Feed &amp; Bag #</th>
+                  <th className="px-3 py-3 whitespace-nowrap text-center">Water</th>
+                  <th className="px-3 py-3 whitespace-nowrap">Temp</th>
+                  <th className="px-3 py-3 whitespace-nowrap">Medication</th>
+                  <th className="px-3 py-3 whitespace-nowrap">Logged By</th>
+                  <th className="px-3 py-3 min-w-[180px]">Notes</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#0F3D24]/10 bg-white">
+                {sortedActivities.map((act) => (
+                  <tr key={act.id} className="hover:bg-[#F7F5F0]/60 transition align-top">
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <div className="font-bold text-[#0F3D24]">{act.activityDate}</div>
+                      {act.activityType !== "Daily Log" && (
+                        <span className="mt-1 inline-block rounded-md bg-[#0F3D24]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#0F3D24]">
+                          {act.activityType}
+                        </span>
+                      )}
+                      {renderApprovalBadge(act) && (
+                        <div className="mt-1">{renderApprovalBadge(act)}</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap font-semibold text-[#0F3D24]">
+                      {act.batchName || "—"}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {act.sickCount && act.sickCount > 0 ? (
+                        <span className="rounded-full bg-orange-100 px-2 py-0.5 font-bold text-orange-800">
+                          {act.sickCount}
+                        </span>
+                      ) : act.activityType === "Daily Log" ? (
+                        <span className="text-[#0F3D24]/50">Nil</span>
+                      ) : (
+                        <span className="text-[#0F3D24]/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      {act.mortalityCount > 0 ? (
+                        <div>
+                          <span className="rounded-full bg-rose-100 px-2 py-0.5 font-bold text-rose-800">
+                            {act.mortalityCount}
+                          </span>
+                          {act.causeOfMortality && (
+                            <div className="mt-1 max-w-[140px] truncate text-[10px] font-medium text-rose-700" title={act.causeOfMortality}>
+                              {act.causeOfMortality}
+                            </div>
+                          )}
+                        </div>
+                      ) : act.activityType === "Daily Log" ? (
+                        <span className="text-[#0F3D24]/50">Nil</span>
+                      ) : (
+                        <span className="text-[#0F3D24]/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      {act.activityType === "Daily Log" ? (
+                        <div className="space-y-1">
+                          <div className="font-semibold text-[#0F3D24]">
+                            {act.feedGiven === false
+                              ? "Not given"
+                              : act.feedBrand || "Given"}
+                          </div>
+                          {act.feedBagNo && act.feedBagStatus && (
+                            <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 whitespace-nowrap">
+                              Bag #{act.feedBagNo} (
+                              {act.feedBagStatus === "finished" ? "Finished" : "Opened"})
+                            </span>
+                          )}
+                          {act.feedConsumedKg > 0 && (
+                            <div className="text-[11px] font-medium text-[#0F3D24]/70">
+                              {act.feedConsumedKg} kg
+                            </div>
+                          )}
+                        </div>
+                      ) : act.feedConsumedKg > 0 ? (
+                        <span className="font-semibold text-[#0F3D24]">
+                          {act.feedConsumedKg} kg
+                        </span>
+                      ) : (
+                        <span className="text-[#0F3D24]/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center whitespace-nowrap">
+                      {act.activityType === "Daily Log" ? (
+                        act.waterGiven ? (
+                          <span className="inline-flex rounded-full bg-sky-100 px-2 py-0.5 font-bold text-sky-800">
+                            ✓
+                          </span>
+                        ) : (
+                          <span className="text-[#0F3D24]/40">—</span>
+                        )
+                      ) : (
+                        <span className="text-[#0F3D24]/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-[#0F3D24]/80">
+                      {act.temperature || <span className="text-[#0F3D24]/40">—</span>}
+                    </td>
+                    <td className="px-3 py-3 max-w-[160px] text-[#0F3D24]/80">
+                      {act.medicationGiven || <span className="text-[#0F3D24]/40">—</span>}
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap text-[#0F3D24]/75">
+                      {act.recordedByName || act.recordedBy || (
+                        <span className="text-[#0F3D24]/40">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 max-w-[220px] text-[#0F3D24]/75">
+                      <div className="space-y-1">
+                        {act.eggsCollected > 0 && (
+                          <span className="inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            🥚 {act.eggsCollected} eggs
+                          </span>
+                        )}
+                        {act.notes ? (
+                          <p className="line-clamp-2" title={act.notes}>
+                            {act.notes}
+                          </p>
+                        ) : act.eggsCollected <= 0 ? (
+                          <span className="text-[#0F3D24]/40">—</span>
+                        ) : null}
+                        {act.approvalStatus === "flagged" && act.rejectionReason && (
+                          <div className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-bold text-orange-900">
+                            Flag: {act.rejectionReason}
+                          </div>
+                        )}
+                        {act.approvalStatus === "rejected" && act.rejectionReason && (
+                          <div className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+                            Reason: {act.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <div className="flex justify-end">{renderActivityActions(act)}</div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="space-y-4">
-            {filteredActivities.map((act) => (
+            {sortedActivities.map((act) => (
               <div
                 key={act.id}
                 className="flex items-start justify-between gap-4 rounded-2xl border border-[#0F3D24]/10 p-4 hover:bg-[#F7F5F0]/50 transition"
@@ -4736,22 +5034,7 @@ export function DailyActivitiesPanel({
                           {act.batchName}
                         </span>
                       )}
-                      {(act.approvalStatus === "pending_approval" ||
-                        (act.approvalStatus as any) === "pending") && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-900">
-                          <Clock size={10} /> Pending Owner Approval
-                        </span>
-                      )}
-                      {act.approvalStatus === "flagged" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[10px] font-bold text-orange-800">
-                          <Flag size={10} /> Flagged · Edit Needed
-                        </span>
-                      )}
-                      {act.approvalStatus === "rejected" && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
-                          <XCircle size={10} /> Rejected
-                        </span>
-                      )}
+                      {renderApprovalBadge(act)}
                       <span className="text-xs text-[#0F3D24]/60">• {act.activityDate}</span>
                     </div>
                     {act.approvalStatus === "flagged" && act.rejectionReason && (
@@ -4814,60 +5097,7 @@ export function DailyActivitiesPanel({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {role !== "owner" && act.approvalStatus !== "approved" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (act.activityType === "Daily Log") {
-                          setEditingDailyLog({
-                            batchId: act.batchId ?? null,
-                            date: act.activityDate,
-                          });
-                        } else {
-                          setEditingActivity(act);
-                        }
-                      }}
-                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold transition ${
-                        act.approvalStatus === "flagged" || act.approvalStatus === "rejected"
-                          ? "bg-orange-600 text-white hover:bg-orange-700"
-                          : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                      }`}
-                    >
-                      <Pencil size={11} /> Edit &amp; Resubmit
-                    </button>
-                  )}
-                  {role === "owner" && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (act.activityType === "Daily Log") {
-                            setEditingDailyLog({
-                              batchId: act.batchId ?? null,
-                              date: act.activityDate,
-                            });
-                          } else {
-                            setEditingActivity(act);
-                          }
-                        }}
-                        className="p-1 text-[#3F8F3F] hover:text-[#0F3D24] transition"
-                        title="Edit activity"
-                      >
-                        <Pencil size={15} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (confirm("Delete this activity log?")) deleteActMut.mutate(act.id);
-                        }}
-                        className="p-1 text-rose-600 hover:text-rose-800 transition"
-                        title="Delete record"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </>
-                  )}
-                </div>
+                {renderActivityActions(act)}
               </div>
             ))}
           </div>
