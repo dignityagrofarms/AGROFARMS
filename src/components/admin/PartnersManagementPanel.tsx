@@ -741,8 +741,12 @@ function PartnerDetailView({
       }
     : livePartner;
 
-  const financials = selectedArchive ? selectedArchive.financials : liveFinancials;
-  const activities = selectedArchive ? selectedArchive.activities : liveActivities;
+  const financials = (selectedArchive ? selectedArchive.financials : liveFinancials).filter(
+    (f) => !f.removedAt,
+  );
+  const activities = (selectedArchive ? selectedArchive.activities : liveActivities).filter(
+    (a) => !a.removedAt,
+  );
   const summary = selectedArchive ? selectedArchive.summary : liveSummary;
   const charts = selectedArchive
     ? buildChartData(
@@ -811,6 +815,8 @@ function PartnerDetailView({
     try {
       await deletePartnerFn({ data: { passcode, partnerId: livePartner.id } });
       qc.invalidateQueries({ queryKey: ["admin-partners"] });
+      qc.invalidateQueries({ queryKey: ["batch-investors"] });
+      qc.invalidateQueries({ queryKey: ["farm-batches"] });
       onBack();
     } catch (err: any) {
       alert(err instanceof Error ? err.message : "Failed to delete partner.");
@@ -2315,9 +2321,17 @@ function PartnerCredentialsSubPanel({
   const [agreedTerms, setAgreedTerms] = useState(partner.agreedTerms || "");
   const [batchId, setBatchId] = useState(partner.batchId || "");
   const [batchAllocationPercentage, setBatchAllocationPercentage] = useState(
-    String(partner.batchAllocationPercentage ?? 100),
+    String(
+      partner.batchAllocationPercentage && partner.batchAllocationPercentage > 0
+        ? partner.batchAllocationPercentage
+        : 100,
+    ),
   );
-  const [autoSyncBatch, setAutoSyncBatch] = useState(partner.autoSyncBatch !== false);
+  const [autoSyncBatch, setAutoSyncBatch] = useState(
+    partner.batchId && !partner.allocatedBirds && Number(partner.batchAllocationPercentage || 0) === 0
+      ? true
+      : partner.autoSyncBatch !== false,
+  );
   const [status, setStatus] = useState<FarmPartner["status"]>(partner.status);
   const [amendReason, setAmendReason] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -2486,7 +2500,6 @@ function PartnerCredentialsSubPanel({
               allowDecimal
               required
               min={0}
-              disabled={!!partner.allocatedBirds}
               value={initialInvestment}
               onValueChange={(_, raw) => setInitialInvestment(raw)}
               className="w-full rounded-xl border border-slate-200 px-3 py-2 font-bold text-[#0F3D24]"
@@ -2501,7 +2514,6 @@ function PartnerCredentialsSubPanel({
               required
               min={0}
               max={100}
-              disabled={!!partner.allocatedBirds}
               value={profitShare}
               onValueChange={(_, raw) => setProfitShare(raw)}
               className="w-full rounded-xl border border-emerald-300 bg-emerald-50/40 px-3 py-2 font-black text-emerald-900"
@@ -2555,9 +2567,12 @@ function PartnerCredentialsSubPanel({
           <div>
             <label className="block font-bold text-[#0F3D24] mb-1">Linked Farm Batch</label>
             <select
-              disabled={!!partner.allocatedBirds}
               value={batchId}
-              onChange={(e) => setBatchId(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setBatchId(next);
+                if (next) setAutoSyncBatch(true);
+              }}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-medium text-[#0F3D24]"
             >
               <option value="">No linked batch (independent slot)</option>
@@ -2573,15 +2588,31 @@ function PartnerCredentialsSubPanel({
                   <input
                     type="checkbox"
                     checked={autoSyncBatch}
-                    disabled
-                    readOnly
-                    className="h-3.5 w-3.5 accent-[#0F3D24]"
+                    onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-[#0F3D24] cursor-pointer"
                   />
                   Auto-sync batch P&amp;L
                 </label>
                 <div className="flex items-center gap-1">
                   <span className="text-slate-600 font-semibold">Ownership:</span>
-                  <span className="text-xs">Calculated in Allocate Partners</span>
+                  {partner.allocatedBirds && batchId === partner.batchId ? (
+                    <span className="text-xs font-bold text-[#0F3D24]">
+                      {partner.allocatedBirds} birds ({Number(batchAllocationPercentage).toFixed(2)}%)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">
+                      <input
+                        type="number"
+                        min={0.01}
+                        max={100}
+                        step="any"
+                        value={batchAllocationPercentage}
+                        onChange={(e) => setBatchAllocationPercentage(e.target.value)}
+                        className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
+                      />
+                      <span className="text-xs font-bold text-[#0F3D24]">%</span>
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -3233,15 +3264,22 @@ function AddPartnerModal({
                         <input
                           type="checkbox"
                           checked={autoSyncBatch}
-                          disabled
-                          readOnly
-                          className="h-3.5 w-3.5 accent-[#0F3D24]"
+                          onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                          className="h-3.5 w-3.5 accent-[#0F3D24] cursor-pointer"
                         />
                         Auto-calculate Profit/Loss from batch ledger
                       </label>
                       <div className="flex items-center gap-1">
-                        <span className="text-emerald-900 font-semibold">Ownership:</span>
-                        <span className="text-xs">Calculated in Allocate Partners</span>
+                        <span className="text-emerald-900 font-semibold">Batch Pool %:</span>
+                        <input
+                          type="number"
+                          min={0.01}
+                          max={100}
+                          step="any"
+                          value={batchAllocationPercentage}
+                          onChange={(e) => setBatchAllocationPercentage(e.target.value)}
+                          className="w-16 rounded-lg border border-emerald-300 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
+                        />
                       </div>
                     </div>
                   )}
@@ -3764,9 +3802,17 @@ export function EditPartnerModal({
   const [cycleEndDate, setCycleEndDate] = useState(partner.cycleEndDate || "");
   const [batchId, setBatchId] = useState(partner.batchId || "");
   const [batchAllocationPercentage, setBatchAllocationPercentage] = useState(
-    String(partner.batchAllocationPercentage ?? 100),
+    String(
+      partner.batchAllocationPercentage && partner.batchAllocationPercentage > 0
+        ? partner.batchAllocationPercentage
+        : 100,
+    ),
   );
-  const [autoSyncBatch, setAutoSyncBatch] = useState(partner.autoSyncBatch !== false);
+  const [autoSyncBatch, setAutoSyncBatch] = useState(
+    partner.batchId && !partner.allocatedBirds && Number(partner.batchAllocationPercentage || 0) === 0
+      ? true
+      : partner.autoSyncBatch !== false,
+  );
 
   // Sharing Matrix
   const [profitShare, setProfitShare] = useState(String(partner.profitSharePercentage ?? 70));
@@ -3885,6 +3931,8 @@ export function EditPartnerModal({
     try {
       await deletePartnerFn({ data: { passcode, partnerId: partner.id } });
       qc.invalidateQueries({ queryKey: ["admin-partners"] });
+      qc.invalidateQueries({ queryKey: ["batch-investors"] });
+      qc.invalidateQueries({ queryKey: ["farm-batches"] });
       if (onDeleted) {
         onDeleted();
       } else {
@@ -4110,7 +4158,6 @@ export function EditPartnerModal({
                       min={0}
                       required
                       placeholder="e.g. 500000"
-                      disabled={!!partner.allocatedBirds}
                       value={initialInvestment}
                       onValueChange={(_, raw) => setInitialInvestment(raw)}
                       className="w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 py-2 text-[#0F3D24] font-mono font-bold outline-none focus:border-[#0F3D24]"
@@ -4194,9 +4241,12 @@ export function EditPartnerModal({
                   Linked Farm Production Batch
                 </label>
                 <select
-                  disabled={!!partner.allocatedBirds}
                   value={batchId}
-                  onChange={(e) => setBatchId(e.target.value)}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setBatchId(next);
+                    if (next) setAutoSyncBatch(true);
+                  }}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[#0F3D24] font-medium outline-none focus:border-[#0F3D24]"
                 >
                   <option value="">No Batch Linked (Standalone Flock)</option>
@@ -4213,21 +4263,37 @@ export function EditPartnerModal({
                       <input
                         type="checkbox"
                         checked={autoSyncBatch}
-                        disabled
-                        readOnly
-                        className="h-3.5 w-3.5 accent-[#0F3D24]"
+                        onChange={(e) => setAutoSyncBatch(e.target.checked)}
+                        className="h-3.5 w-3.5 accent-[#0F3D24] cursor-pointer"
                       />
                       Auto-calculate Profit/Loss from batch ledger
                     </label>
                     <div className="flex items-center gap-1">
                       <span className="text-slate-600 font-semibold">Ownership:</span>
-                      <span className="text-xs">Calculated in Allocate Partners</span>
+                      {partner.allocatedBirds && batchId === partner.batchId ? (
+                        <span className="text-xs font-bold text-[#0F3D24]">
+                          {partner.allocatedBirds} birds ({Number(batchAllocationPercentage).toFixed(2)}%)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={0.01}
+                            max={100}
+                            step="any"
+                            value={batchAllocationPercentage}
+                            onChange={(e) => setBatchAllocationPercentage(e.target.value)}
+                            className="w-16 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-[#0F3D24]"
+                          />
+                          <span className="text-xs font-bold text-[#0F3D24]">%</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 )}
                 <p className="text-[10px] text-slate-500">
-                  After linking, use Allocate Partners to confirm birds and capital and enable
-                  automatic synchronization.
+                  When enabled, batch revenue, expenses, and flock logs automatically sync into this
+                  partner&apos;s workspace.
                 </p>
               </div>
             </div>
@@ -4248,7 +4314,6 @@ export function EditPartnerModal({
                   min="0"
                   max="100"
                   step="1"
-                  disabled={!!partner.allocatedBirds}
                   value={profitShare}
                   onChange={(e) => setProfitShare(e.target.value)}
                   className="w-full accent-[#0F3D24]"

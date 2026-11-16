@@ -1,6 +1,7 @@
 import { stableAdminCredential, isSessionDenied } from "@/lib/admin-session";
 import { getFinancialAccess } from "@/lib/financial-access.functions";
 import { OperationalWorkspace } from "@/components/admin/OperationalWorkspace";
+import { StaffClockInGate } from "@/components/admin/StaffClockInGate";
 import React, { useEffect, useState, useRef } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -961,12 +962,26 @@ function AdminOrders() {
         )}
       </main>
     );
+  if (role === "staff" && accessQuery.data.clockedInToday === false) {
+    return (
+      <StaffClockInGate
+        passcode={passcode}
+        username={currentUsername}
+        onClockedIn={() => {
+          accessQuery.refetch();
+        }}
+        onSignOut={signOut}
+      />
+    );
+  }
+
   if (!accessQuery.data.canViewFinancials || query.data?.financialsRestricted)
     return (
       <OperationalWorkspace
         passcode={passcode}
         role={role}
         username={currentUsername}
+        clockInTime={accessQuery.data.clockInTime}
         onSignOut={signOut}
       />
     );

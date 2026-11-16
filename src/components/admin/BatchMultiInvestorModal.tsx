@@ -132,7 +132,7 @@ export function BatchMultiInvestorModal({
     calculated.some((r) => !r.allocation) ||
     assigned > initial ||
     query.data?.unresolvedHistoricalAllocation ||
-    query.data?.batchStatus !== "active";
+    query.data?.batchStatus === "archived";
   function change(id: string, patch: Partial<Row>) {
     setRows((old) => old.map((r) => (r.partnerId === id ? { ...r, ...patch } : r)));
     setReviewed(false);

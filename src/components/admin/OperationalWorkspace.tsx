@@ -16,11 +16,13 @@ export function OperationalWorkspace({
   passcode,
   role,
   username,
+  clockInTime,
   onSignOut,
 }: {
   passcode: string;
   role: AdminRole;
   username: string;
+  clockInTime?: string | null;
   onSignOut: () => void;
 }) {
   const [tab, setTab] = useState("entry"),
@@ -128,9 +130,21 @@ export function OperationalWorkspace({
       <header className="flex flex-wrap justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-emerald-950">Farm operations</h1>
-          <p className="text-sm">
-            Signed in as {username} · Financial reports are restricted by the Farm Owner.
-          </p>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span>
+              Signed in as {username} · Financial reports are restricted by the Farm Owner.
+            </span>
+            {clockInTime && (
+              <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-900">
+                Clocked in at{" "}
+                {new Date(clockInTime).toLocaleTimeString("en-NG", {
+                  timeZone: "Africa/Lagos",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex gap-3">
           <Link to="/" className="min-h-11 py-3 underline">

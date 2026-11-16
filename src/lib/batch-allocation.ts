@@ -41,3 +41,63 @@ export function allocationFromInvestment(
 export function weightedProfitShare(rows: { ownership: number; profitShare: number }[]) {
   return rows.reduce((sum, row) => sum + (row.ownership * row.profitShare) / 100, 0);
 }
+export function resolveRegistrationBatchAllocation(params: {
+  batchId: string | null | undefined;
+  initialInvestment: number;
+  initialHeadcount: number;
+  fundingPerBird: number | null | undefined;
+  reservedBirds?: number;
+  requestedAllocationPct?: number | null;
+  requestedAutoSync?: boolean;
+}) {
+  const {
+    batchId,
+    initialInvestment,
+    initialHeadcount,
+    fundingPerBird,
+    reservedBirds = 0,
+    requestedAllocationPct,
+    requestedAutoSync,
+  } = params;
+  if (!batchId) {
+    return {
+      batch_id: null,
+      allocated_birds: null,
+      batch_allocation_percentage: 0,
+      auto_sync_batch: false,
+    };
+  }
+  const autoSync = requestedAutoSync !== false;
+  const fallbackPct =
+    requestedAllocationPct !== null &&
+    requestedAllocationPct !== undefined &&
+    Number(requestedAllocationPct) > 0
+      ? Number(requestedAllocationPct)
+      : 100;
+
+  const rate = Number(fundingPerBird || 0);
+  if (initialHeadcount > 0 && rate > 0 && initialInvestment > 0) {
+    const invCents = cents(initialInvestment);
+    const rateCents = cents(rate);
+    const birds = Math.round(invCents / rateCents);
+    if (
+      birds >= 1 &&
+      Math.abs(invCents - birds * rateCents) <= 1 &&
+      birds + reservedBirds <= initialHeadcount
+    ) {
+      return {
+        batch_id: batchId,
+        allocated_birds: birds,
+        batch_allocation_percentage: (100 * birds) / initialHeadcount,
+        auto_sync_batch: autoSync,
+      };
+    }
+  }
+
+  return {
+    batch_id: batchId,
+    allocated_birds: null,
+    batch_allocation_percentage: fallbackPct,
+    auto_sync_batch: autoSync,
+  };
+}

@@ -34,12 +34,12 @@ export function UndoPartnerAllocation({
   const mutation = useMutation({
     mutationFn: async () => {
       const p = query.data;
-      if (!p?.canUndo || !p.changeId) throw new Error("Reload and review the allocation preview");
+      if (!p?.canUndo) throw new Error("Reload and review the allocation preview");
       return undo({
         data: {
           passcode,
           partnerId,
-          changeId: p.changeId,
+          changeId: p.changeId || partnerId,
           allocationVersion: p.allocationVersion,
           batchRevision: p.batchRevision,
           previousBatchRevision: p.previousBatchRevision,

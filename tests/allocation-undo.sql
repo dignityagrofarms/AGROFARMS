@@ -56,6 +56,11 @@ DECLARE b uuid;p uuid;f uuid;m uuid;v jsonb;first_version bigint;investment nume
  UPDATE farm_partners SET cycle_status='closed' WHERE id=p;
  UPDATE farm_partners SET cycle_status='open',settled_at=NULL,settlement_snapshot=NULL WHERE id=p;
  IF partner_undo_preview(p)->>'reason' NOT ILIKE '%settled%' THEN RAISE EXCEPTION 'Reopening a cycle bypassed settlement protection';END IF;
+ -- Registration-linked partners (INSERT with batch_id) can be previewed and cleanly detached via undo.
+ INSERT INTO farm_batches(batch_name,batch_type,initial_headcount,current_headcount,start_date,funding_per_bird) VALUES('TEST registration batch','Broiler',100,100,current_date,7500) RETURNING id INTO b;
+ INSERT INTO farm_partners(full_name,phone,username,passcode_hash,batch_id,allocated_birds,initial_investment,batch_allocation_percentage,profit_share_percentage,loss_share_percentage,auto_sync_batch) VALUES('TEST registration investor','08000000000','test-reg-investor','not-a-login',b,25,187500,25,100,100,true) RETURNING id INTO p;
+ PERFORM pg_temp.undo(p);
+ IF NOT EXISTS(SELECT 1 FROM farm_partners WHERE id=p AND batch_id IS NULL AND allocated_birds IS NULL AND NOT auto_sync_batch) THEN RAISE EXCEPTION 'Registration-linked partner was not detached on undo';END IF;
  IF has_function_privilege('anon','undo_partner_allocation(uuid,uuid,bigint,integer,integer,text)','EXECUTE') OR has_table_privilege('authenticated','partner_allocation_changes','SELECT') THEN RAISE EXCEPTION 'Undo snapshots or mutation are public';END IF;
 END $$;
 ROLLBACK;

@@ -23,6 +23,7 @@ import {
   adminResetUserPasscode,
   adminToggleUserActive,
   adminDeleteUserAccount,
+  adminListAttendance,
   type AdminRole,
   type UserAccountItem,
 } from "@/lib/orders.functions";
@@ -53,11 +54,18 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
   const resetPasscodeFn = useServerFn(adminResetUserPasscode);
   const toggleActiveFn = useServerFn(adminToggleUserActive);
   const deleteAccountFn = useServerFn(adminDeleteUserAccount);
+  const listAttendanceFn = useServerFn(adminListAttendance);
   const setPasscodeFn = useServerFn(adminSetPasscode);
 
   const accountsQuery = useQuery({
     queryKey: ["admin-user-accounts", passcode],
     queryFn: () => listAccountsFn({ data: { passcode } }),
+    enabled: role === "owner" && Boolean(passcode),
+  });
+
+  const attendanceQuery = useQuery({
+    queryKey: ["hr-attendance-list", passcode],
+    queryFn: () => listAttendanceFn({ data: { passcode } }),
     enabled: role === "owner" && Boolean(passcode),
   });
 
@@ -309,6 +317,68 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
                             </>
                           )}
                         </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Staff Daily Clock-In & Attendance Log */}
+          <div className="space-y-3 pt-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70 flex items-center gap-2">
+              <Clock size={15} className="text-[#3F8F3F]" /> Staff Clock-In &amp; Attendance Log ({attendanceQuery.data?.length || 0})
+            </h3>
+            {attendanceQuery.isLoading ? (
+              <div className="py-5 text-center text-xs text-[#0F3D24]/50">
+                <Loader2 size={16} className="animate-spin mx-auto mb-1" /> Loading attendance records...
+              </div>
+            ) : (attendanceQuery.data || []).length === 0 ? (
+              <div className="rounded-2xl border border-[#0F3D24]/10 bg-[#F7F5F0]/50 p-5 text-center text-xs text-[#0F3D24]/60">
+                No staff clock-in records logged yet. Staff members are required to clock in upon logging in.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-[#0F3D24]/10 shadow-sm">
+                <table className="w-full text-left text-xs min-w-[600px]">
+                  <thead className="bg-[#F7F5F0] text-[#0F3D24]/70 font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">Staff Member</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3">Exact Clock-In Timestamp</th>
+                      <th className="p-3">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#0F3D24]/10">
+                    {(attendanceQuery.data || []).slice(0, 50).map((att: any) => (
+                      <tr key={att.id} className="hover:bg-slate-50">
+                        <td className="p-3 font-mono font-bold text-[#0F3D24] whitespace-nowrap">
+                          {att.attendanceDate}
+                        </td>
+                        <td className="p-3">
+                          <span className="font-bold text-[#0F3D24]">{att.fullName || att.username}</span>{" "}
+                          <span className="font-mono text-[10px] text-[#0F3D24]/60">@{att.username}</span>
+                        </td>
+                        <td className="p-3">
+                          <span className="inline-block rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-emerald-800">
+                            {att.status}
+                          </span>
+                        </td>
+                        <td className="p-3 font-mono text-[#0F3D24]/80 whitespace-nowrap">
+                          {att.clockInTime
+                            ? new Date(att.clockInTime).toLocaleString("en-NG", {
+                                timeZone: "Africa/Lagos",
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                              })
+                            : "N/A"}
+                        </td>
+                        <td className="p-3 text-[#0F3D24]/70">{att.notes || "Recorded"}</td>
                       </tr>
                     ))}
                   </tbody>

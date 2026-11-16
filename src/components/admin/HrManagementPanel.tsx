@@ -30,6 +30,7 @@ import {
   adminListUserAccounts,
   adminCreateUserAccount,
   adminUpdateStaffMember,
+  adminDeleteUserAccount,
   adminRecordSuspension,
   adminListSuspensions,
   adminUploadStaffDocument,
@@ -58,6 +59,8 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   // Filter & Search states
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDept, setSelectedDept] = useState("all");
+  const [attDateFilter, setAttDateFilter] = useState("");
+  const [attSearch, setAttSearch] = useState("");
 
   // Modals
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
@@ -110,6 +113,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const listStaffFn = useServerFn(adminListUserAccounts);
   const createStaffFn = useServerFn(adminCreateUserAccount);
   const updateStaffFn = useServerFn(adminUpdateStaffMember);
+  const deleteStaffFn = useServerFn(adminDeleteUserAccount);
   const recordSuspensionFn = useServerFn(adminRecordSuspension);
   const listSuspensionsFn = useServerFn(adminListSuspensions);
   const uploadDocFn = useServerFn(adminUploadStaffDocument);
@@ -286,6 +290,21 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
     onError: (err: any) => setActionMsg("Error: " + err.message),
   });
 
+  const deleteStaffMut = useMutation({
+    mutationFn: (targetUsername: string) =>
+      deleteStaffFn({ data: { passcode, targetUsername } }),
+    onSuccess: (_res, targetUsername) => {
+      setActionMsg(`Account "@${targetUsername}" and its HR records were permanently deleted.`);
+      qc.invalidateQueries({ queryKey: ["hr-staff-list"] });
+      qc.invalidateQueries({ queryKey: ["admin-user-accounts"] });
+      qc.invalidateQueries({ queryKey: ["hr-attendance-list"] });
+      if (selectedStaffUser?.username === targetUsername) {
+        setSelectedStaffUser(null);
+      }
+    },
+    onError: (err: any) => setActionMsg("Error: " + (err?.message || "Failed to delete staff account.")),
+  });
+
   const staffList = staffQuery.data || [];
   const suspensionsList = suspensionsQuery.data || [];
   const attendanceList = attendanceQuery.data || [];
@@ -295,7 +314,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
 
   // Metrics
   const totalStaffCount = staffList.length;
-  const todayStr = new Date().toISOString().split("T")[0];
+  const todayStr = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
   const presentTodayCount = attendanceList.filter((a: any) => a.attendanceDate === todayStr && a.status === "present").length;
   const suspendedCount = staffList.filter((s: any) => s.status === "suspended").length;
   const pendingPayrollCount = payrollList.filter((p: any) => p.status === "pending_signature").length;
@@ -592,6 +611,24 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                           >
                             <DollarSign size={14} />
                           </button>
+                          {staff.username !== "owner" && staff.username !== "admin" && (
+                            <button
+                              disabled={deleteStaffMut.isPending}
+                              onClick={() => {
+                                if (
+                                  window.confirm(
+                                    `Permanently delete staff account "${staff.fullName || staff.username}" (@${staff.username})? This removes the account and its attendance/HR records from the database so it can be cleanly recreated. This cannot be undone.`,
+                                  )
+                                ) {
+                                  deleteStaffMut.mutate(staff.username);
+                                }
+                              }}
+                              title="Permanently Delete Staff Account"
+                              className="rounded-full bg-red-50 p-1.5 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50 transition"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <button
@@ -721,13 +758,132 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
       )}
 
       {/* 4. Attendance Register Sub-Tab */}
-      {subTab === "attendance" && (
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-bold text-[#0F3D24] flex items-center gap-2">
-              <Calendar size={18} className="text-[#3F8F3F]" /> Staff Daily Attendance Log
-            </h3>
-            <span className="text-xs font-semibold text-[#0F3D24]/70">Today: {todayStr}</span>
+      {subTab === "attendance" && (() => {
+        const staffAccountsOnly = staffList.filter((s) => s.role === "staff");
+        const todayAttMap = new Map(
+          attendanceList
+            .filter((a: any) => a.attendanceDate === todayStr)
+            .map((a: any) => [String(a.username || "").toLowerCase(), a]),
+        );
+        const filteredAttendance = attendanceList.filter((att: any) => {
+          if (attDateFilter && att.attendanceDate !== attDateFilter) return false;
+          if (attSearch.trim()) {
+            const q = attSearch.toLowerCase();
+            return (
+              String(att.username || "").toLowerCase().includes(q) ||
+              String(att.fullName || "").toLowerCase().includes(q) ||
+              String(att.notes || "").toLowerCase().includes(q)
+            );
+          }
+          return true;
+        });
+
+        return (
+        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-[#0F3D24] flex items-center gap-2">
+                <Calendar size={18} className="text-[#3F8F3F]" /> Staff Daily Attendance &amp; Clock-In Log
+              </h3>
+              <p className="text-xs text-[#0F3D24]/65">
+                Live clock-in register showing who clocked in, attendance date, and exact clock-in timestamp.
+              </p>
+            </div>
+            <span className="rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-bold text-[#0F3D24]">
+              Today (Lagos): {todayStr}
+            </span>
+          </div>
+
+          {staffAccountsOnly.length > 0 && (
+            <div className="rounded-2xl border border-[#0F3D24]/10 bg-[#F7F5F0]/60 p-4 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0F3D24]/70">
+                  Today&apos;s Staff Shift Clock-Ins
+                </span>
+                <span className="text-xs font-bold text-emerald-800">
+                  {staffAccountsOnly.filter((s) => todayAttMap.has(s.username.toLowerCase())).length} of{" "}
+                  {staffAccountsOnly.length} clocked in today
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {staffAccountsOnly.map((s) => {
+                  const rec: any = todayAttMap.get(s.username.toLowerCase());
+                  return (
+                    <div
+                      key={s.id}
+                      className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs ${
+                        rec
+                          ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
+                          : "border-amber-200 bg-amber-50/70 text-amber-950"
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold truncate">{s.fullName || s.username}</p>
+                        <p className="text-[10px] font-mono opacity-75 truncate">@{s.username}</p>
+                      </div>
+                      {rec ? (
+                        <span className="shrink-0 rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-extrabold text-white">
+                          {rec.clockInTime
+                            ? new Date(rec.clockInTime).toLocaleTimeString("en-NG", {
+                                timeZone: "Africa/Lagos",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })
+                            : "Clocked In"}
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-full bg-amber-200 px-2.5 py-0.5 text-[10px] font-extrabold text-amber-950">
+                          Not Clocked In
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-2.5 text-[#0F3D24]/40" />
+              <input
+                type="text"
+                value={attSearch}
+                onChange={(e) => setAttSearch(e.target.value)}
+                placeholder="Search by staff name, @username, or note..."
+                className="w-full rounded-xl bg-[#F7F5F0] pl-8 pr-3 py-2 text-xs font-medium text-[#0F3D24] outline-none focus:ring-2 focus:ring-[#3F8F3F]"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAttDateFilter("")}
+                className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                  attDateFilter === ""
+                    ? "bg-[#0F3D24] text-white"
+                    : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+                }`}
+              >
+                All Dates
+              </button>
+              <button
+                type="button"
+                onClick={() => setAttDateFilter(todayStr)}
+                className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                  attDateFilter === todayStr
+                    ? "bg-[#0F3D24] text-white"
+                    : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+                }`}
+              >
+                Today Only
+              </button>
+              <input
+                type="date"
+                value={attDateFilter}
+                onChange={(e) => setAttDateFilter(e.target.value)}
+                className="rounded-xl border border-[#0F3D24]/15 bg-white px-3 py-1.5 text-xs font-semibold text-[#0F3D24] outline-none"
+              />
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -735,41 +891,71 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
               <thead className="bg-[#F7F5F0] text-[10px] font-extrabold uppercase tracking-wider text-[#0F3D24]/60">
                 <tr>
                   <th className="p-3">Date</th>
-                  <th className="p-3">Staff Username</th>
-                  <th className="p-3">Attendance Status</th>
-                  <th className="p-3">Clock-In Time</th>
+                  <th className="p-3">Staff Member</th>
+                  <th className="p-3">Role</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Exact Clock-In Timestamp</th>
                   <th className="p-3">Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#0F3D24]/5 font-medium">
-                {attendanceList.map((att: any) => (
-                  <tr key={att.id} className="hover:bg-[#F7F5F0]/50 transition">
-                    <td className="p-3 font-mono font-bold text-[#0F3D24]">{att.attendanceDate}</td>
-                    <td className="p-3 font-semibold text-[#0F3D24]">@{att.username}</td>
-                    <td className="p-3">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${
-                          att.status === "present"
-                            ? "bg-emerald-100 text-emerald-800"
-                            : att.status === "late"
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-rose-100 text-rose-800"
-                        }`}
-                      >
-                        {att.status}
-                      </span>
+                {filteredAttendance.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-xs text-[#0F3D24]/60">
+                      No attendance clock-ins found matching this filter.
                     </td>
-                    <td className="p-3 font-mono text-[#0F3D24]/70">
-                      {att.clockInTime ? new Date(att.clockInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "N/A"}
-                    </td>
-                    <td className="p-3 text-[#0F3D24]/70">{att.notes || "Recorded"}</td>
                   </tr>
-                ))}
+                ) : (
+                  filteredAttendance.map((att: any) => (
+                    <tr key={att.id} className="hover:bg-[#F7F5F0]/50 transition">
+                      <td className="p-3 font-mono font-bold text-[#0F3D24] whitespace-nowrap">
+                        {att.attendanceDate}
+                      </td>
+                      <td className="p-3">
+                        <p className="font-bold text-[#0F3D24]">{att.fullName || att.username}</p>
+                        <p className="text-[10px] font-mono text-[#0F3D24]/60">@{att.username}</p>
+                      </td>
+                      <td className="p-3">
+                        <span className="capitalize rounded-full bg-[#0F3D24]/10 px-2.5 py-0.5 text-[10px] font-bold text-[#0F3D24]">
+                          {att.role || "staff"}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold uppercase ${
+                            att.status === "present"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : att.status === "late"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-rose-100 text-rose-800"
+                          }`}
+                        >
+                          {att.status}
+                        </span>
+                      </td>
+                      <td className="p-3 font-mono text-[#0F3D24] whitespace-nowrap">
+                        {att.clockInTime
+                          ? new Date(att.clockInTime).toLocaleString("en-NG", {
+                              timeZone: "Africa/Lagos",
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })
+                          : "N/A"}
+                      </td>
+                      <td className="p-3 text-[#0F3D24]/70">{att.notes || "Recorded"}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* 5. Payroll Receipts Sub-Tab */}
       {subTab === "payroll" && (

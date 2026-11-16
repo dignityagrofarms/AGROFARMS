@@ -788,11 +788,22 @@ export const adminDeleteUserAccount = createServerFn({ method: "POST" })
       if (data.targetUsername === "owner" || data.targetUsername === "admin") {
         throw new Error("Cannot delete primary Administrator account.");
       }
+      const uname = data.targetUsername.trim().toLowerCase();
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      // Clean up all dependent staff HR records so recreated usernames start clean
+      await Promise.all([
+        (supabaseAdmin.from("staff_attendance" as any) as any).delete().ilike("username", uname),
+        (supabaseAdmin.from("staff_documents" as any) as any).delete().ilike("username", uname),
+        (supabaseAdmin.from("staff_suspensions" as any) as any).delete().ilike("staff_username", uname),
+        (supabaseAdmin.from("staff_leave_requests" as any) as any).delete().ilike("username", uname),
+        (supabaseAdmin.from("staff_payment_receipts" as any) as any).delete().ilike("username", uname),
+      ]).catch(() => {});
+
       const { error } = await supabaseAdmin
         .from("admin_access")
         .delete()
-        .eq("username", data.targetUsername);
+        .ilike("username", uname);
       if (error) {
         console.error("[adminDeleteUserAccount] Supabase error:", error);
         throw new Error(error.message);
@@ -1982,28 +1993,39 @@ export const staffClockIn = createServerFn({ method: "POST" })
     ).toLowerCase();
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
 
     const { data: existing } = await (supabaseAdmin.from("staff_attendance" as any) as any)
-      .select("id")
+      .select("id, clock_in_time")
       .eq("username", verifiedUsername)
       .eq("attendance_date", today)
       .maybeSingle();
 
     if (existing) {
-      return { ok: true, message: "Already clocked in today!" };
+      return {
+        ok: true,
+        message: "Already clocked in today!",
+        attendanceDate: today,
+        clockInTime: existing.clock_in_time as string | null,
+      };
     }
 
+    const clockInTime = new Date().toISOString();
     const { error } = await (supabaseAdmin.from("staff_attendance" as any) as any).insert({
       username: verifiedUsername,
       attendance_date: today,
       status: "present",
-      clock_in_time: new Date().toISOString(),
-      notes: data.notes || "Marked attendance via Staff Portal",
+      clock_in_time: clockInTime,
+      notes: data.notes?.trim() || "Clocked in via Staff Portal",
     });
 
     if (error) throw new Error(error.message);
-    return { ok: true, message: "Attendance clocked in successfully!" };
+    return {
+      ok: true,
+      message: "Attendance clocked in successfully!",
+      attendanceDate: today,
+      clockInTime,
+    };
   });
 
 export const adminListAttendance = createServerFn({ method: "POST" })
@@ -2023,7 +2045,8 @@ export const adminListAttendance = createServerFn({ method: "POST" })
 
     let q = (supabaseAdmin.from("staff_attendance" as any) as any)
       .select("*")
-      .order("attendance_date", { ascending: false });
+      .order("attendance_date", { ascending: false })
+      .order("clock_in_time", { ascending: false });
     if (data.username) {
       q = q.eq("username", data.username.toLowerCase());
     }
@@ -2034,19 +2057,39 @@ export const adminListAttendance = createServerFn({ method: "POST" })
       q = q.lte("attendance_date", data.endDate);
     }
 
-    const { data: rows, error } = await q;
+    const [{ data: rows, error }, { data: staffUsers }] = await Promise.all([
+      q,
+      supabaseAdmin.from("admin_access").select("username, full_name, role, department"),
+    ]);
     if (error) throw new Error(error.message);
 
-    return (rows || []).map((r: any) => ({
-      id: r.id,
-      username: r.username,
-      attendanceDate: r.attendance_date,
-      status: r.status,
-      clockInTime: r.clock_in_time,
-      clockOutTime: r.clock_out_time,
-      notes: r.notes,
-      createdAt: r.created_at,
-    }));
+    const userMap = new Map<string, { fullName: string; role: string; department: string }>();
+    for (const u of staffUsers || []) {
+      const uname = String((u as any).username || "").trim().toLowerCase();
+      if (!uname) continue;
+      userMap.set(uname, {
+        fullName: String((u as any).full_name || "").trim() || uname,
+        role: String((u as any).role || "staff"),
+        department: String((u as any).department || "Farm Operations"),
+      });
+    }
+
+    return (rows || []).map((r: any) => {
+      const meta = userMap.get(String(r.username || "").trim().toLowerCase());
+      return {
+        id: r.id,
+        username: r.username,
+        fullName: meta?.fullName || r.username,
+        role: meta?.role || "staff",
+        department: meta?.department || "Farm Operations",
+        attendanceDate: r.attendance_date,
+        status: r.status,
+        clockInTime: r.clock_in_time,
+        clockOutTime: r.clock_out_time,
+        notes: r.notes,
+        createdAt: r.created_at,
+      };
+    });
   });
 
 export const adminMarkAttendance = createServerFn({ method: "POST" })

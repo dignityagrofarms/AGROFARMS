@@ -1,19 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { checkOwner, checkPasscode } from "./orders.functions";
+import { checkOwner, checkPasscode, parseAdminCredential } from "./orders.functions";
 export const getFinancialAccess = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ passcode: z.string().min(1) }).parse(input))
   .handler(async ({ data }) => {
     const { financialAccess } = await import("./financial-access.server");
     const access = await financialAccess(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+
+    let clockedInToday = true;
+    let clockInTime: string | null = null;
+    if (access.role === "staff") {
+      const cred = parseAdminCredential(data.passcode);
+      const uname = (cred.username && cred.username !== "unknown" ? cred.username : "staff")
+        .trim()
+        .toLowerCase();
+      const { data: attRow } = await (supabaseAdmin.from("staff_attendance" as any) as any)
+        .select("clock_in_time, status")
+        .eq("username", uname)
+        .eq("attendance_date", today)
+        .maybeSingle();
+      clockedInToday = Boolean(attRow);
+      clockInTime = attRow?.clock_in_time || null;
+    }
+
     if (access.role !== "owner")
       return {
         role: access.role,
         canViewFinancials: access.canViewFinancials,
         staff: false,
         manager: false,
+        clockedInToday,
+        clockInTime,
+        attendanceDate: today,
       };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: settings, error } = await supabaseAdmin
       .from("app_settings")
       .select("key,value")
@@ -23,6 +44,9 @@ export const getFinancialAccess = createServerFn({ method: "POST" })
       ...access,
       staff: settings?.find((s) => s.key === "financial_visibility_staff")?.value === "true",
       manager: settings?.find((s) => s.key === "financial_visibility_manager")?.value === "true",
+      clockedInToday: true,
+      clockInTime: null as string | null,
+      attendanceDate: today,
     };
   });
 export const setFinancialAccess = createServerFn({ method: "POST" })

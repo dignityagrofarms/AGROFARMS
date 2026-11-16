@@ -4,6 +4,7 @@ import {
   allocationFromBirds,
   allocationFromInvestment,
   weightedProfitShare,
+  resolveRegistrationBatchAllocation,
 } from "../src/lib/batch-allocation.ts";
 import {
   partnerFinancialView,
@@ -39,6 +40,38 @@ test("ownership derives from original birds and funding; investment requires who
     70,
   );
   assert.equal(allocationFromBirds(1, 10000, 100).ownership, 0.01);
+  assert.deepEqual(
+    resolveRegistrationBatchAllocation({
+      batchId: "batch-1",
+      initialInvestment: 187500,
+      initialHeadcount: 50,
+      fundingPerBird: 7500,
+      reservedBirds: 0,
+      requestedAutoSync: true,
+    }),
+    {
+      batch_id: "batch-1",
+      allocated_birds: 25,
+      batch_allocation_percentage: 50,
+      auto_sync_batch: true,
+    },
+  );
+  assert.deepEqual(
+    resolveRegistrationBatchAllocation({
+      batchId: "batch-1",
+      initialInvestment: 187500,
+      initialHeadcount: 50,
+      fundingPerBird: null,
+      requestedAllocationPct: 100,
+      requestedAutoSync: true,
+    }),
+    {
+      batch_id: "batch-1",
+      allocated_birds: null,
+      batch_allocation_percentage: 100,
+      auto_sync_batch: true,
+    },
+  );
 });
 const privateFinancial = {
   id: "own-ledger-id",
