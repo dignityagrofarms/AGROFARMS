@@ -22,9 +22,36 @@ export const enforceFinancialVisibility = createMiddleware({ type: "function" })
         "Financial figures are restricted by the Farm Owner. Use your operational workspace.",
       );
     const result = await next();
-    if (name === "adminListOrders")
-      return { ...result, result: { orders: [], role: access.role, financialsRestricted: true } };
-    if (["adminListBatches", "adminListActivities", "adminListTasks"].includes(name))
+    if (name === "adminListOrders") {
+      const inner = (result as { result?: { orders?: any[]; role?: string } })?.result;
+      const sanitizedOrders = (inner?.orders || []).map((o) => ({
+        ...o,
+        subtotal: 0,
+        deliveryFee: 0,
+        total: 0,
+        discountAmount: 0,
+        items: Array.isArray(o.items)
+          ? o.items.map((item: any) => ({ ...item, unitPrice: 0 }))
+          : [],
+      }));
+      return {
+        ...result,
+        result: {
+          ...inner,
+          orders: sanitizedOrders,
+          role: access.role,
+          financialsRestricted: true,
+        },
+      };
+    }
+    if (
+      [
+        "adminListBatches",
+        "adminListActivities",
+        "adminListTasks",
+        "adminListLeads",
+      ].includes(name)
+    )
       return {
         ...result,
         result: operationalProjection((result as typeof result & { result: unknown }).result),

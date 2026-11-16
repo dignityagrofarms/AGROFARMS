@@ -4376,6 +4376,7 @@ export function OrderRow({
 
           <PaymentSection
             order={order}
+            role={role}
             onApprove={() => decideAndNotify("approved")}
             onReject={() => decideAndNotify("rejected", rejectReason)}
             showReject={showReject}
@@ -4653,6 +4654,7 @@ export function OrderRow({
 
 function PaymentSection({
   order,
+  role,
   onApprove,
   onReject,
   showReject,
@@ -4663,6 +4665,7 @@ function PaymentSection({
   error,
 }: {
   order: AdminOrder;
+  role?: AdminRole;
   onApprove: () => void;
   onReject: () => void;
   showReject: boolean;
@@ -4706,9 +4709,10 @@ function PaymentSection({
             };
 
   const canDecide =
-    order.paymentStatus === "submitted" ||
-    order.paymentStatus === "pending" ||
-    order.paymentStatus === "rejected";
+    role === "owner" &&
+    (order.paymentStatus === "submitted" ||
+      order.paymentStatus === "pending" ||
+      order.paymentStatus === "rejected");
 
   return (
     <div className={`mt-4 rounded-2xl px-4 py-3 ring-1 ${badge.bg} ${badge.ring}`}>

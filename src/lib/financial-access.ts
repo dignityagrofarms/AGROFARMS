@@ -29,6 +29,11 @@ export const restrictedOperationalFunctions = new Set([
   "adminDecideLeaveRequest",
   "adminListAttendance",
   "adminMarkAttendance",
+  "adminListLeads",
+  "adminCreateLead",
+  "adminUpdateLead",
+  "adminDeleteLead",
+  "adminLogLeadCommunication",
 ]);
 export function operationalFunctionName(name: string) {
   return name.split("_createServerFn")[0];
@@ -40,6 +45,8 @@ export function mayUseRestrictedEndpoint(name: string) {
 const privateOperationalKeys = new Set([
   "fundingPerBird",
   "funding_per_bird",
+  "estimatedValue",
+  "estimated_value",
   "notes",
   "receiptUrl",
   "photoUrl",
