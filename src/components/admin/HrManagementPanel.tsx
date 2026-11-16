@@ -38,6 +38,8 @@ import {
   adminDeleteStaffDocument,
   adminListAttendance,
   adminMarkAttendance,
+  staffClockIn,
+  parseAdminCredential,
   adminCreatePaymentReceipt,
   adminListPaymentReceipts,
   adminListLeaveRequests,
@@ -122,6 +124,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const deleteDocFn = useServerFn(adminDeleteStaffDocument);
   const listAttendanceFn = useServerFn(adminListAttendance);
   const markAttendanceFn = useServerFn(adminMarkAttendance);
+  const clockInFn = useServerFn(staffClockIn);
   const createPayrollFn = useServerFn(adminCreatePaymentReceipt);
   const listPayrollFn = useServerFn(adminListPaymentReceipts);
   const listLeaveFn = useServerFn(adminListLeaveRequests);
@@ -333,6 +336,39 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
   const pendingLeaveCount = leaveList.filter((l: any) => l.status === "pending").length;
   const attendancePercentage = totalStaffCount > 0 ? Math.round((presentTodayCount / totalStaffCount) * 100) : 100;
 
+  const currentUsername = useMemo(() => {
+    try {
+      const parsed = parseAdminCredential(passcode);
+      return (parsed.username || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }, [passcode]);
+
+  const myClockInMut = useMutation({
+    mutationFn: () =>
+      clockInFn({
+        data: {
+          passcode,
+          username: currentUsername || (role === "manager" ? "manager" : "staff"),
+          notes: "Clocked in via HR Management Workspace",
+        },
+      }),
+    onSuccess: async () => {
+      setActionMsg("Successfully clocked in for today's shift!");
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["financial-access"] }),
+        qc.invalidateQueries({ queryKey: ["hr-attendance-list"] }),
+        qc.invalidateQueries({ queryKey: ["staff-my-attendance"] }),
+      ]);
+    },
+    onError: (err: any) => {
+      setActionMsg("Error clocking in: " + (err?.message || "Please retry."));
+    },
+  });
+
+  const myTodayAtt = todayAttMap.get(currentUsername);
+
   // Filtered Directory
   const filteredStaff = staffList.filter((s) => {
     const matchesSearch =
@@ -469,55 +505,83 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
         </div>
 
         {/* Sub Navigation Bar */}
-        <div className="mt-6 flex flex-wrap gap-2 border-b border-[#0F3D24]/10 pb-3">
-          <button
-            onClick={() => setSubTab("directory")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              subTab === "directory" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
-            }`}
-          >
-            <Users size={14} /> Staff Directory ({totalStaffCount})
-          </button>
-          <button
-            onClick={() => setSubTab("documents")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              subTab === "documents" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
-            }`}
-          >
-            <FileText size={14} /> Signed Documents ({docsList.length})
-          </button>
-          <button
-            onClick={() => setSubTab("suspensions")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              subTab === "suspensions" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
-            }`}
-          >
-            <AlertTriangle size={14} /> Suspensions Register ({suspensionsList.length})
-          </button>
-          <button
-            onClick={() => setSubTab("attendance")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              subTab === "attendance" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
-            }`}
-          >
-            <Calendar size={14} /> Attendance Register
-          </button>
-          <button
-            onClick={() => setSubTab("payroll")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              subTab === "payroll" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
-            }`}
-          >
-            <DollarSign size={14} /> Monthly Payroll Receipts
-          </button>
-          <button
-            onClick={() => setSubTab("leave")}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
-              subTab === "leave" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
-            }`}
-          >
-            <Calendar size={14} /> Leave Requests ({leaveList.length}) {pendingLeaveCount > 0 && <span className="rounded-full bg-amber-500 text-white px-1.5 py-0.2 text-[9px] font-extrabold">{pendingLeaveCount}</span>}
-          </button>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-b border-[#0F3D24]/10 pb-3">
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSubTab("directory")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                subTab === "directory" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              <Users size={14} /> Staff Directory ({totalStaffCount})
+            </button>
+            <button
+              onClick={() => setSubTab("documents")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                subTab === "documents" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              <FileText size={14} /> Signed Documents ({docsList.length})
+            </button>
+            <button
+              onClick={() => setSubTab("suspensions")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                subTab === "suspensions" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              <AlertTriangle size={14} /> Suspensions Register ({suspensionsList.length})
+            </button>
+            <button
+              onClick={() => setSubTab("attendance")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                subTab === "attendance" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              <Calendar size={14} /> Attendance Register
+            </button>
+            <button
+              onClick={() => setSubTab("payroll")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                subTab === "payroll" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              <DollarSign size={14} /> Monthly Payroll Receipts
+            </button>
+            <button
+              onClick={() => setSubTab("leave")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition ${
+                subTab === "leave" ? "bg-[#0F3D24] text-white shadow-sm" : "bg-[#F7F5F0] text-[#0F3D24]/70 hover:bg-[#0F3D24]/10"
+              }`}
+            >
+              <Calendar size={14} /> Leave Requests ({leaveList.length}) {pendingLeaveCount > 0 && <span className="rounded-full bg-amber-500 text-white px-1.5 py-0.2 text-[9px] font-extrabold">{pendingLeaveCount}</span>}
+            </button>
+          </div>
+
+          {/* Personal Shift Status & Quick Clock-In for Manager / Staff */}
+          {role !== "owner" && (
+            <div className="flex items-center gap-2">
+              {myTodayAtt ? (
+                <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 border border-emerald-300 px-3 py-1.5 text-xs font-black text-emerald-900 shadow-xs">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
+                  Your Shift: Active {myTodayAtt.clockInTime ? `· In at ${new Date(myTodayAtt.clockInTime).toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit" })}` : ""}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => myClockInMut.mutate()}
+                  disabled={myClockInMut.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3.5 py-1.5 text-xs font-black text-white hover:bg-emerald-800 transition shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  {myClockInMut.isPending ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Clock size={13} />
+                  )}
+                  Clock In for Today
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -904,9 +968,22 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                 Live clock-in register showing who clocked in, attendance date, and exact clock-in timestamp.
               </p>
             </div>
-            <span className="rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-bold text-[#0F3D24]">
-              Today (Lagos): {todayStr}
-            </span>
+            <div className="flex items-center gap-2">
+              {role !== "owner" && !myTodayAtt && (
+                <button
+                  type="button"
+                  onClick={() => myClockInMut.mutate()}
+                  disabled={myClockInMut.isPending}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-800 transition shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {myClockInMut.isPending ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}
+                  Clock In to Your Shift
+                </button>
+              )}
+              <span className="rounded-full bg-[#F7F5F0] px-3 py-1 text-xs font-bold text-[#0F3D24]">
+                Today (Lagos): {todayStr}
+              </span>
+            </div>
           </div>
 
           {staffAccountsOnly.length > 0 && (

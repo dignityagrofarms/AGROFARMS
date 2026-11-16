@@ -961,7 +961,7 @@ function AdminOrders() {
         )}
       </main>
     );
-  if (role === "staff" && accessQuery.data.clockedInToday === false) {
+  if ((role === "staff" || role === "manager") && accessQuery.data.clockedInToday === false) {
     return (
       <StaffClockInGate
         passcode={passcode}
@@ -1345,10 +1345,17 @@ function AdminOrders() {
           </div>
 
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:gap-3">
-            {role === "staff" && accessQuery.data?.clockInTime && (
+            {(role === "staff" || role === "manager") && accessQuery.data?.clockInTime && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-900 border border-emerald-300 px-2.5 sm:px-3 py-1 text-xs font-bold shadow-xs">
                 <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-                <span className="hidden sm:inline">Shift Active ·</span> Clocked in at {accessQuery.data.clockInTime}
+                <span className="hidden sm:inline">Shift Active ·</span> Clocked in at{" "}
+                {accessQuery.data.clockInTime.includes("T")
+                  ? new Date(accessQuery.data.clockInTime).toLocaleTimeString("en-NG", {
+                      timeZone: "Africa/Lagos",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : accessQuery.data.clockInTime}
               </span>
             )}
             {/* Top Plus (+) Button to Place Order for Owner, Manager & Staff */}

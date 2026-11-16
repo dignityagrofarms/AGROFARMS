@@ -11,9 +11,9 @@ export const getFinancialAccess = createServerFn({ method: "POST" })
 
     let clockedInToday = true;
     let clockInTime: string | null = null;
-    if (access.role === "staff") {
+    if (access.role === "staff" || access.role === "manager") {
       const cred = parseAdminCredential(data.passcode);
-      const uname = (cred.username && cred.username !== "unknown" ? cred.username : "staff")
+      const uname = (cred.username && cred.username !== "unknown" ? cred.username : access.role)
         .trim()
         .toLowerCase();
       const { data: attRow } = await (supabaseAdmin.from("staff_attendance" as any) as any)
