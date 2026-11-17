@@ -52,7 +52,7 @@ export const previewPartnerAllocationUndo = createServerFn({ method: "POST" })
       const [{ data: pRow }, { data: payouts }, { data: sigs }] = await Promise.all([
         supabaseAdmin
           .from("farm_partners")
-          .select("id, active, cycle_status, cycle_name, settled_at, settlement_snapshot, agreement_signed")
+          .select("id, active, cycle_status, cycle_name, settled_at, settlement_snapshot")
           .eq("id", data.partnerId)
           .maybeSingle(),
         supabaseAdmin
@@ -79,7 +79,7 @@ export const previewPartnerAllocationUndo = createServerFn({ method: "POST" })
         pRow.cycle_status === "open" &&
         !pRow.settled_at &&
         !pRow.settlement_snapshot &&
-        !pRow.agreement_signed &&
+        !Boolean((pRow as any)?.agreement_signed) &&
         !hasSignedOfficial &&
         !(payouts && payouts.length > 0)
       ) {

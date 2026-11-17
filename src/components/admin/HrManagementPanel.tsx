@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Sparkles,
   Eye,
+  EyeOff,
 } from "lucide-react";
 import {
   adminListUserAccounts,
@@ -67,6 +68,7 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
 
   // Modals
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
+  const [showNewStaffPasscode, setShowNewStaffPasscode] = useState(false);
   const [showSuspensionModal, setShowSuspensionModal] = useState(false);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showPayrollModal, setShowPayrollModal] = useState(false);
@@ -85,6 +87,26 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
     emergencyContact: "",
     notes: "",
   });
+
+  // Explicitly wipe staff creation form state when modal opens to prevent browser credential retention
+  useEffect(() => {
+    if (showAddStaffModal) {
+      setNewStaff({
+        username: "",
+        passcode: "",
+        role: "staff",
+        fullName: "",
+        phone: "",
+        email: "",
+        address: "",
+        department: "Farm Operations",
+        emergencyContact: "",
+        notes: "",
+      });
+      setShowNewStaffPasscode(false);
+      setAddStaffError(null);
+    }
+  }, [showAddStaffModal]);
 
   const [suspensionForm, setSuspensionForm] = useState({
     username: "",
@@ -1392,6 +1414,16 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
               <button onClick={() => setShowAddStaffModal(false)} className="text-[#0F3D24]/60 hover:text-[#0F3D24]">✕</button>
             </div>
 
+            <form
+              autoComplete="off"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!createStaffMut.isPending && newStaff.username.trim() && newStaff.passcode && !isDuplicateUsername) {
+                  createStaffMut.mutate();
+                }
+              }}
+              className="space-y-4"
+            >
             <div className="grid gap-3 sm:grid-cols-2 text-xs">
               <div>
                 <label className="block font-bold text-[#0F3D24] mb-1">Full Name</label>
@@ -1408,6 +1440,9 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                 <label className="block font-bold text-[#0F3D24] mb-1">Login Username</label>
                 <input
                   type="text"
+                  name="new_employee_username"
+                  id="new_employee_username"
+                  autoComplete="off"
                   placeholder="e.g. cnwadi"
                   value={newStaff.username}
                   onChange={(e) => {
@@ -1427,13 +1462,27 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
 
               <div>
                 <label className="block font-bold text-[#0F3D24] mb-1">Passcode / Password</label>
-                <input
-                  type="password"
-                  placeholder="At least 6 characters"
-                  value={newStaff.passcode}
-                  onChange={(e) => setNewStaff({ ...newStaff, passcode: e.target.value })}
-                  className="w-full rounded-xl bg-[#F7F5F0] p-2.5 font-medium text-[#0F3D24] focus:outline-none focus:ring-2 focus:ring-[#3F8F3F]"
-                />
+                <div className="relative">
+                  <input
+                    type={showNewStaffPasscode ? "text" : "password"}
+                    name="new_employee_passcode"
+                    id="new_employee_passcode"
+                    autoComplete="new-password"
+                    placeholder="At least 6 characters"
+                    value={newStaff.passcode}
+                    onChange={(e) => setNewStaff({ ...newStaff, passcode: e.target.value })}
+                    className="w-full rounded-xl bg-[#F7F5F0] p-2.5 pr-9 font-medium text-[#0F3D24] focus:outline-none focus:ring-2 focus:ring-[#3F8F3F]"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowNewStaffPasscode(!showNewStaffPasscode)}
+                    className="absolute right-2.5 top-2.5 text-[#0F3D24]/40 hover:text-[#0F3D24]"
+                    title={showNewStaffPasscode ? "Hide password" : "Show password"}
+                  >
+                    {showNewStaffPasscode ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
 
               <div>

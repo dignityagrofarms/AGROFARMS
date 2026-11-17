@@ -32,6 +32,8 @@ import {
   FileText,
   HelpCircle,
   ExternalLink,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { partnerVerifyLogin, partnerGetMyDashboard } from "@/lib/partners.functions";
@@ -154,6 +156,7 @@ function PublicPartnersLanding({
 
   const [username, setUsername] = useState("");
   const [passcode, setPasscode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -218,16 +221,17 @@ function PublicPartnersLanding({
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4 text-xs">
+          <form onSubmit={handleLogin} className="space-y-4 text-xs" autoComplete="off">
             <div>
               <label className="block font-bold text-[#0F3D24] mb-1">Partner Username</label>
               <div className="relative">
                 <input
                   type="text"
                   required
-                  placeholder="e.g. emeka_okafor"
+                  placeholder="e.g. testing_partner"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  autoComplete="username"
                   className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/60 pl-9 pr-3.5 py-3 font-semibold text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
                 />
                 <User size={15} className="absolute left-3 top-3.5 text-slate-400" />
@@ -238,14 +242,23 @@ function PublicPartnersLanding({
               <label className="block font-bold text-[#0F3D24] mb-1">Account Password</label>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   required
                   placeholder="••••••••"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/60 pl-9 pr-3.5 py-3 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
+                  autoComplete="current-password"
+                  className="w-full rounded-xl border border-slate-200 bg-[#F7F5F0]/60 pl-9 pr-10 py-3 text-[#0F3D24] outline-none focus:border-[#3F8F3F] focus:bg-white"
                 />
                 <Lock size={15} className="absolute left-3 top-3.5 text-slate-400" />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-3 text-slate-400 hover:text-[#0F3D24] transition p-0.5 cursor-pointer"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
             </div>
 

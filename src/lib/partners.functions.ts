@@ -1647,9 +1647,24 @@ export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
         .update(payload)
         .eq("id", data.partnerId);
 
-      if (error && (error.message.includes("agreement_signature_data") || error.message.includes("schema cache"))) {
+      if (
+        error &&
+        (error.message.includes("agreement_signature_data") ||
+          error.message.includes("agreement_signed") ||
+          error.message.includes("schema cache") ||
+          error.message.includes("column"))
+      ) {
         const safePayload = { ...payload };
         delete safePayload.agreement_signature_data;
+        delete safePayload.agreement_signed;
+        delete safePayload.agreement_signed_at;
+        delete safePayload.agreement_signed_by;
+        delete safePayload.agreement_terms;
+        delete safePayload.agreement_document_url;
+        delete safePayload.agreement_document_name;
+        delete safePayload.agreement_document_size;
+        delete safePayload.agreement_document_uploaded_at;
+        delete safePayload.agreement_document_uploaded_by;
         const retryRes = await supabaseAdmin
           .from("farm_partners")
           .update(safePayload)
@@ -2729,7 +2744,7 @@ export const partnerSignAgreement = createServerFn({ method: "POST" })
 
     const { data: partner, error: pErr } = await supabaseAdmin
       .from("farm_partners")
-      .select("id, full_name, terms_history, agreement_signed")
+      .select("id, full_name, terms_history")
       .eq("id", session.pid)
       .single();
 
