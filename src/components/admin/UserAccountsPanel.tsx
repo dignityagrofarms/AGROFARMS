@@ -179,6 +179,9 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
           <div className="grid gap-3 sm:grid-cols-3">
             <input
               type="password"
+              name="owner_new_passcode"
+              id="owner_new_passcode"
+              autoComplete="new-password"
               value={nextPasscode}
               onChange={(e) => setNextPasscode(e.target.value)}
               placeholder="New passcode (min 6 chars)"
@@ -186,6 +189,9 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
             />
             <input
               type="password"
+              name="owner_confirm_passcode"
+              id="owner_confirm_passcode"
+              autoComplete="new-password"
               value={confirmPasscode}
               onChange={(e) => setConfirmPasscode(e.target.value)}
               placeholder="Confirm new passcode"
@@ -396,6 +402,9 @@ export function UserAccountsPanel({ passcode, role, onPasscodeChanged }: UserAcc
             <h3 className="text-base font-bold text-[#0F3D24]">Reset Passcode for "{resetTargetUser}"</h3>
             <input
               type="password"
+              name="admin_reset_user_passcode"
+              id="admin_reset_user_passcode"
+              autoComplete="new-password"
               value={resetPasscodeVal}
               onChange={(e) => setResetPasscodeVal(e.target.value)}
               placeholder="Enter new passcode (min 6 chars)"

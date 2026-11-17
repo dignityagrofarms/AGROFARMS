@@ -134,6 +134,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               Master Recovery Key / Phrase
               <input
                 type="password"
+                name="recovery_key_phrase"
+                id="recovery_key_phrase"
+                autoComplete="off"
                 value={recoveryKey}
                 onChange={(e) => setRecoveryKey(e.target.value)}
                 placeholder="Enter recovery phrase or master key"
@@ -145,6 +148,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
               6-Digit Authenticator Code (TOTP)
               <input
                 type="text"
+                name="totp_recovery_code"
+                id="totp_recovery_code"
+                autoComplete="off"
                 maxLength={6}
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
@@ -158,6 +164,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
             Account Username to Reset
             <input
               type="text"
+              name="recovery_target_username"
+              id="recovery_target_username"
+              autoComplete="off"
               value={targetUsername}
               onChange={(e) => setTargetUsername(e.target.value)}
               placeholder="e.g. owner, manager, staff"
@@ -169,6 +178,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
             New Passcode (min 6 characters)
             <input
               type="password"
+              name="recovery_new_passcode"
+              id="recovery_new_passcode"
+              autoComplete="new-password"
               value={newPasscode}
               onChange={(e) => setNewPasscode(e.target.value)}
               placeholder="Enter new passcode"
@@ -180,6 +192,9 @@ export function PasswordRecoveryModal({ isOpen, onClose, onSuccess }: PasswordRe
             Confirm New Passcode
             <input
               type="password"
+              name="recovery_confirm_passcode"
+              id="recovery_confirm_passcode"
+              autoComplete="new-password"
               value={confirmPasscode}
               onChange={(e) => setConfirmPasscode(e.target.value)}
               placeholder="Re-enter new passcode"

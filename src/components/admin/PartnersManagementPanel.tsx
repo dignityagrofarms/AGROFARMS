@@ -1,6 +1,6 @@
 import { UndoPartnerAllocation } from "./UndoPartnerAllocation";
 import { OfficialAgreementPanel } from "@/components/agreements/OfficialAgreementPanel";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import {
@@ -3833,6 +3833,12 @@ export function EditPartnerModal({
   // Credentials
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  // Ensure password reset field always starts completely blank when editing any partner
+  useEffect(() => {
+    setNewPassword("");
+    setShowPassword(false);
+  }, [partner.id]);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
   const [saving, setSaving] = useState(false);

@@ -279,6 +279,9 @@ function PasscodePanel({
       <div className="mt-5 grid gap-3 sm:grid-cols-3">
         <input
           type="text"
+          name="legacy_new_passcode"
+          id="legacy_new_passcode"
+          autoComplete="new-password"
           value={next}
           onChange={(e) => setNext(e.target.value)}
           placeholder="New passcode (min 6 characters)"
@@ -286,6 +289,9 @@ function PasscodePanel({
         />
         <input
           type="text"
+          name="legacy_confirm_passcode"
+          id="legacy_confirm_passcode"
+          autoComplete="new-password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           placeholder="Confirm new passcode"
