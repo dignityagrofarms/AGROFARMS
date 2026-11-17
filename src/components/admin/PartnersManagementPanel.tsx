@@ -2729,12 +2729,16 @@ function PartnerCredentialsSubPanel({
           {/* Reset Password Form */}
           <form
             onSubmit={handleResetPasscode}
+            autoComplete="off"
             className="space-y-3 pt-3 border-t border-slate-100 text-xs"
           >
             <label className="block font-bold text-[#0F3D24]">Reset Partner Password</label>
             <div className="flex gap-2">
               <input
                 type="password"
+                name="partner_card_reset_password"
+                id="partner_card_reset_password"
+                autoComplete="new-password"
                 placeholder="Enter new 6+ char password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -3151,6 +3155,9 @@ function AddPartnerModal({
                     <label className="block font-bold text-[#0F3D24] mb-1">Portal Username *</label>
                     <input
                       type="text"
+                      name="new_partner_portal_username"
+                      id="new_partner_portal_username"
+                      autoComplete="off"
                       required
                       placeholder="e.g. emeka_okafor"
                       value={username}
@@ -3167,6 +3174,9 @@ function AddPartnerModal({
                     <div className="relative">
                       <input
                         type={showPassword ? "text" : "password"}
+                        name="new_partner_portal_password"
+                        id="new_partner_portal_password"
+                        autoComplete="new-password"
                         required
                         placeholder="Min 6 characters"
                         value={password}
@@ -4428,6 +4438,9 @@ export function EditPartnerModal({
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
+                    name="partner_edit_reset_password"
+                    id="partner_edit_reset_password"
+                    autoComplete="new-password"
                     placeholder="Leave blank to keep current, or enter 6+ chars"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}

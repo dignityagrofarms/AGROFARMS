@@ -1576,14 +1576,14 @@ export function HrManagementPanel({ passcode, role }: HrManagementPanelProps) {
                 Cancel
               </button>
               <button
-                type="button"
-                onClick={() => createStaffMut.mutate()}
+                type="submit"
                 disabled={createStaffMut.isPending || !newStaff.username.trim() || !newStaff.passcode || isDuplicateUsername}
                 className="rounded-full bg-[#0F3D24] px-5 py-2 text-xs font-bold text-white hover:bg-[#134a2c] disabled:opacity-50 transition flex items-center gap-1.5"
               >
                 {createStaffMut.isPending && <Loader2 size={14} className="animate-spin" />} Save Staff Profile
               </button>
             </div>
+            </form>
           </div>
         </div>
       )}
