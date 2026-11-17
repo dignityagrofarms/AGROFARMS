@@ -5,3 +5,4 @@ ALTER TABLE public.farm_partners
   ADD COLUMN IF NOT EXISTS agreement_signature_data text;
 
 NOTIFY pgrst, 'reload schema';
+

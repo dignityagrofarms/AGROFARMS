@@ -130,8 +130,7 @@ export function BatchFinancialsPanel({
   onNavigateToApprovals?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const isPrivilegedFinancialViewer =
-    role === "owner" || (role === "manager" && Boolean(canViewFinancials));
+  const isPrivilegedFinancialViewer = role === "owner";
   const [finSubView, setFinSubView] = useState<"overview" | "debtors_creditors">("overview");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -1509,114 +1508,7 @@ export function BatchFinancialsPanel({
         </div>
       )}
 
-      {role === "manager" &&
-        myFinancialSubmissions.some(
-          (s) =>
-            s.approvalStatus === "pending_approval" ||
-            s.approvalStatus === "pending" ||
-            s.approvalStatus === "flagged" ||
-            s.approvalStatus === "rejected",
-        ) && (
-          <div className="rounded-3xl bg-amber-50/70 p-5 border border-amber-200/80 space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-amber-950">
-                <Clock size={15} className="text-amber-600" />
-                Your Pending, Flagged &amp; Rejected Entries (Not in Live Totals Until Approved)
-              </div>
-              {mySubmissionsQuery.isFetching && (
-                <Loader2 size={13} className="animate-spin text-amber-700" />
-              )}
-            </div>
-            <div className="divide-y divide-amber-200/60 rounded-2xl bg-white px-4 border border-amber-200/50">
-              {myFinancialSubmissions
-                .filter(
-                  (s) =>
-                    s.approvalStatus === "pending_approval" ||
-                    s.approvalStatus === "pending" ||
-                    s.approvalStatus === "flagged" ||
-                    s.approvalStatus === "rejected",
-                )
-                .slice(0, 10)
-                .map((sub) => {
-                  const isFlagged = sub.approvalStatus === "flagged";
-                  const canEdit = sub.approvalStatus !== "approved" && Boolean(sub.financialRecord);
-                  return (
-                    <div
-                      key={`${sub.targetType}-${sub.id}`}
-                      className="py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"
-                    >
-                      <div>
-                        <div className="font-bold text-[#0F3D24]">
-                          {sub.title}
-                          {sub.amount !== null && ` · ${formatNaira(sub.amount)}`}
-                          {sub.batchName && (
-                            <span className="font-normal text-[#0F3D24]/70">
-                              {" "}
-                              · {sub.batchName}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[#0F3D24]/70">
-                          {sub.subtitle} · {sub.date}
-                        </div>
-                        {isFlagged && sub.rejectionReason && (
-                          <div className="mt-1 inline-flex items-center gap-1 rounded-lg bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-900">
-                            <Flag size={11} /> Owner Flag Note: {sub.rejectionReason}
-                          </div>
-                        )}
-                        {sub.approvalStatus === "rejected" && sub.rejectionReason && (
-                          <div className="mt-0.5 text-[11px] font-semibold text-rose-700">
-                            Reason: {sub.rejectionReason}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              sub.financialRecord && setEditingFinancial(sub.financialRecord)
-                            }
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold transition ${
-                              isFlagged || sub.approvalStatus === "rejected"
-                                ? "bg-orange-600 text-white hover:bg-orange-700"
-                                : "bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
-                            }`}
-                          >
-                            <Pencil size={10} /> Edit &amp; Resubmit
-                          </button>
-                        )}
-                        {isFlagged ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2.5 py-0.5 text-[10px] font-bold text-orange-800">
-                            <Flag size={10} /> Flagged
-                          </span>
-                        ) : sub.approvalStatus === "rejected" ? (
-                          <>
-                            <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-bold text-rose-800">
-                              Rejected
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                dismissMySubMut.mutate({ id: sub.id, targetType: sub.targetType })
-                              }
-                              className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-semibold text-slate-700 hover:bg-slate-200"
-                            >
-                              Dismiss
-                            </button>
-                          </>
-                        ) : (
-                          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
-                            Pending Owner Approval
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        )}
+
 
       {/* Sub-View Switch: Overview & Ledger vs Debtors & Creditors */}
       <div className="flex flex-wrap items-center gap-2">

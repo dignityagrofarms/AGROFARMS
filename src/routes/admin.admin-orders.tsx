@@ -1144,7 +1144,7 @@ function AdminOrders() {
                 >
                   <TrendingUp size={18} className="shrink-0" />
                   {!isSidebarCollapsed && (
-                    <span>{role === "staff" ? "Record Expenses" : "Batches & Finances"}</span>
+                    <span>{role === "owner" ? "Batches & Finances" : "Record Expenses"}</span>
                   )}
                 </button>
               </li>
@@ -1340,7 +1340,9 @@ function AdminOrders() {
             <h2 className="text-lg font-bold text-gray-800 capitalize hidden lg:block">
               {activeTab === "partners"
                 ? "For Partners"
-                : `${activeTab.replace("-", " ")} Dashboard`}
+                : activeTab === "financials" && role !== "owner"
+                  ? "Record Expenses"
+                  : `${activeTab.replace("-", " ")} Dashboard`}
             </h2>
           </div>
 
