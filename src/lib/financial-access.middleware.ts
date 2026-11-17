@@ -9,13 +9,25 @@ export const enforceFinancialVisibility = createMiddleware({ type: "function" })
     const { financialAccess } = await import("./financial-access.server");
     const name = operationalFunctionName(serverFnMeta.name);
     // Login uses a separate username/password pair, and is verified by its handler.
-    if (name === "adminVerifyLogin" || name === "adminRecoverPasscode") return next();
+    if (
+      name === "adminVerifyLogin" ||
+      name === "adminRecoverPasscode" ||
+      name === "partnerVerifyLogin"
+    ) {
+      return next();
+    }
     const passcode =
       data && typeof data === "object" && "passcode" in data
         ? (data as { passcode?: unknown }).passcode
         : undefined;
     if (typeof passcode !== "string" || !passcode) return next();
-    const access = await financialAccess(passcode);
+    let access;
+    try {
+      access = await financialAccess(passcode);
+    } catch {
+      // If passcode is not a valid admin credential, allow downstream handler to authenticate or fail
+      return next();
+    }
     if (access.canViewFinancials) return next();
     if (!mayUseRestrictedEndpoint(name))
       throw new Error(
