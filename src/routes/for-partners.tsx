@@ -53,6 +53,8 @@ import {
   SignAgreementModal,
   UploadWrittenAgreementModal,
 } from "@/components/partners/PartnerSettlementCards";
+import { DigitalSalesReceiptModal } from "@/components/partners/DigitalSalesReceiptModal";
+import type { PartnerFinancial } from "@/lib/partners.functions";
 import { exportPartnerReportPDF, exportPartnerReportCSV } from "@/lib/partner-report-export";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
@@ -400,6 +402,7 @@ function PartnersAccountPortal({
     title: string;
     subtitle?: string;
   } | null>(null);
+  const [selectedSalesReceipt, setSelectedSalesReceipt] = useState<PartnerFinancial | null>(null);
 
   const getDashboardFn = useServerFn(partnerGetMyDashboard);
   const dashboardQuery = useQuery({
@@ -769,6 +772,15 @@ function PartnersAccountPortal({
         />
       )}
 
+      {selectedSalesReceipt && (
+        <DigitalSalesReceiptModal
+          receipt={selectedSalesReceipt}
+          partnerName={displayPartner.fullName || displayPartner.username}
+          batchName={displayPartner.batchName}
+          onClose={() => setSelectedSalesReceipt(null)}
+        />
+      )}
+
       {/* 7. Itemized Financials & Pen Activity Logs */}
       <div
         id="ledger-section"
@@ -974,6 +986,16 @@ function PartnersAccountPortal({
                                     <Paperclip size={10} className="text-emerald-700" />
                                     <span>{row.attachmentName || "Receipt"}</span>
                                   </button>
+                                ) : row.type === "income" || row.category === "Bird Sales" ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSalesReceipt(row)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-xs cursor-pointer"
+                                    title="View verified digital sales receipt & audit voucher"
+                                  >
+                                    <Receipt size={10} className="text-emerald-700" />
+                                    <span>Sales Receipt</span>
+                                  </button>
                                 ) : (
                                   <span className="text-[10px] text-slate-400 font-mono italic">
                                     No file
@@ -1099,94 +1121,124 @@ function PartnersAccountPortal({
                     No activity logs match this filter. Daily updates appear here once recorded.
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {filteredActivities.map((act) => {
-                      const removed = Boolean(act.removedAt);
-                      return (
-                        <div
-                          key={act.id}
-                          className={`rounded-2xl border p-4 space-y-2 transition-colors ${
-                            removed
-                              ? "border-slate-200 bg-slate-50 opacity-60"
-                              : "border-slate-200 bg-[#F7F5F0]/40 hover:bg-[#F7F5F0]/80"
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs font-bold text-slate-500">
-                                {act.activityDate}
-                              </span>
-                              <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
-                                  removed
-                                    ? "bg-slate-200 text-slate-600 line-through"
-                                    : "bg-[#3F8F3F]/15 text-[#0F3D24]"
-                                }`}
-                              >
-                                {act.activityType}
-                              </span>
-                              {act.mortalityCount > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-800">
-                                  {act.mortalityCount} Mortality
-                                </span>
-                              )}
-                              {act.stockHeadcount > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-800">
-                                  +{act.stockHeadcount} Birds Received
-                                </span>
-                              )}
-                              {act.feedConsumedKg > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">
-                                  {act.feedConsumedKg} kg Feed
-                                </span>
-                              )}
-                              {act.averageWeightKg > 0 && (
-                                <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800">
-                                  Avg: {act.averageWeightKg} kg
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-slate-400">
-                              {act.recordedBy || "Farm Management"}
-                            </span>
-                          </div>
-
-                          {act.notes && (
-                            <p
-                              className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}
+                  <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-[#F7F5F0]/80 text-[10px] font-black uppercase tracking-wider text-[#0F3D24]/70">
+                          <th className="py-3 px-3.5">Date</th>
+                          <th className="py-3 px-3">Activity Type</th>
+                          <th className="py-3 px-3">Flock Metrics</th>
+                          <th className="py-3 px-3">Notes &amp; Observations</th>
+                          <th className="py-3 px-3">Pen Photo</th>
+                          <th className="py-3 px-3.5 text-right">Recorded By</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredActivities.map((act) => {
+                          const removed = Boolean(act.removedAt);
+                          const cleanNotes = act.notes
+                            ? act.notes.replace(/\s*\[SYNC:[^\]]+\]/gi, "").trim()
+                            : null;
+                          return (
+                            <tr
+                              key={act.id}
+                              className={
+                                removed
+                                  ? "bg-slate-50 opacity-60"
+                                  : "hover:bg-slate-50/70 transition-colors"
+                              }
                             >
-                              {act.notes.replace(/\s*\[SYNC:[^\]]+\]/gi, "")}
-                            </p>
-                          )}
-
-                          {act.photoUrl && (
-                            <div className="pt-1">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setLightboxMedia({
-                                    url: act.photoUrl!,
-                                    title: `Flock Pen Inspection: ${act.activityType} (${act.activityDate})`,
-                                    subtitle: act.notes ? act.notes.replace(/\s*\[SYNC:[^\]]+\]/gi, "") : undefined,
-                                  })
-                                }
-                                className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#0F3D24] shadow-xs hover:bg-[#0F3D24]/10 transition"
-                              >
-                                <Camera size={13} className="text-[#3F8F3F]" />
-                                <span>View Pen Photo</span>
-                              </button>
-                            </div>
-                          )}
-
-                          {removed && (
-                            <p className="text-[11px] font-semibold text-rose-700">
-                              Removed on {act.removedAt?.slice(0, 10)} (
-                              {act.removalReason || "Correction"})
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
+                              <td className="py-3 px-3.5 font-medium text-slate-600 whitespace-nowrap">
+                                {act.activityDate}
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${
+                                    removed
+                                      ? "bg-slate-200 text-slate-600 line-through"
+                                      : "bg-[#3F8F3F]/15 text-[#0F3D24]"
+                                  }`}
+                                >
+                                  {act.activityType}
+                                </span>
+                              </td>
+                              <td className="py-3 px-3">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {act.mortalityCount > 0 && (
+                                    <span className="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-800">
+                                      {act.mortalityCount} Mortality
+                                    </span>
+                                  )}
+                                  {act.stockHeadcount > 0 && (
+                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-800">
+                                      +{act.stockHeadcount} Birds Received
+                                    </span>
+                                  )}
+                                  {act.feedConsumedKg > 0 && (
+                                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">
+                                      {act.feedConsumedKg} kg Feed
+                                    </span>
+                                  )}
+                                  {act.averageWeightKg > 0 && (
+                                    <span className="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-extrabold text-purple-800">
+                                      Avg: {act.averageWeightKg} kg
+                                    </span>
+                                  )}
+                                  {act.mortalityCount === 0 &&
+                                    act.stockHeadcount === 0 &&
+                                    act.feedConsumedKg === 0 &&
+                                    act.averageWeightKg === 0 && (
+                                      <span className="text-[11px] text-slate-400 italic">
+                                        Routine Check
+                                      </span>
+                                    )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-3 text-slate-700 max-w-md">
+                                {cleanNotes ? (
+                                  <span className={removed ? "line-through text-slate-400" : ""}>
+                                    {cleanNotes}
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400 italic text-[11px]">No notes</span>
+                                )}
+                                {removed && (
+                                  <span className="block text-[10px] font-semibold text-rose-700">
+                                    Removed on {act.removedAt?.slice(0, 10)} (
+                                    {act.removalReason || "Correction"})
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3 whitespace-nowrap">
+                                {act.photoUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setLightboxMedia({
+                                        url: act.photoUrl!,
+                                        title: `Flock Pen Inspection: ${act.activityType} (${act.activityDate})`,
+                                        subtitle: cleanNotes || undefined,
+                                      })
+                                    }
+                                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800 hover:bg-emerald-100 transition shadow-xs cursor-pointer"
+                                  >
+                                    <Camera size={11} className="text-[#3F8F3F]" />
+                                    <span>View Photo</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-mono italic">
+                                    No photo
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-medium text-slate-500 whitespace-nowrap text-[11px]">
+                                {act.recordedBy || "Farm Management"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

@@ -1796,7 +1796,7 @@ function PartnerFinancialsSubPanel({
                         <span className={`block ${removed ? "line-through" : ""}`}>
                           {row.description}
                         </span>
-                        {row.receiptUrl && (
+                        {row.receiptUrl ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -1810,7 +1810,11 @@ function PartnerFinancialsSubPanel({
                           >
                             <Eye size={11} /> View Receipt
                           </button>
-                        )}
+                        ) : row.type === "income" || row.category === "Bird Sales" ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                            <Receipt size={10} className="text-emerald-700" /> Digital Sales Receipt
+                          </span>
+                        ) : null}
                         {removed && (
                           <span className="block text-[10px] font-semibold text-rose-700">
                             Removed ({row.removalReason || "no reason"})

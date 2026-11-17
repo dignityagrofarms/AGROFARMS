@@ -154,6 +154,7 @@ export interface PartnerFinancial {
   receiptUrl: string | null;
   attachmentName: string | null;
   cycleName?: string | null;
+  birdsSold?: number | null;
 }
 
 export interface PartnerActivity {
@@ -239,6 +240,7 @@ interface EmbeddedRowMeta {
   attachmentName?: string | null;
   photoUrl?: string | null;
   cycleName?: string | null;
+  birdsSold?: number | null;
 }
 
 function packTextWithMeta(text: string | null | undefined, meta: EmbeddedRowMeta): string {
@@ -352,6 +354,23 @@ const mapFin = (r: any): PartnerFinancial => {
   const approvalStatus: "approved" | "pending_approval" | "rejected" =
     r.approval_status || meta.approvalStatus || "approved";
 
+  let birdsSold: number | null = null;
+  if (r.birds_sold !== undefined && r.birds_sold !== null) {
+    birdsSold = Number(r.birds_sold);
+  } else if (meta.birdsSold !== undefined && meta.birdsSold !== null) {
+    birdsSold = Number(meta.birdsSold);
+  } else if (r.category === "Bird Sales" || r.type === "income") {
+    const desc = cleanDesc || r.description || "";
+    const match =
+      desc.match(/\b(?:sales|purchase)?\s*(?:of)?\s*(\d+)\s*birds?\b/i) ||
+      desc.match(/\b(\d+)\s*birds?\b/i);
+    if (match) {
+      birdsSold = Number(match[1]);
+    } else if (/\bone\s*bird\b/i.test(desc) || /\bsales of one\b/i.test(desc)) {
+      birdsSold = 1;
+    }
+  }
+
   return {
     id: r.id,
     partnerId: r.partner_id,
@@ -374,6 +393,7 @@ const mapFin = (r: any): PartnerFinancial => {
     receiptUrl: r.receipt_url ?? meta.receiptUrl ?? null,
     attachmentName: r.attachment_name ?? meta.attachmentName ?? null,
     cycleName: r.cycle_name ?? meta.cycleName ?? null,
+    birdsSold,
   };
 };
 
@@ -790,7 +810,20 @@ function buildSummaryAndCharts(
   const stocked = approvedActs.reduce((s, a) => s + a.stockHeadcount, 0);
   const mortality = approvedActs.reduce((s, a) => s + a.mortalityCount, 0);
   const feed = approvedActs.reduce((s, a) => s + a.feedConsumedKg, 0);
-  const currentStockCount = Math.max(0, stocked - mortality);
+  const birdsSold = approvedFins
+    .filter((f: PartnerFinancial) => f.type === "income")
+    .reduce((sum, f) => {
+      if (f.birdsSold && f.birdsSold > 0) return sum + f.birdsSold;
+      const match =
+        f.description?.match(/\b(?:sales|purchase)?\s*(?:of)?\s*(\d+)\s*birds?\b/i) ||
+        f.description?.match(/\b(\d+)\s*birds?\b/i);
+      if (match) return sum + Number(match[1]);
+      if (/\bone\s*bird\b/i.test(f.description) || /\bsales of one\b/i.test(f.description)) {
+        return sum + 1;
+      }
+      return sum;
+    }, 0);
+  const currentStockCount = Math.max(0, stocked - mortality - birdsSold);
 
   // Latest recorded average bird weight (sorted descending by activityDate/createdAt)
   const weightRecord = approvedActs.find((a) => a.averageWeightKg > 0);
@@ -2632,13 +2665,22 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
           remaining: Number(stats[0].live_birds),
         };
     }
+    const effectiveStockCount =
+      batchProgress !== undefined
+        ? batchProgress.remaining
+        : computed.summary.currentStockCount;
+
     return {
       partner: maskedPartner,
       batchProgress,
       batchSales,
       financials: maskedFin,
       activities: maskedAct,
-      summary: { ...computed.summary, feedBagStats },
+      summary: {
+        ...computed.summary,
+        currentStockCount: effectiveStockCount,
+        feedBagStats,
+      },
       charts: computed.charts,
     };
   });
