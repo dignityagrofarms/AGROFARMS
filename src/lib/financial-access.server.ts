@@ -10,8 +10,9 @@ export async function financialAccess(passcode: string) {
   if (error) throw new Error("Financial access settings are unavailable. Please retry.");
   const staff = data?.find((r) => r.key === "financial_visibility_staff")?.value === "true";
   const manager = data?.find((r) => r.key === "financial_visibility_manager")?.value === "true";
-  // Strict rule: Only the Farm Owner may view aggregated financial totals and figures
-  return { role, canViewFinancials: false, staff: false, manager: false };
+  const canViewFinancials =
+    role === "staff" ? Boolean(staff) : role === "manager" ? Boolean(manager) : false;
+  return { role, canViewFinancials, staff: Boolean(staff), manager: Boolean(manager) };
 }
 export async function requireFinancialAccess(passcode: string) {
   const access = await financialAccess(passcode);

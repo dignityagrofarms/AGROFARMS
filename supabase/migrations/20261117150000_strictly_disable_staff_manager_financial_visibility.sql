@@ -8,3 +8,4 @@ WHERE key IN ('financial_visibility_staff', 'financial_visibility_manager');
 INSERT INTO public.app_settings (key, value)
 VALUES ('financial_visibility_staff', 'false'), ('financial_visibility_manager', 'false')
 ON CONFLICT (key) DO UPDATE SET value = 'false';
+

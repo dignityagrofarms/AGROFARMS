@@ -130,7 +130,8 @@ export function BatchFinancialsPanel({
   onNavigateToApprovals?: () => void;
 }) {
   const queryClient = useQueryClient();
-  const isPrivilegedFinancialViewer = role === "owner";
+  const isPrivilegedFinancialViewer =
+    role === "owner" || (role === "manager" && Boolean(canViewFinancials));
   const [finSubView, setFinSubView] = useState<"overview" | "debtors_creditors">("overview");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showBatchModal, setShowBatchModal] = useState(false);

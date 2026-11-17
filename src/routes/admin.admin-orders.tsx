@@ -488,6 +488,9 @@ function AdminOrders() {
     qc,
   ]);
   const role = (accessQuery.data?.role as AdminRole) || (query.data?.role as AdminRole) || "staff";
+  const canViewFinancials = accessQuery.data?.canViewFinancials ?? false;
+  const isPrivilegedFinancialViewer =
+    role === "owner" || (role === "manager" && canViewFinancials);
 
   const getPartnerSettingsFn = useServerFn(adminGetPartnerSettings);
   const partnerSettingsQuery = useQuery({
@@ -1144,7 +1147,7 @@ function AdminOrders() {
                 >
                   <TrendingUp size={18} className="shrink-0" />
                   {!isSidebarCollapsed && (
-                    <span>{role === "owner" ? "Batches & Finances" : "Record Expenses"}</span>
+                    <span>{isPrivilegedFinancialViewer ? "Batches & Finances" : "Record Expenses"}</span>
                   )}
                 </button>
               </li>
@@ -1340,7 +1343,7 @@ function AdminOrders() {
             <h2 className="text-lg font-bold text-gray-800 capitalize hidden lg:block">
               {activeTab === "partners"
                 ? "For Partners"
-                : activeTab === "financials" && role !== "owner"
+                : activeTab === "financials" && !isPrivilegedFinancialViewer
                   ? "Record Expenses"
                   : `${activeTab.replace("-", " ")} Dashboard`}
             </h2>
@@ -1943,6 +1946,7 @@ function AdminOrders() {
                               batches={batchesQuery.data || []}
                               onSaved={() => query.refetch()}
                               onOpenSmsModal={(order) => setOrderSmsTarget(order)}
+                              onResetFilters={resetFilters}
                             />
                           );
                         })()}
