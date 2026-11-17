@@ -13,3 +13,4 @@ ALTER TABLE public.farm_partners
   ADD COLUMN IF NOT EXISTS agreement_document_uploaded_by text;
 
 NOTIFY pgrst, 'reload schema';
+
