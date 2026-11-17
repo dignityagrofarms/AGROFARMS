@@ -27,6 +27,26 @@ interface FarmBatchOption {
   currentHeadcount: number;
   initialHeadcount: number;
   status: string;
+  totalMortality?: number;
+  totalBirdsSold?: number;
+  startDate?: string;
+  closedAt?: string | null;
+  targetHarvestDate?: string | null;
+}
+
+function formatDisplayDate(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  try {
+    const d = new Date(dateStr.slice(0, 10));
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-NG", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
 }
 
 interface ExportReportModalProps {
@@ -75,7 +95,15 @@ export function ExportReportModal({
   const selectedBatchObj = batches.find((b) => b.id === batchId);
   const batchName = batchId === "all" ? "All Batches (Farm Overview)" : (selectedBatchObj?.batchName || "Batch Report");
   const batchType = batchId === "all" ? "Broiler & Layer" : (selectedBatchObj?.batchType || "Broiler");
-  const headcount = batchId === "all" ? batches.reduce((sum, b) => sum + b.currentHeadcount, 0) : (selectedBatchObj?.currentHeadcount || 0);
+  const isBatchClosed =
+    selectedBatchObj?.status === "closed" ||
+    selectedBatchObj?.status === "completed" ||
+    selectedBatchObj?.status === "archived";
+  const headcount = isBatchClosed
+    ? 0
+    : batchId === "all"
+    ? batches.filter((b) => b.status === "active").reduce((sum, b) => sum + (b.currentHeadcount || 0), 0)
+    : Math.max(0, selectedBatchObj?.currentHeadcount || 0);
 
   // Filter transactions by date range and batch
   const filteredFinancials = financials.filter((t) => {
@@ -153,9 +181,35 @@ export function ExportReportModal({
       ? "100% Margin (No Expenses)"
       : "0% ROI";
 
+  // Dynamic Mortality & Date Range Calculations
+  const batchActivitiesMortality = filteredActivities.reduce(
+    (sum, a) => sum + (Number(a.mortalityCount) || 0),
+    0,
+  );
+  const mortalityCount =
+    batchId === "all"
+      ? batchActivitiesMortality
+      : (selectedBatchObj?.totalMortality ?? batchActivitiesMortality);
+
+  const initialCount =
+    batchId === "all"
+      ? batches.reduce((sum, b) => sum + (Number(b.initialHeadcount) || 0), 0)
+      : (Number(selectedBatchObj?.initialHeadcount) || 0);
+
+  const calculatedMortalityRate =
+    initialCount > 0
+      ? Number(((mortalityCount / initialCount) * 100).toFixed(1))
+      : 0;
+
+  const formattedBatchSpan = selectedBatchObj?.startDate
+    ? `${formatDisplayDate(selectedBatchObj.startDate)} – ${selectedBatchObj.closedAt ? formatDisplayDate(selectedBatchObj.closedAt) : (selectedBatchObj.targetHarvestDate ? formatDisplayDate(selectedBatchObj.targetHarvestDate) : "Present")}`
+    : "All Time";
+
   const dateRangeText =
     dateFilter === "all"
-      ? "All Time"
+      ? batchId !== "all" && selectedBatchObj
+        ? formattedBatchSpan
+        : "All Time"
       : dateFilter === "today"
       ? "Today Only"
       : dateFilter === "7d"
@@ -172,8 +226,8 @@ export function ExportReportModal({
         batchName,
         batchType,
         headcount,
-        mortality: 0,
-        mortalityRate: 0,
+        mortality: mortalityCount,
+        mortalityRate: calculatedMortalityRate,
         dateRangeText,
         includeFinancials,
         includeActivities,

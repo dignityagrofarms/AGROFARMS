@@ -2223,7 +2223,7 @@ function PartnerActivitiesSubPanel({
                       <p
                         className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}
                       >
-                        {act.notes}
+                        {act.notes.replace(/\s*\[SYNC:[^\]]+\]/gi, "")}
                       </p>
                     )}
                     {removed && (

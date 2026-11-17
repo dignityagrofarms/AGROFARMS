@@ -115,6 +115,7 @@ const formatNaira = (val: number) =>
 export function BatchFinancialsPanel({
   passcode,
   role = "owner",
+  canViewFinancials = false,
   username,
   onNavigateToContacts,
   pendingApprovalsCount = 0,
@@ -122,12 +123,15 @@ export function BatchFinancialsPanel({
 }: {
   passcode: string;
   role?: AdminRole;
+  canViewFinancials?: boolean;
   username?: string;
   onNavigateToContacts?: () => void;
   pendingApprovalsCount?: number;
   onNavigateToApprovals?: () => void;
 }) {
   const queryClient = useQueryClient();
+  const isPrivilegedFinancialViewer =
+    role === "owner" || (role === "manager" && Boolean(canViewFinancials));
   const [finSubView, setFinSubView] = useState<"overview" | "debtors_creditors">("overview");
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -839,10 +843,10 @@ export function BatchFinancialsPanel({
     </>
   );
 
-  if (role === "staff") {
+  if (role === "staff" || !isPrivilegedFinancialViewer) {
     return (
       <div className="space-y-6">
-        {/* Staff Header */}
+        {/* Staff / Restricted Header */}
         <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-[#0F3D24]">
@@ -855,7 +859,7 @@ export function BatchFinancialsPanel({
             </p>
           </div>
           <span className="rounded-full bg-amber-100 px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-amber-900">
-            Staff Expense Entry Mode
+            {role === "manager" ? "Manager Restricted Mode" : "Staff Expense Entry Mode"}
           </span>
         </div>
 
@@ -1881,101 +1885,107 @@ export function BatchFinancialsPanel({
               );
             })()}
 
-          {/* Permanent Farm-wide Grand Total Banner (Always reflects ALL batches combined) */}
-          <div className="rounded-3xl bg-[#0F3D24] p-5 text-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">
-                  Farm-wide Grand Total (All Batches Combined · Approved Records)
-                </span>
-                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-                  <span>
-                    Total Revenue:{" "}
-                    <strong className="text-lg font-extrabold text-white tabular-nums">
-                      {formatNaira(farmWideTotals.totalIncome)}
-                    </strong>
+          {/* Permanent Farm-wide Grand Total Banner (Privileged Viewers Only) */}
+          {isPrivilegedFinancialViewer && (
+            <div className="rounded-3xl bg-[#0F3D24] p-5 text-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                    Farm-wide Grand Total (All Batches Combined · Approved Records)
                   </span>
-                  <span>
-                    Total Expenses:{" "}
-                    <strong className="text-lg font-extrabold text-rose-300 tabular-nums">
-                      {formatNaira(farmWideTotals.totalExpense)}
-                    </strong>
-                  </span>
-                  <span>
-                    Net Position:{" "}
-                    <strong
-                      className={`text-lg font-extrabold tabular-nums ${
-                        farmWideTotals.netProfit >= 0 ? "text-emerald-300" : "text-rose-300"
-                      }`}
-                    >
-                      {formatNaira(farmWideTotals.netProfit)}
-                    </strong>
-                  </span>
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+                    <span>
+                      Total Revenue:{" "}
+                      <strong className="text-lg font-extrabold text-white tabular-nums">
+                        {formatNaira(farmWideTotals.totalIncome)}
+                      </strong>
+                    </span>
+                    <span>
+                      Total Expenses:{" "}
+                      <strong className="text-lg font-extrabold text-rose-300 tabular-nums">
+                        {formatNaira(farmWideTotals.totalExpense)}
+                      </strong>
+                    </span>
+                    <span>
+                      Net Position:{" "}
+                      <strong
+                        className={`text-lg font-extrabold tabular-nums ${
+                          farmWideTotals.netProfit >= 0 ? "text-emerald-300" : "text-rose-300"
+                        }`}
+                      >
+                        {formatNaira(farmWideTotals.netProfit)}
+                      </strong>
+                    </span>
+                  </div>
                 </div>
+                {selectedBatchId !== "all" && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBatchId("all")}
+                    className="rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-white/25 transition"
+                  >
+                    View All Batches
+                  </button>
+                )}
               </div>
-              {selectedBatchId !== "all" && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedBatchId("all")}
-                  className="rounded-full bg-white/15 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-white/25 transition"
-                >
-                  View All Batches
-                </button>
-              )}
             </div>
-          </div>
+          )}
 
           {/* Summary Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
-              <div className="flex items-center justify-between text-[#0F3D24]/70">
-                <span className="text-xs font-semibold">Total Revenue (Income)</span>
-                <div className="rounded-full bg-emerald-50 p-2 text-emerald-600">
-                  <TrendingUp size={18} />
+            {isPrivilegedFinancialViewer && (
+              <>
+                <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
+                  <div className="flex items-center justify-between text-[#0F3D24]/70">
+                    <span className="text-xs font-semibold">Total Revenue (Income)</span>
+                    <div className="rounded-full bg-emerald-50 p-2 text-emerald-600">
+                      <TrendingUp size={18} />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-[#0F3D24]">{formatNaira(totalIncome)}</p>
+                  <span className="mt-1 block text-xs text-[#0F3D24]/70">
+                    Store: <strong>{formatNaira(totalStoreIncome)}</strong> • Pre-Orders/Farm:{" "}
+                    <strong>{formatNaira(totalPreorderIncome + totalManualIncome)}</strong>
+                  </span>
                 </div>
-              </div>
-              <p className="mt-3 text-2xl font-bold text-[#0F3D24]">{formatNaira(totalIncome)}</p>
-              <span className="mt-1 block text-xs text-[#0F3D24]/70">
-                Store: <strong>{formatNaira(totalStoreIncome)}</strong> • Pre-Orders/Farm:{" "}
-                <strong>{formatNaira(totalPreorderIncome + totalManualIncome)}</strong>
-              </span>
-            </div>
 
-            <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
-              <div className="flex items-center justify-between text-[#0F3D24]/70">
-                <span className="text-xs font-semibold">Total Expenses</span>
-                <div className="rounded-full bg-rose-50 p-2 text-rose-600">
-                  <TrendingDown size={18} />
+                <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
+                  <div className="flex items-center justify-between text-[#0F3D24]/70">
+                    <span className="text-xs font-semibold">Total Expenses</span>
+                    <div className="rounded-full bg-rose-50 p-2 text-rose-600">
+                      <TrendingDown size={18} />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-2xl font-bold text-rose-600">{formatNaira(totalExpense)}</p>
+                  <span className="mt-1 block text-xs text-[#0F3D24]/60">
+                    Feed, Meds, Logistics & Ops
+                  </span>
                 </div>
-              </div>
-              <p className="mt-3 text-2xl font-bold text-rose-600">{formatNaira(totalExpense)}</p>
-              <span className="mt-1 block text-xs text-[#0F3D24]/60">
-                Feed, Meds, Logistics & Ops
-              </span>
-            </div>
 
-            <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
-              <div className="flex items-center justify-between text-[#0F3D24]/70">
-                <span className="text-xs font-semibold">Net Profit / Loss</span>
-                <div
-                  className={`rounded-full p-2 ${netProfit >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}
-                >
-                  <DollarSign size={18} />
+                <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
+                  <div className="flex items-center justify-between text-[#0F3D24]/70">
+                    <span className="text-xs font-semibold">Net Profit / Loss</span>
+                    <div
+                      className={`rounded-full p-2 ${netProfit >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}`}
+                    >
+                      <DollarSign size={18} />
+                    </div>
+                  </div>
+                  <p
+                    className={`mt-3 text-2xl font-bold ${netProfit >= 0 ? "text-emerald-700" : "text-rose-700"}`}
+                  >
+                    {formatNaira(netProfit)}
+                  </p>
+                  <span className="mt-1 block text-xs text-[#0F3D24]/60">
+                    {totalExpense > 0
+                      ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%`
+                      : netProfit > 0
+                        ? "100% Margin (No Expenses)"
+                        : "0% ROI"}
+                  </span>
                 </div>
-              </div>
-              <p
-                className={`mt-3 text-2xl font-bold ${netProfit >= 0 ? "text-emerald-700" : "text-rose-700"}`}
-              >
-                {formatNaira(netProfit)}
-              </p>
-              <span className="mt-1 block text-xs text-[#0F3D24]/60">
-                {totalExpense > 0
-                  ? `ROI: ${((netProfit / totalExpense) * 100).toFixed(1)}%`
-                  : netProfit > 0
-                    ? "100% Margin (No Expenses)"
-                    : "0% ROI"}
-              </span>
-            </div>
+              </>
+            )}
 
             <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5">
               <div className="flex items-center justify-between text-[#0F3D24]/70">
@@ -2265,18 +2275,18 @@ export function BatchFinancialsPanel({
                         {batches.reduce((s, b) => s + b.currentHeadcount, 0).toLocaleString()}
                       </td>
                       <td className="p-3 text-right tabular-nums">
-                        {formatNaira(farmWideTotals.totalIncome)}
+                        {isPrivilegedFinancialViewer ? formatNaira(farmWideTotals.totalIncome) : "—"}
                       </td>
                       <td className="p-3 text-right text-rose-200 tabular-nums">
-                        {formatNaira(farmWideTotals.totalExpense)}
+                        {isPrivilegedFinancialViewer ? formatNaira(farmWideTotals.totalExpense) : "—"}
                       </td>
                       <td
                         className={`p-3 text-right tabular-nums ${farmWideTotals.netProfit >= 0 ? "text-emerald-300" : "text-rose-300"}`}
                       >
-                        {formatNaira(farmWideTotals.netProfit)}
+                        {isPrivilegedFinancialViewer ? formatNaira(farmWideTotals.netProfit) : "—"}
                       </td>
                       <td className="p-3 text-right rounded-br-xl tabular-nums">
-                        {farmWideTotals.totalExpense > 0
+                        {isPrivilegedFinancialViewer && farmWideTotals.totalExpense > 0
                           ? `${((farmWideTotals.netProfit / farmWideTotals.totalExpense) * 100).toFixed(1)}%`
                           : "—"}
                       </td>

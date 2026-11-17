@@ -1950,6 +1950,7 @@ function AdminOrders() {
                     <BatchFinancialsPanel
                       passcode={passcode}
                       role={role}
+                      canViewFinancials={accessQuery.data?.canViewFinancials ?? false}
                       username={currentUsername}
                       onNavigateToContacts={() => setActiveTab("contacts")}
                       pendingApprovalsCount={pendingApprovalsCount}

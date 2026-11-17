@@ -1142,7 +1142,7 @@ function PartnersAccountPortal({
                             <p
                               className={`text-xs font-medium text-slate-800 ${removed ? "line-through" : ""}`}
                             >
-                              {act.notes}
+                              {act.notes.replace(/\s*\[SYNC:[^\]]+\]/gi, "")}
                             </p>
                           )}
 
@@ -1154,7 +1154,7 @@ function PartnersAccountPortal({
                                   setLightboxMedia({
                                     url: act.photoUrl!,
                                     title: `Flock Pen Inspection: ${act.activityType} (${act.activityDate})`,
-                                    subtitle: act.notes || undefined,
+                                    subtitle: act.notes ? act.notes.replace(/\s*\[SYNC:[^\]]+\]/gi, "") : undefined,
                                   })
                                 }
                                 className="inline-flex items-center gap-1.5 rounded-xl border border-[#0F3D24]/20 bg-white px-3 py-1.5 text-xs font-bold text-[#0F3D24] shadow-xs hover:bg-[#0F3D24]/10 transition"

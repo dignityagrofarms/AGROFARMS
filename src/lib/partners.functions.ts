@@ -253,19 +253,25 @@ function packTextWithMeta(text: string | null | undefined, meta: EmbeddedRowMeta
   return `${clean}${META_MARKER}${JSON.stringify(meta)}`;
 }
 
+export function stripInternalSyncTags(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const cleaned = text.replace(/\s*\[SYNC:[^\]]+\]/gi, "").trim();
+  return cleaned || null;
+}
+
 function unpackTextAndMeta(raw: string | null | undefined): {
   cleanText: string | null;
   meta: EmbeddedRowMeta;
 } {
   if (!raw) return { cleanText: null, meta: {} };
   const idx = raw.indexOf(META_MARKER);
-  if (idx === -1) return { cleanText: raw, meta: {} };
-  const cleanText = raw.slice(0, idx) || null;
+  if (idx === -1) return { cleanText: stripInternalSyncTags(raw), meta: {} };
+  const cleanText = stripInternalSyncTags(raw.slice(0, idx)) || null;
   try {
     const meta = JSON.parse(raw.slice(idx + META_MARKER.length)) as EmbeddedRowMeta;
     return { cleanText, meta: meta || {} };
   } catch {
-    return { cleanText: raw, meta: {} };
+    return { cleanText: stripInternalSyncTags(raw), meta: {} };
   }
 }
 
@@ -1635,21 +1641,33 @@ export const adminRolloverPartnerCycle = createServerFn({ method: "POST" })
       updated_at: now,
     };
 
-    const { error: fullErr } = await supabaseAdmin
-      .from("farm_partners")
-      .update({
-        ...baseUpdate,
-        archived_cycles: existingArchives,
-        payout_election: null,
-      })
-      .eq("id", data.partnerId);
+    const tryUpdate = async (payload: Record<string, unknown>) => {
+      let { error } = await supabaseAdmin
+        .from("farm_partners")
+        .update(payload)
+        .eq("id", data.partnerId);
+
+      if (error && (error.message.includes("agreement_signature_data") || error.message.includes("schema cache"))) {
+        const safePayload = { ...payload };
+        delete safePayload.agreement_signature_data;
+        const retryRes = await supabaseAdmin
+          .from("farm_partners")
+          .update(safePayload)
+          .eq("id", data.partnerId);
+        error = retryRes.error;
+      }
+      return error;
+    };
+
+    const fullErr = await tryUpdate({
+      ...baseUpdate,
+      archived_cycles: existingArchives,
+      payout_election: null,
+    });
 
     if (fullErr) {
       // Fallback if archived_cycles / payout_election columns aren't migrated yet
-      const { error: fallbackErr } = await supabaseAdmin
-        .from("farm_partners")
-        .update(baseUpdate)
-        .eq("id", data.partnerId);
+      const fallbackErr = await tryUpdate(baseUpdate);
       if (fallbackErr) throw new Error(fallbackErr.message);
     }
 
