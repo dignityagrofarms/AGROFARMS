@@ -3087,3 +3087,105 @@ export const adminSetPartnerManagerVisibility = createServerFn({ method: "POST" 
     }
     return { success: true, hideFromManager: data.hide };
   });
+
+/**
+ * Get the Managing Director's official authorized signature and title
+ */
+export const adminGetAuthorizedSignature = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1).max(200),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { role } = await checkOwnerOrManager(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await supabaseAdmin
+      .from("app_settings")
+      .select("key, value")
+      .in("key", ["authorized_signature_png", "authorized_signatory_name", "authorized_signatory_title"]);
+
+    const sigRow = rows?.find((r) => r.key === "authorized_signature_png");
+    const nameRow = rows?.find((r) => r.key === "authorized_signatory_name");
+    const titleRow = rows?.find((r) => r.key === "authorized_signatory_title");
+
+    return {
+      signaturePng: sigRow?.value || null,
+      signatoryName: nameRow?.value || "Managing Director / Chief Executive",
+      signatoryTitle: titleRow?.value || "Dignity Agro Farms Limited · Authorized Signatory",
+      role,
+    };
+  });
+
+/**
+ * Save or update the Managing Director's official authorized signature
+ */
+export const adminSaveAuthorizedSignature = createServerFn({ method: "POST" })
+  .inputValidator((data: unknown) =>
+    z
+      .object({
+        passcode: z.string().min(1).max(200),
+        signaturePng: z.string().min(10).max(3_000_000), // Base64 data URL or storage URL
+        signatoryName: z.string().max(100).optional(),
+        signatoryTitle: z.string().max(150).optional(),
+      })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    await checkOwner(data.passcode);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const now = new Date().toISOString();
+
+    const updates = [
+      {
+        key: "authorized_signature_png",
+        value: data.signaturePng,
+        updated_at: now,
+      },
+      {
+        key: "authorized_signatory_name",
+        value: (data.signatoryName || "Managing Director / Chief Executive").trim(),
+        updated_at: now,
+      },
+      {
+        key: "authorized_signatory_title",
+        value: (data.signatoryTitle || "Dignity Agro Farms Limited · Authorized Signatory").trim(),
+        updated_at: now,
+      },
+    ];
+
+    for (const item of updates) {
+      const { error } = await supabaseAdmin.from("app_settings").upsert(item, { onConflict: "key" });
+      if (error) {
+        throw new Error(`Failed to save signature setting: ${error.message}`);
+      }
+    }
+
+    return { success: true };
+  });
+
+/**
+ * Public query for partner portal and document export to fetch official authorized signature
+ */
+export const getPublicAuthorizedSignature = createServerFn({ method: "GET" }).handler(async () => {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: rows } = await supabaseAdmin
+    .from("app_settings")
+    .select("key, value")
+    .in("key", ["authorized_signature_png", "authorized_signatory_name", "authorized_signatory_title"]);
+
+  const sigRow = rows?.find((r) => r.key === "authorized_signature_png");
+  const nameRow = rows?.find((r) => r.key === "authorized_signatory_name");
+  const titleRow = rows?.find((r) => r.key === "authorized_signatory_title");
+
+  const { defaultAuthorizedSignaturePng } = await import("@/lib/receipt-logo");
+
+  return {
+    signaturePng: sigRow?.value || defaultAuthorizedSignaturePng,
+    signatoryName: nameRow?.value || "Managing Director / Chief Executive",
+    signatoryTitle: titleRow?.value || "Dignity Agro Farms Limited · Authorized Signatory",
+    isCustom: Boolean(sigRow?.value),
+  };
+});

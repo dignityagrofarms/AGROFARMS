@@ -1,4 +1,5 @@
 import { FinancialVisibilityControls } from "@/components/admin/FinancialVisibilityControls";
+import { AuthorizedSignatureModal } from "@/components/admin/AuthorizedSignatureModal";
 import { useEffect, useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -17,6 +18,7 @@ import {
   Loader2,
   Activity,
   Layers,
+  FileSignature,
 } from "lucide-react";
 import { SiteLayout } from "@/components/site/Layout";
 import { UserAccountsPanel } from "@/components/admin/UserAccountsPanel";
@@ -55,6 +57,7 @@ function UserAccountsPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [activeTab, setActiveTab] = useState<"accounts" | "approvals">("accounts");
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
 
   // Load session credentials from localStorage on mount (prevents SSR hydration error #418)
   useEffect(() => {
@@ -219,7 +222,40 @@ function UserAccountsPage() {
     <SiteLayout>
       <div className="min-h-screen bg-[#FDFBF7] py-8 text-[#0F3D24]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
-          {role === "owner" && verifyQuery.isSuccess && <FinancialVisibilityControls passcode={passcode}/>}
+          {role === "owner" && verifyQuery.isSuccess && (
+            <div className="space-y-4">
+              <FinancialVisibilityControls passcode={passcode} />
+
+              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-[#0F3D24]/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="rounded-2xl bg-emerald-50 p-3 text-[#0F3D24] border border-emerald-200">
+                    <FileSignature size={22} className="text-[#3F8F3F]" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-[#0F3D24]">
+                      Managing Director Official Signature &amp; Stamp
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Configure your authorized signature and corporate seal to embed by default on all generated PDF statements, partner reports, and sales receipts.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSignatureModal(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#0F3D24] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#165232] transition shrink-0 cursor-pointer"
+                >
+                  <FileSignature size={14} /> Configure Signature &amp; Stamp
+                </button>
+              </div>
+
+              <AuthorizedSignatureModal
+                isOpen={showSignatureModal}
+                onClose={() => setShowSignatureModal(false)}
+                passcode={passcode}
+              />
+            </div>
+          )}
           {/* Top Bar Header */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/5">
             <div className="flex items-center space-x-4">

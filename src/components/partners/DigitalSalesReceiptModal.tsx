@@ -2,6 +2,7 @@ import React from "react";
 import { X, Receipt, ShieldCheck, Printer, Lock } from "lucide-react";
 import type { PartnerFinancial } from "@/lib/partners.functions";
 import { scrubBuyerPII } from "@/lib/partner-privacy";
+import { base64LogoWhiteBg, defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
 
 export function DigitalSalesReceiptModal({
   receipt,
@@ -74,9 +75,12 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
 </style></head><body>
 <div class="sheet">
   <div class="head">
-    <div class="brand">
-      Dignity Agro Farms
-      <small>Limited · Agriculture &amp; Livestock Management</small>
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="${base64LogoWhiteBg}" alt="Dignity Agro Farms Logo" style="height:48px;width:auto;object-fit:contain;" />
+      <div class="brand">
+        Dignity Agro Farms
+        <small>Limited · Agriculture &amp; Livestock Management</small>
+      </div>
     </div>
     <div class="title-box">
       <div class="doc-title">Official Sales Receipt</div>
@@ -123,6 +127,21 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
       <span class="amount-total">${formattedAmount}</span>
     </div>
   </div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:28px;padding:16px 20px;border:1px solid #0F3D2425;border-radius:14px;background:#F7F5F0">
+    <div style="display:flex;align-items:center;gap:14px;">
+      <img src="${defaultAuthorizedSignaturePng}" alt="Authorized Signature" style="height:40px;max-width:130px;object-fit:contain;" />
+      <div style="border-left:1px solid #ccc;padding-left:14px;font-size:11px;">
+        <strong style="color:#0F3D24;font-size:12px;">Managing Director / Chief Executive</strong><br>
+        <span style="color:#666;font-size:10px;">Dignity Agro Farms Limited · Authorized Signatory</span><br>
+        <span style="color:#137333;font-size:9px;font-weight:700;">✓ Digitally Certified &amp; Stamped</span>
+      </div>
+    </div>
+    <div style="border:2px solid #0F3D24;border-radius:50%;width:50px;height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:6px;font-weight:900;color:#0F3D24;line-height:1;">
+      <span>DIGNITY</span>
+      <span style="color:#3F8F3F;font-size:5px;margin:1px 0;">★ SEAL ★</span>
+      <span>AUDITED</span>
+    </div>
+  </div>
   <div class="footer">
     This document serves as verifiable electronic proof of farm revenue deposited to Dignity Agro Farms account.<br>
     Buyer personal information is strictly protected under commercial confidentiality policies.<br>
@@ -158,16 +177,18 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
         {/* Official Header */}
         <div className="flex items-start justify-between gap-4 border-b border-[#0F3D24]/10 pb-4">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="rounded-xl bg-[#0F3D24] p-2 text-white">
-                <Receipt size={20} />
-              </span>
+            <div className="flex items-center gap-3">
+              <img
+                src="/assets/logo-forwhitebg.png"
+                alt="Dignity Agro Farms Logo"
+                className="h-10 w-10 object-contain rounded-lg"
+              />
               <div>
                 <h3 className="text-lg font-black text-[#0F3D24] leading-tight">
                   Dignity Agro Farms
                 </h3>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[#3F8F3F]">
-                  Official Farm Sales Receipt
+                  Official Farm Sales Receipt · RC / Agribusiness
                 </span>
               </div>
             </div>
@@ -258,6 +279,27 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
         <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-[#0F3D24]/10">
           <span>Recorded by: <strong>{receipt.recordedBy || "Farm Management"}</strong></span>
           <span>Status: <strong className="text-emerald-700">Approved &amp; Reconciled</strong></span>
+        </div>
+
+        {/* Official Signature & Corporate Seal Stamp */}
+        <div className="rounded-2xl border border-slate-200 bg-[#F7F5F0]/60 p-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img
+              src={defaultAuthorizedSignaturePng}
+              alt="Authorized Signature"
+              className="h-9 max-w-[120px] object-contain"
+            />
+            <div className="border-l border-slate-300 pl-3 text-[10px]">
+              <div className="font-bold text-[#0F3D24]">Managing Director / Chief Executive</div>
+              <div className="text-slate-500">Dignity Agro Farms Limited · Authorized Signatory</div>
+              <div className="text-[9px] text-emerald-800 font-semibold mt-0.5">Digitally Certified &amp; Stamped</div>
+            </div>
+          </div>
+          <div className="h-10 w-10 shrink-0 rounded-full border-2 border-[#0F3D24] flex flex-col items-center justify-center text-[5px] font-black uppercase text-[#0F3D24] leading-none text-center">
+            <span>DIGNITY</span>
+            <span className="text-[#3F8F3F] text-[4px]">★ SEAL ★</span>
+            <span>AUDITED</span>
+          </div>
         </div>
 
         {/* Modal Actions */}

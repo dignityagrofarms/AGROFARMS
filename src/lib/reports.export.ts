@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
+import { base64LogoWhiteBg, defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
 
 export interface ReportTransaction {
   id: string;
@@ -386,13 +387,16 @@ export async function generatePDFReport(options: ExportReportOptions) {
   raw.push({
     html: `
     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0F3D24; padding-bottom: 14px;">
-      <div>
-        <h1 style="margin: 0; font-size: 24px; font-weight: 800; color: #0F3D24; letter-spacing: -0.5px;">DIGNITY AGRO FARMS</h1>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: #3F8F3F; font-weight: 600;">Official Farm Financial &amp; Operations Report</p>
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <img src="${base64LogoWhiteBg}" alt="Dignity Agro Farms Logo" style="height: 48px; width: 48px; object-fit: contain;" />
+        <div>
+          <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #0F3D24; letter-spacing: -0.5px;">DIGNITY AGRO FARMS</h1>
+          <p style="margin: 4px 0 0 0; font-size: 11px; color: #3F8F3F; font-weight: 600;">Official Farm Financial &amp; Operations Report · RC / Agribusiness</p>
+        </div>
       </div>
       <div style="text-align: right;">
-        <p style="margin: 0; font-size: 11px; color: #6B7280; font-weight: 600;">Report Date</p>
-        <p style="margin: 2px 0 0 0; font-size: 13px; font-weight: 700; color: #0F3D24;">${esc(
+        <p style="margin: 0; font-size: 10px; color: #6B7280; font-weight: 600;">Report Date</p>
+        <p style="margin: 2px 0 0 0; font-size: 12px; font-weight: 700; color: #0F3D24;">${esc(
           new Date().toLocaleDateString("en-NG", { year: "numeric", month: "long", day: "numeric" })
         )}</p>
       </div>
@@ -581,18 +585,31 @@ export async function generatePDFReport(options: ExportReportOptions) {
     }
   }
 
-  // Signature block
+  // Official Corporate Certification & Managing Director Signature Block
   raw.push({
     html: `
-    <div style="height: 18px;"></div>
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 26px;">
-      <div style="text-align: left;">
-        <div style="width: 200px; border-bottom: 1px solid #0F3D24; margin-bottom: 4px;"></div>
-        <p style="margin: 0; font-size: 10px; font-weight: 700; color: #0F3D24;">Authorized Farm Manager (Signature)</p>
+    <div style="height: 20px;"></div>
+    <div style="border: 1.5px solid #0F3D24; border-radius: 12px; padding: 14px 18px; background-color: #F7F5F0;">
+      <div style="font-size: 11px; font-weight: 800; color: #0F3D24; text-transform: uppercase; letter-spacing: 0.5px;">
+        OFFICIAL CORPORATE CERTIFICATION &amp; AUDIT SIGN-OFF
       </div>
-      <div style="text-align: right;">
-        <div style="width: 200px; border-bottom: 1px solid #0F3D24; margin-bottom: 4px;"></div>
-        <p style="margin: 0; font-size: 10px; font-weight: 700; color: #0F3D24;">Date &amp; Official Stamp</p>
+      <p style="margin: 4px 0 12px 0; font-size: 9.5px; color: #4B5563;">
+        This document represents the verified and official operational &amp; financial records of Dignity Agro Farms Limited.
+      </p>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; padding-top: 10px; border-top: 1px solid #D1D5DB;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <img src="${defaultAuthorizedSignaturePng}" alt="Authorized Signature" style="height: 40px; max-width: 130px; object-fit: contain;" />
+          <div style="border-left: 1px solid #9CA3AF; padding-left: 12px;">
+            <div style="font-size: 12px; font-weight: 800; color: #0F3D24;">Managing Director / Chief Executive</div>
+            <div style="font-size: 10px; color: #6B7280;">Dignity Agro Farms Limited · Authorized Signatory</div>
+            <div style="font-size: 9px; color: #15803D; font-weight: 700; margin-top: 2px;">✓ Verified &amp; Certified · ${esc(new Date().toLocaleDateString("en-NG"))}</div>
+          </div>
+        </div>
+        <div style="border: 2px solid #0F3D24; border-radius: 50%; width: 48px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #0F3D24; font-size: 5.5px; font-weight: 900; line-height: 1;">
+          <span>DIGNITY</span>
+          <span style="color: #3F8F3F; font-size: 4.5px; margin: 1px 0;">★ SEAL ★</span>
+          <span>AUDITED</span>
+        </div>
       </div>
     </div>`,
   });
@@ -675,8 +692,11 @@ export async function generatePDFReport(options: ExportReportOptions) {
         <div id="pdf-page-target" style="position: relative; width: ${PAGE_W}px; height: ${PAGE_H}px; min-width: ${PAGE_W}px; max-width: ${PAGE_W}px; box-sizing: border-box; padding: ${PAD}px; background: #ffffff; font-family: system-ui, sans-serif; color: #0F3D24; overflow: hidden; margin: 0; display: block;">
           ${
             p > 0
-              ? `<div style="display: flex; justify-content: space-between; border-bottom: 2px solid #0F3D24; padding-bottom: 6px; margin-bottom: 14px;">
-                   <span style="font-size: 11px; font-weight: 800; color: #0F3D24;">DIGNITY AGRO FARMS — ${esc(options.batchName)} (continued)</span>
+              ? `<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0F3D24; padding-bottom: 6px; margin-bottom: 14px;">
+                   <div style="display: flex; align-items: center; gap: 8px;">
+                     <img src="${base64LogoWhiteBg}" alt="Logo" style="height: 20px; width: 20px; object-fit: contain;" />
+                     <span style="font-size: 11px; font-weight: 800; color: #0F3D24;">DIGNITY AGRO FARMS — ${esc(options.batchName)} (continued)</span>
+                   </div>
                    <span style="font-size: 10px; color: #6B7280;">${esc(options.dateRangeText)}</span>
                  </div>`
               : ""

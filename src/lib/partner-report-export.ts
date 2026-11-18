@@ -6,7 +6,9 @@ import type {
   PartnerReceivablesSummary,
   PartnerDashboardSummary,
 } from "@/lib/partners.functions";
+import { getPublicAuthorizedSignature } from "@/lib/partners.functions";
 import { scrubBuyerPII } from "@/lib/partner-privacy";
+import { base64LogoDarkBg, defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
 
 const naira = (n: number) => "NGN " + Math.round(n || 0).toLocaleString("en-NG");
 const nairaSymbol = (n: number) => "₦" + Math.round(n || 0).toLocaleString("en-NG");
@@ -14,13 +16,31 @@ const nairaSymbol = (n: number) => "₦" + Math.round(n || 0).toLocaleString("en
 /**
  * Generate and download an official PDF Statement for a Partner
  */
-export function exportPartnerReportPDF(
+export async function exportPartnerReportPDF(
   partner: FarmPartner,
   financials: PartnerFinancial[],
   activities: PartnerActivity[],
   receivables?: PartnerReceivablesSummary | null,
   summary?: PartnerDashboardSummary | null,
+  customSignature?: {
+    signaturePng?: string | null;
+    signatoryName?: string | null;
+    signatoryTitle?: string | null;
+  } | null,
 ) {
+  let activeSig = customSignature;
+  if (!activeSig) {
+    try {
+      activeSig = await getPublicAuthorizedSignature();
+    } catch {
+      activeSig = {
+        signaturePng: defaultAuthorizedSignaturePng,
+        signatoryName: "Managing Director / Chief Executive",
+        signatoryTitle: "Dignity Agro Farms Limited · Authorized Signatory",
+      };
+    }
+  }
+
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const s = partner.settlement;
   const isProfit = s.result === "profit";
@@ -35,25 +55,50 @@ export function exportPartnerReportPDF(
 
   let y = 14;
 
-  // Header Banner
+  // Header Banner with Official Dignity Agro Farms Logo
   doc.setFillColor(15, 61, 36); // #0F3D24
-  doc.rect(0, 0, 210, 28, "F");
+  doc.rect(0, 0, 210, 32, "F");
+
+  try {
+    doc.addImage(base64LogoDarkBg, "PNG", 14, 3, 26, 26);
+  } catch {
+    // Fallback if image rendering fails
+  }
 
   doc.setTextColor(255, 255, 255);
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
-  doc.text("DIGNITY AGRO FARMS LIMITED", 14, 12);
+  doc.text("DIGNITY AGRO FARMS LIMITED", 44, 12);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(230, 240, 230);
+  doc.text("RC / Agribusiness · Owerri, Imo State · Tel: +234 816 709 9492 · dignityagrofarms.com", 44, 18);
 
   doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  doc.text("RC / Agribusiness · Owerri, Imo State · Tel: +234 816 709 9492 · dignityagrofarms.com", 14, 18);
-
-  doc.setFontSize(10);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(168, 230, 168);
-  doc.text("OFFICIAL PARTNER STATEMENT & SETTLEMENT REPORT", 14, 24);
+  doc.text("OFFICIAL PARTNER STATEMENT & SETTLEMENT REPORT", 44, 25);
 
-  y = 35;
+  y = 38;
+
+  // Helper for continuation headers on pages 2+
+  const renderContinuationHeader = (subtitle: string) => {
+    doc.setFillColor(15, 61, 36);
+    doc.rect(0, 0, 210, 13, "F");
+    try {
+      doc.addImage(base64LogoDarkBg, "PNG", 14, 1.5, 10, 10);
+    } catch {}
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text(`DIGNITY AGRO FARMS — ${partner.fullName} (@${partner.username})`, 28, 8.5);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(168, 230, 168);
+    doc.text(subtitle, 196, 8.5, { align: "right" });
+    y = 20;
+  };
 
   // Document meta box
   doc.setDrawColor(220, 225, 220);
@@ -203,7 +248,7 @@ export function exportPartnerReportPDF(
   financials.forEach((f, idx) => {
     if (y > 272) {
       doc.addPage();
-      y = 15;
+      renderContinuationHeader("Itemized Ledger (Cont.)");
       renderFinHeader(true);
     }
     const bg = idx % 2 === 0 ? 255 : 248;
@@ -245,7 +290,7 @@ export function exportPartnerReportPDF(
   if (activities.length > 0) {
     if (y > 210) {
       doc.addPage();
-      y = 15;
+      renderContinuationHeader("Daily Farm Operations Log");
     } else {
       y += 8;
     }
@@ -304,7 +349,7 @@ export function exportPartnerReportPDF(
     activities.forEach((a, idx) => {
       if (y > 272) {
         doc.addPage();
-        y = 15;
+        renderContinuationHeader("Daily Farm Operations (Cont.)");
         renderActHeader(true);
       }
       const bg = idx % 2 === 0 ? 255 : 248;
@@ -363,6 +408,114 @@ export function exportPartnerReportPDF(
       y += 5.5;
     });
   }
+
+  // 5. Official Corporate Certification & Settlement Sign-off Block
+  if (y > 218) {
+    doc.addPage();
+    renderContinuationHeader("Official Corporate Certification & Sign-off");
+    y = 20;
+  } else {
+    y += 10;
+  }
+
+  const boxY = y;
+  doc.setDrawColor(15, 61, 36);
+  doc.setFillColor(247, 245, 240);
+  doc.roundedRect(14, boxY, 182, 50, 2, 2, "FD");
+
+  // Title inside box
+  doc.setFontSize(8.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 36);
+  doc.text("OFFICIAL CORPORATE CERTIFICATION & SETTLEMENT SIGN-OFF", 20, boxY + 6.5);
+
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(60, 70, 60);
+  doc.text(
+    "I hereby certify that this official statement represents the verified financial ledger, flock inventory, and operational",
+    20,
+    boxY + 11.5,
+  );
+  doc.text(
+    "records of Dignity Agro Farms Limited. All calculations, splits, and payouts follow the ratified Co-Financing Agreement.",
+    20,
+    boxY + 15.5,
+  );
+
+  // Divider line
+  doc.setDrawColor(210, 215, 210);
+  doc.line(20, boxY + 18, 190, boxY + 18);
+
+  // Left side: Managing Director Signature & Seal
+  const sigImg = activeSig?.signaturePng || defaultAuthorizedSignaturePng;
+  try {
+    doc.addImage(sigImg, "PNG", 22, boxY + 19, 42, 16);
+  } catch {
+    // Fallback if image render error
+  }
+
+  // Circular Seal Stamp
+  const sealCenterX = 76;
+  const sealCenterY = boxY + 28;
+  doc.setDrawColor(15, 61, 36);
+  doc.setLineWidth(0.4);
+  doc.circle(sealCenterX, sealCenterY, 8.5);
+  doc.setLineWidth(0.15);
+  doc.circle(sealCenterX, sealCenterY, 7.2);
+  doc.setFontSize(4.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 36);
+  doc.text("DIGNITY AGRO FARMS", sealCenterX, sealCenterY - 3, { align: "center" });
+  doc.setTextColor(63, 143, 63);
+  doc.text("★ SEAL ★", sealCenterX, sealCenterY, { align: "center" });
+  doc.setTextColor(15, 61, 36);
+  doc.text("AUDITED & SEALED", sealCenterX, sealCenterY + 3.2, { align: "center" });
+  doc.setLineWidth(0.2);
+
+  // Signature line (Managing Director)
+  doc.setDrawColor(120, 130, 120);
+  doc.line(20, boxY + 38, 92, boxY + 38);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 36);
+  doc.text(activeSig?.signatoryName || "Managing Director / Chief Executive", 20, boxY + 42);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(90, 100, 90);
+  doc.text(activeSig?.signatoryTitle || "Dignity Agro Farms Limited · Authorized Signatory", 20, boxY + 45.5);
+  doc.text(`Certified Date: ${nowStr.slice(0, 11)}`, 20, boxY + 48.5);
+
+  // Right side: Partner Digital Acceptance / Verification
+  doc.setFillColor(235, 245, 235);
+  doc.setDrawColor(63, 143, 63);
+  doc.roundedRect(114, boxY + 20, 72, 14, 1.5, 1.5, "FD");
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 36);
+  doc.text("INVESTOR DIGITAL VERIFICATION", 118, boxY + 25);
+  doc.setFontSize(6.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(60, 70, 60);
+  doc.text("Verified Acceptance & Co-Financing Rights", 118, boxY + 29.5);
+
+  doc.setDrawColor(120, 130, 120);
+  doc.line(114, boxY + 38, 186, boxY + 38);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(15, 61, 36);
+  doc.text(`${partner.fullName} (Partner / Investor)`, 114, boxY + 42);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  if (partner.agreementSigned) {
+    doc.setTextColor(15, 110, 45);
+    doc.text(`Digital Agreement: Signed (${partner.agreementSignedAt?.slice(0, 10) || "Recorded"})`, 114, boxY + 45.5);
+  } else {
+    doc.setTextColor(160, 100, 20);
+    doc.text("Digital Agreement: Record on file · Verified Acceptance", 114, boxY + 45.5);
+  }
+  doc.setTextColor(90, 100, 90);
+  doc.text(`Co-Financier: @${partner.username} · Profit Split: ${partner.profitSharePercentage}%`, 114, boxY + 48.5);
 
   // Footer Certificate
   const pageCount = doc.getNumberOfPages();

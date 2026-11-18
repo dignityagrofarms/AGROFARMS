@@ -49,6 +49,7 @@ import {
   Award,
   Clock,
   X,
+  FileSignature,
 } from "lucide-react";
 import {
   adminListPartners,
@@ -100,6 +101,7 @@ import {
   WeeklyWhatsAppDigestModal,
 } from "@/components/admin/PartnerOperationsModals";
 import { exportPartnerReportPDF, exportPartnerReportCSV } from "@/lib/partner-report-export";
+import { AuthorizedSignatureModal } from "./AuthorizedSignatureModal";
 
 const naira = (n: number) => "\u20a6" + Math.round(n || 0).toLocaleString("en-NG");
 const signedNaira = (n: number) => (n > 0 ? "+" : n < 0 ? "-" : "") + naira(Math.abs(n));
@@ -115,6 +117,7 @@ export function PartnersManagementPanel({
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [showBatchSplitModal, setShowBatchSplitModal] = useState(false);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [editingPartner, setEditingPartner] = useState<FarmPartner | null>(null);
   const [createdPartnerInfo, setCreatedPartnerInfo] = useState<{
@@ -300,6 +303,17 @@ export function PartnersManagementPanel({
               >
                 {isHiddenFromManager ? "Locked" : "Visible"}
               </span>
+            </button>
+          )}
+          {effectiveRole === "owner" && (
+            <button
+              type="button"
+              onClick={() => setShowSignatureModal(true)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white/15 border border-white/25 px-4 py-2 text-xs font-black text-white shadow-xs transition hover:bg-white hover:text-[#0F3D24] cursor-pointer"
+              title="Configure Managing Director Official Signature & Corporate Seal"
+            >
+              <FileSignature size={15} className="text-[#a8e6a8]" />
+              <span>Official Signature &amp; Stamp</span>
             </button>
           )}
           {effectiveRole === "owner" && (
@@ -609,6 +623,15 @@ export function PartnersManagementPanel({
             qc.invalidateQueries({ queryKey: ["admin-partners"] });
             qc.invalidateQueries({ queryKey: ["admin-partner-detail"] });
           }}
+        />
+      )}
+
+      {/* Managing Director Authorized Signature & Seal Modal */}
+      {showSignatureModal && effectiveRole === "owner" && (
+        <AuthorizedSignatureModal
+          isOpen={showSignatureModal}
+          onClose={() => setShowSignatureModal(false)}
+          passcode={passcode}
         />
       )}
 
