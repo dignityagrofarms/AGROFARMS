@@ -4,6 +4,7 @@ import type {
   PartnerFinancial,
   PartnerActivity,
   PartnerReceivablesSummary,
+  PartnerDashboardSummary,
 } from "@/lib/partners.functions";
 import { scrubBuyerPII } from "@/lib/partner-privacy";
 
@@ -18,6 +19,7 @@ export function exportPartnerReportPDF(
   financials: PartnerFinancial[],
   activities: PartnerActivity[],
   receivables?: PartnerReceivablesSummary | null,
+  summary?: PartnerDashboardSummary | null,
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const s = partner.settlement;
@@ -178,29 +180,31 @@ export function exportPartnerReportPDF(
   doc.text(`ITEMIZED FINANCIAL TRANSACTIONS (${financials.length} Entries)`, 14, y);
   y += 4;
 
-  // Table Header
-  doc.setFillColor(15, 61, 36);
-  doc.rect(14, y, 182, 6, "F");
-  doc.setFontSize(7.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text("Date", 16, y + 4.2);
-  doc.text("Type", 38, y + 4.2);
-  doc.text("Category", 60, y + 4.2);
-  doc.text("Description", 95, y + 4.2);
-  doc.text("Method", 150, y + 4.2);
-  doc.text("Amount (NGN)", 175, y + 4.2);
+  const renderFinHeader = (isCont?: boolean) => {
+    doc.setFillColor(15, 61, 36);
+    doc.rect(14, y, 182, 6, "F");
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(255, 255, 255);
+    doc.text("Date", 16, y + 4.2);
+    doc.text("Type", 38, y + 4.2);
+    doc.text("Category", 60, y + 4.2);
+    doc.text(isCont ? "Description (Cont.)" : "Description", 95, y + 4.2);
+    doc.text("Method", 150, y + 4.2);
+    doc.text("Amount (NGN)", 175, y + 4.2);
+    y += 6;
+  };
 
-  y += 6;
+  renderFinHeader();
 
-  const validFins = financials.slice(0, 35); // Keep concise or paginated
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
 
-  validFins.forEach((f, idx) => {
-    if (y > 275) {
+  financials.forEach((f, idx) => {
+    if (y > 272) {
       doc.addPage();
       y = 15;
+      renderFinHeader(true);
     }
     const bg = idx % 2 === 0 ? 255 : 248;
     doc.setFillColor(bg, bg, bg);
@@ -237,17 +241,9 @@ export function exportPartnerReportPDF(
     y += 5.5;
   });
 
-  if (financials.length > 35) {
-    y += 3;
-    doc.setFontSize(7.5);
-    doc.setTextColor(120, 120, 120);
-    doc.text(`... and ${financials.length - 35} more transactions available in the digital portal.`, 16, y);
-    y += 5;
-  }
-
-  // Section: Daily Activities Summary (if space permits or on new page)
+  // Section: Daily Activities & Flock Health Logs
   if (activities.length > 0) {
-    if (y > 220) {
+    if (y > 210) {
       doc.addPage();
       y = 15;
     } else {
@@ -257,43 +253,112 @@ export function exportPartnerReportPDF(
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(15, 61, 36);
-    doc.text(`RECENT DAILY FARM ACTIVITIES & STOCK LOGS (${activities.length} Entries)`, 14, y);
-    y += 4;
+    doc.text(`DAILY FARM ACTIVITIES & FLOCK MONITORING LOGS (${activities.length} Entries)`, 14, y);
+    y += 4.5;
 
-    doc.setFillColor(15, 61, 36);
-    doc.rect(14, y, 182, 6, "F");
+    // Flock KPI Summary Strip
+    const liveStock = summary?.currentStockCount ?? "—";
+    const totalMort = summary?.totalMortalityCount ?? activities.reduce((sum, a) => sum + (a.mortalityCount || 0), 0);
+    const mortRate = summary?.mortalityRatePercent ?? (summary?.initialStockCount ? ((totalMort / summary.initialStockCount) * 100).toFixed(1) : "—");
+    const totalFeed = summary?.totalFeedConsumedKg ?? activities.reduce((sum, a) => sum + (a.feedConsumedKg || 0), 0);
+    const avgWeight = summary?.latestAverageWeightKg
+      ? `${summary.latestAverageWeightKg.toFixed(2)} kg`
+      : (activities.find((a) => a.averageWeightKg > 0)?.averageWeightKg
+          ? `${activities.find((a) => a.averageWeightKg > 0)!.averageWeightKg.toFixed(2)} kg`
+          : "—");
+
+    doc.setFillColor(245, 249, 246);
+    doc.setDrawColor(210, 230, 215);
+    doc.roundedRect(14, y, 182, 11, 1.5, 1.5, "FD");
+
     doc.setFontSize(7.5);
     doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.text("Date", 16, y + 4.2);
-    doc.text("Activity Type", 40, y + 4.2);
-    doc.text("Stock", 88, y + 4.2);
-    doc.text("Mortality", 108, y + 4.2);
-    doc.text("Feed (kg)", 130, y + 4.2);
-    doc.text("Notes", 152, y + 4.2);
+    doc.setTextColor(15, 61, 36);
+    doc.text(
+      `Flock Metrics:  Live Birds: ${liveStock}  |  Total Mortality: ${totalMort} (${mortRate}%)  |  Total Feed: ${typeof totalFeed === "number" ? totalFeed.toLocaleString() : totalFeed} kg  |  Latest Avg Weight: ${avgWeight}`,
+      18,
+      y + 7,
+    );
+    y += 14;
 
-    y += 6;
+    const renderActHeader = (isCont?: boolean) => {
+      doc.setFillColor(15, 61, 36);
+      doc.rect(14, y, 182, 6, "F");
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(255, 255, 255);
+      doc.text("Date", 16, y + 4.2);
+      doc.text("Activity Type", 36, y + 4.2);
+      doc.text("Mortality", 68, y + 4.2);
+      doc.text("Feed Intake", 86, y + 4.2);
+      doc.text("Avg Weight", 106, y + 4.2);
+      doc.text(isCont ? "Notes & Observations (Cont.)" : "Notes & Observations", 126, y + 4.2);
+      y += 6;
+    };
 
-    activities.slice(0, 20).forEach((a, idx) => {
-      if (y > 275) {
+    renderActHeader();
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+
+    activities.forEach((a, idx) => {
+      if (y > 272) {
         doc.addPage();
         y = 15;
+        renderActHeader(true);
       }
       const bg = idx % 2 === 0 ? 255 : 248;
       doc.setFillColor(bg, bg, bg);
       doc.rect(14, y, 182, 5.5, "F");
 
-      doc.setFontSize(7);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(60, 60, 60);
+      doc.setTextColor(a.removedAt ? 160 : 60, a.removedAt ? 160 : 60, a.removedAt ? 160 : 60);
       doc.text(a.activityDate, 16, y + 3.8);
-      doc.text((a.activityType || "").slice(0, 25), 40, y + 3.8);
-      doc.text(String(a.stockHeadcount || 0), 88, y + 3.8);
-      doc.setTextColor(a.mortalityCount > 0 ? 180 : 60, a.mortalityCount > 0 ? 30 : 60, 30);
-      doc.text(String(a.mortalityCount || 0), 108, y + 3.8);
+
+      // Activity Type
+      doc.text((a.activityType || "").slice(0, 22), 36, y + 3.8);
+
+      // Mortality (highlighted if > 0)
+      if (a.mortalityCount && a.mortalityCount > 0) {
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(180, 40, 40);
+        doc.text(`${a.mortalityCount} birds`, 68, y + 3.8);
+        doc.setFont("helvetica", "normal");
+      } else {
+        doc.setTextColor(160, 160, 160);
+        doc.text("—", 68, y + 3.8);
+      }
+
+      // Feed Intake
+      if (a.feedConsumedKg && a.feedConsumedKg > 0) {
+        doc.setTextColor(160, 80, 0);
+        doc.text(`${a.feedConsumedKg} kg`, 86, y + 3.8);
+      } else {
+        doc.setTextColor(160, 160, 160);
+        doc.text("—", 86, y + 3.8);
+      }
+
+      // Average Weight
+      if (a.averageWeightKg && a.averageWeightKg > 0) {
+        doc.setTextColor(100, 30, 140);
+        doc.text(`${a.averageWeightKg} kg`, 106, y + 3.8);
+      } else {
+        doc.setTextColor(160, 160, 160);
+        doc.text("—", 106, y + 3.8);
+      }
+
+      // Clean Notes (strip [SYNC:...], append cause of mortality if present)
+      let cleanNotes = (a.notes || "").replace(/\s*\[SYNC:[^\]]+\]/gi, "").trim();
+      if (a.causeOfMortality) {
+        cleanNotes = cleanNotes
+          ? `${cleanNotes} (Cause: ${a.causeOfMortality})`
+          : `Cause: ${a.causeOfMortality}`;
+      }
+      if (!cleanNotes) cleanNotes = "—";
+      if (a.removedAt) {
+        cleanNotes = `[REMOVED] ${cleanNotes}`;
+      }
       doc.setTextColor(60, 60, 60);
-      doc.text(String(a.feedConsumedKg || 0), 130, y + 3.8);
-      doc.text((a.notes || "—").slice(0, 28), 152, y + 3.8);
+      doc.text(cleanNotes.slice(0, 44), 126, y + 3.8);
 
       y += 5.5;
     });
@@ -386,18 +451,20 @@ export function exportPartnerReportCSV(
   lines.push("");
 
   lines.push(`"=== DAILY FARM ACTIVITIES & FLOCK LOGS ==="`);
-  lines.push("Date,Activity Type,Headcount,Mortality,Feed Consumed (KG),Average Weight (KG),Notes,Status");
+  lines.push("Date,Activity Type,Mortality,Cause of Mortality,Feed Consumed (KG),Average Weight (KG),Notes,Status");
 
   activities.forEach((a) => {
-    const notes = `"${(a.notes || "").replace(/"/g, '""')}"`;
+    let cleanNotes = (a.notes || "").replace(/\s*\[SYNC:[^\]]+\]/gi, "").trim();
+    const notes = `"${cleanNotes.replace(/"/g, '""')}"`;
+    const cause = `"${(a.causeOfMortality || "").replace(/"/g, '""')}"`;
     lines.push(
       [
         a.activityDate,
         `"${a.activityType}"`,
-        a.stockHeadcount,
-        a.mortalityCount,
-        a.feedConsumedKg,
-        a.averageWeightKg,
+        a.mortalityCount || 0,
+        cause,
+        a.feedConsumedKg || 0,
+        a.averageWeightKg || 0,
         notes,
         a.removedAt ? "REMOVED" : "ACTIVE",
       ].join(","),

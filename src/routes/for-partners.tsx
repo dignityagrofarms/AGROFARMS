@@ -482,6 +482,33 @@ function PartnersAccountPortal({
 
   return (
     <div className="space-y-6 pb-24 sm:pb-8">
+      {/* Print-specific style overrides */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          header, footer, nav, .print\\:hidden {
+            display: none !important;
+          }
+          .overflow-x-auto {
+            overflow: visible !important;
+          }
+          table {
+            width: 100% !important;
+            page-break-inside: auto;
+          }
+          tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+          }
+          thead {
+            display: table-header-group;
+          }
+        }
+      `}</style>
+
       {/* Top Welcome Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl bg-gradient-to-r from-[#0F3D24] via-[#165232] to-[#0F3D24] p-6 sm:p-8 text-white shadow-xl">
         <div className="space-y-1.5">
@@ -517,14 +544,14 @@ function PartnersAccountPortal({
           <button
             type="button"
             onClick={() => setShowCertificateModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/25 transition backdrop-blur-sm ring-1 ring-white/20 shadow-sm"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-2 text-xs font-bold text-white hover:bg-white/25 transition backdrop-blur-sm ring-1 ring-white/20 shadow-sm print:hidden"
           >
             <Award size={14} className="text-[#a8e6a8]" />
             Certificate
           </button>
 
           {/* Export Report Dropdown */}
-          <div className="relative">
+          <div className="relative print:hidden">
             <button
               type="button"
               onClick={() => setShowExportMenu((v) => !v)}
@@ -551,6 +578,7 @@ function PartnersAccountPortal({
                       financials,
                       activities,
                       dashboardQuery.data.receivables,
+                      summary,
                     )
                   }
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
@@ -605,7 +633,7 @@ function PartnersAccountPortal({
           <button
             type="button"
             onClick={onLogout}
-            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-xs font-bold text-white hover:bg-white/25 transition backdrop-blur-sm"
+            className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 text-xs font-bold text-white hover:bg-white/25 transition backdrop-blur-sm print:hidden"
           >
             <LogOut size={14} /> Sign Out
           </button>
@@ -813,7 +841,7 @@ function PartnersAccountPortal({
         id="ledger-section"
         className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-[#0F3D24]/10 space-y-6"
       >
-        <div className="flex border-b border-slate-200">
+        <div className="flex border-b border-slate-200 print:hidden">
           <button
             type="button"
             onClick={() => setActiveTab("financials")}
@@ -839,8 +867,8 @@ function PartnersAccountPortal({
         </div>
 
         {/* Tab 1: Financial Statements */}
-        {activeTab === "financials" &&
-          (() => {
+        <div className={activeTab === "financials" ? "block" : "hidden print:block print:mt-8"}>
+          {(() => {
             const filteredFinancials = financials.filter((row) => {
               if (finFilter !== "all" && row.type !== finFilter) return false;
               if (finSearch.trim()) {
@@ -893,7 +921,7 @@ function PartnersAccountPortal({
                 </div>
 
                 {/* Filter Pills + Search Bar */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1 print:hidden">
                   <div className="flex flex-wrap gap-1.5 text-xs">
                     {[
                       { key: "all", label: `All (${financials.length})` },
@@ -1075,10 +1103,11 @@ function PartnersAccountPortal({
               </div>
             );
           })()}
+        </div>
 
         {/* Tab 2: Daily Farm Activities */}
-        {activeTab === "activities" &&
-          (() => {
+        <div className={activeTab === "activities" ? "block" : "hidden print:block print:mt-8"}>
+          {(() => {
             const filteredActivities = activities.filter((act) => {
               if (actFilter !== "all" && act.activityType !== actFilter) return false;
               return true;
@@ -1122,7 +1151,7 @@ function PartnersAccountPortal({
 
                 {/* Activity Type Filters */}
                 {actTypes.length > 1 && (
-                  <div className="flex flex-wrap gap-1.5 text-xs pt-1">
+                  <div className="flex flex-wrap gap-1.5 text-xs pt-1 print:hidden">
                     <button
                       type="button"
                       onClick={() => setActFilter("all")}
@@ -1279,12 +1308,13 @@ function PartnersAccountPortal({
               </div>
             );
           })()}
+        </div>
       </div>
 
       {/* Mobile Sticky Bottom Navigation (Native App feel for investors on phones) */}
       <nav
         aria-label="Partner mobile navigation"
-        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around text-[10px] font-bold text-slate-600"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 px-3 py-2 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] flex items-center justify-around text-[10px] font-bold text-slate-600 print:hidden"
       >
         <button
           type="button"
