@@ -337,18 +337,18 @@ export async function exportPartnerReportPDF(
       doc.setFont("helvetica", "bold");
       doc.setTextColor(255, 255, 255);
       doc.text("Date", 16, y + 4.2);
-      doc.text("Activity Type", 36, y + 4.2);
-      doc.text("Mortality", 68, y + 4.2);
-      doc.text("Feed Intake", 86, y + 4.2);
-      doc.text("Avg Weight", 106, y + 4.2);
-      doc.text(isCont ? "Notes & Observations (Cont.)" : "Notes & Observations", 126, y + 4.2);
+      doc.text("Activity Type", 34, y + 4.2);
+      doc.text("Mortality", 72, y + 4.2, { align: "center" });
+      doc.text("Feed Intake", 88, y + 4.2, { align: "center" });
+      doc.text("Avg Weight", 104, y + 4.2, { align: "center" });
+      doc.text(isCont ? "Notes & Observations (Cont.)" : "Notes & Observations", 114, y + 4.2);
       y += 6;
     };
 
     renderActHeader();
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(6.7);
 
     activities.forEach((a, idx) => {
       if (y > 272) {
@@ -364,35 +364,35 @@ export async function exportPartnerReportPDF(
       doc.text(a.activityDate, 16, y + 3.8);
 
       // Activity Type
-      doc.text((a.activityType || "").slice(0, 22), 36, y + 3.8);
+      doc.text(a.activityType || "", 34, y + 3.8);
 
       // Mortality (highlighted if > 0)
       if (a.mortalityCount && a.mortalityCount > 0) {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(180, 40, 40);
-        doc.text(`${a.mortalityCount} birds`, 68, y + 3.8);
+        doc.text(`${a.mortalityCount} birds`, 72, y + 3.8, { align: "center" });
         doc.setFont("helvetica", "normal");
       } else {
         doc.setTextColor(160, 160, 160);
-        doc.text("—", 68, y + 3.8);
+        doc.text("—", 72, y + 3.8, { align: "center" });
       }
 
       // Feed Intake
       if (a.feedConsumedKg && a.feedConsumedKg > 0) {
         doc.setTextColor(160, 80, 0);
-        doc.text(`${a.feedConsumedKg} kg`, 86, y + 3.8);
+        doc.text(`${a.feedConsumedKg} kg`, 88, y + 3.8, { align: "center" });
       } else {
         doc.setTextColor(160, 160, 160);
-        doc.text("—", 86, y + 3.8);
+        doc.text("—", 88, y + 3.8, { align: "center" });
       }
 
       // Average Weight
       if (a.averageWeightKg && a.averageWeightKg > 0) {
         doc.setTextColor(100, 30, 140);
-        doc.text(`${a.averageWeightKg} kg`, 106, y + 3.8);
+        doc.text(`${a.averageWeightKg} kg`, 104, y + 3.8, { align: "center" });
       } else {
         doc.setTextColor(160, 160, 160);
-        doc.text("—", 106, y + 3.8);
+        doc.text("—", 104, y + 3.8, { align: "center" });
       }
 
       // Clean Notes (strip [SYNC:...], append cause of mortality if present)
@@ -407,25 +407,26 @@ export async function exportPartnerReportPDF(
         cleanNotes = `[REMOVED] ${cleanNotes}`;
       }
       doc.setTextColor(60, 60, 60);
-      doc.text(cleanNotes.slice(0, 44), 126, y + 3.8);
+      doc.text(cleanNotes, 114, y + 3.8);
 
       y += 5.5;
     });
   }
 
   // 5. Official Corporate Certification & Settlement Sign-off Block
-  if (y > 218) {
+  if (y > 215) {
     doc.addPage();
     renderContinuationHeader("Official Corporate Certification & Sign-off");
     y = 20;
   } else {
-    y += 10;
+    y += 8;
   }
 
   const boxY = y;
+  const boxH = 54;
   doc.setDrawColor(15, 61, 36);
   doc.setFillColor(247, 245, 240);
-  doc.roundedRect(14, boxY, 182, 50, 2, 2, "FD");
+  doc.roundedRect(14, boxY, 182, boxH, 2, 2, "FD");
 
   // Title inside box
   doc.setFontSize(8.5);
@@ -451,75 +452,64 @@ export async function exportPartnerReportPDF(
   doc.setDrawColor(210, 215, 210);
   doc.line(20, boxY + 18, 190, boxY + 18);
 
-  // Left side: Managing Director Signature & Seal
+  // Left side: Managing Director Signature & Authentic Corporate Seal
   const sigImg = activeSig?.signaturePng || defaultAuthorizedSignaturePng;
   try {
-    doc.addImage(sigImg, "PNG", 22, boxY + 19, 42, 16);
+    doc.addImage(sigImg, "PNG", 20, boxY + 19, 44, 16);
   } catch {
     // Fallback if image render error
   }
 
-  // Circular Seal Stamp
-  const sealCenterX = 76;
-  const sealCenterY = boxY + 28;
-  doc.setDrawColor(15, 61, 36);
-  doc.setLineWidth(0.4);
-  doc.circle(sealCenterX, sealCenterY, 8.5);
-  doc.setLineWidth(0.15);
-  doc.circle(sealCenterX, sealCenterY, 7.2);
-  doc.setFontSize(4.5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(15, 61, 36);
-  doc.text("DIGNITY AGRO FARMS", sealCenterX, sealCenterY - 3, { align: "center" });
-  doc.setTextColor(63, 143, 63);
-  doc.text("★ SEAL ★", sealCenterX, sealCenterY, { align: "center" });
-  doc.setTextColor(15, 61, 36);
-  doc.text("AUDITED & SEALED", sealCenterX, sealCenterY + 3.2, { align: "center" });
-  doc.setLineWidth(0.2);
+  // Official Corporate Seal Stamp (High-res 300DPI Transparent)
+  try {
+    doc.addImage(officialCorporateSealPng, "PNG", 66, boxY + 18, 28, 28);
+  } catch {
+    // Fallback if seal render error
+  }
 
   // Signature line (Managing Director)
   doc.setDrawColor(120, 130, 120);
-  doc.line(20, boxY + 38, 92, boxY + 38);
+  doc.line(20, boxY + 40, 94, boxY + 40);
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 61, 36);
-  doc.text(activeSig?.signatoryName || "Managing Director / Chief Executive", 20, boxY + 42);
+  doc.text(activeSig?.signatoryName || "Managing Director / Chief Executive", 20, boxY + 44.5);
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(90, 100, 90);
-  doc.text(activeSig?.signatoryTitle || "Dignity Agro Farms Limited · Authorized Signatory", 20, boxY + 45.5);
-  doc.text(`Certified Date: ${nowStr.slice(0, 11)}`, 20, boxY + 48.5);
+  doc.text(activeSig?.signatoryTitle || "Dignity Agro Farms Limited · Authorized Signatory", 20, boxY + 48);
+  doc.text(`Certified Date: ${nowStr.slice(0, 11)}`, 20, boxY + 51.5);
 
   // Right side: Partner Digital Acceptance / Verification
   doc.setFillColor(235, 245, 235);
   doc.setDrawColor(63, 143, 63);
-  doc.roundedRect(114, boxY + 20, 72, 14, 1.5, 1.5, "FD");
+  doc.roundedRect(114, boxY + 20, 76, 16, 1.5, 1.5, "FD");
   doc.setFontSize(7.5);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 61, 36);
-  doc.text("INVESTOR DIGITAL VERIFICATION", 118, boxY + 25);
-  doc.setFontSize(6.5);
+  doc.text("INVESTOR DIGITAL VERIFICATION", 118, boxY + 25.5);
+  doc.setFontSize(6.8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(60, 70, 60);
-  doc.text("Verified Acceptance & Co-Financing Rights", 118, boxY + 29.5);
+  doc.text("Verified Acceptance & Co-Financing Rights", 118, boxY + 30);
 
   doc.setDrawColor(120, 130, 120);
-  doc.line(114, boxY + 38, 186, boxY + 38);
+  doc.line(114, boxY + 40, 190, boxY + 40);
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(15, 61, 36);
-  doc.text(`${partner.fullName} (Partner / Investor)`, 114, boxY + 42);
+  doc.text(`${partner.fullName} (Partner / Investor)`, 114, boxY + 44.5);
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
   if (partner.agreementSigned) {
     doc.setTextColor(15, 110, 45);
-    doc.text(`Digital Agreement: Signed (${partner.agreementSignedAt?.slice(0, 10) || "Recorded"})`, 114, boxY + 45.5);
+    doc.text(`Digital Agreement: Signed (${partner.agreementSignedAt?.slice(0, 10) || "Recorded"})`, 114, boxY + 48);
   } else {
     doc.setTextColor(160, 100, 20);
-    doc.text("Digital Agreement: Record on file · Verified Acceptance", 114, boxY + 45.5);
+    doc.text("Digital Agreement: Record on file · Verified Acceptance", 114, boxY + 48);
   }
   doc.setTextColor(90, 100, 90);
-  doc.text(`Co-Financier: @${partner.username} · Profit Split: ${partner.profitSharePercentage}%`, 114, boxY + 48.5);
+  doc.text(`Co-Financier: @${partner.username} · Profit Split: ${partner.profitSharePercentage}%`, 114, boxY + 51.5);
 
   // Footer Certificate
   const pageCount = doc.getNumberOfPages();

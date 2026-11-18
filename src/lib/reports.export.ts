@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
 import { toPng } from "html-to-image";
-import { base64LogoWhiteBg, defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
+import { base64LogoWhiteBg, defaultAuthorizedSignaturePng, officialCorporateSealPng } from "@/lib/receipt-logo";
 
 export interface ReportTransaction {
   id: string;
@@ -605,11 +605,7 @@ export async function generatePDFReport(options: ExportReportOptions) {
             <div style="font-size: 9px; color: #15803D; font-weight: 700; margin-top: 2px;">✓ Verified &amp; Certified · ${esc(new Date().toLocaleDateString("en-NG"))}</div>
           </div>
         </div>
-        <div style="border: 2px solid #0F3D24; border-radius: 50%; width: 48px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #0F3D24; font-size: 5.5px; font-weight: 900; line-height: 1;">
-          <span>DIGNITY</span>
-          <span style="color: #3F8F3F; font-size: 4.5px; margin: 1px 0;">★ SEAL ★</span>
-          <span>AUDITED</span>
-        </div>
+        <img src="${officialCorporateSealPng}" alt="Official Corporate Seal" style="width: 52px; height: 52px; object-fit: contain;" />
       </div>
     </div>`,
   });

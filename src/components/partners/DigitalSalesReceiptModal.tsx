@@ -2,7 +2,7 @@ import React from "react";
 import { X, Receipt, ShieldCheck, Printer, Lock } from "lucide-react";
 import type { PartnerFinancial } from "@/lib/partners.functions";
 import { scrubBuyerPII } from "@/lib/partner-privacy";
-import { base64LogoWhiteBg, defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
+import { base64LogoWhiteBg, defaultAuthorizedSignaturePng, officialCorporateSealPng } from "@/lib/receipt-logo";
 
 export function DigitalSalesReceiptModal({
   receipt,
@@ -136,11 +136,7 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
         <span style="color:#137333;font-size:9px;font-weight:700;">✓ Digitally Certified &amp; Stamped</span>
       </div>
     </div>
-    <div style="border:2px solid #0F3D24;border-radius:50%;width:50px;height:50px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:6px;font-weight:900;color:#0F3D24;line-height:1;">
-      <span>DIGNITY</span>
-      <span style="color:#3F8F3F;font-size:5px;margin:1px 0;">★ SEAL ★</span>
-      <span>AUDITED</span>
-    </div>
+    <img src="${officialCorporateSealPng}" alt="Official Corporate Seal" style="width:48px;height:48px;object-fit:contain;" />
   </div>
   <div class="footer">
     This document serves as verifiable electronic proof of farm revenue deposited to Dignity Agro Farms account.<br>
@@ -295,11 +291,11 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
               <div className="text-[9px] text-emerald-800 font-semibold mt-0.5">Digitally Certified &amp; Stamped</div>
             </div>
           </div>
-          <div className="h-10 w-10 shrink-0 rounded-full border-2 border-[#0F3D24] flex flex-col items-center justify-center text-[5px] font-black uppercase text-[#0F3D24] leading-none text-center">
-            <span>DIGNITY</span>
-            <span className="text-[#3F8F3F] text-[4px]">★ SEAL ★</span>
-            <span>AUDITED</span>
-          </div>
+          <img
+            src={officialCorporateSealPng}
+            alt="Corporate Seal"
+            className="h-11 w-11 shrink-0 object-contain drop-shadow-sm select-none pointer-events-none"
+          />
         </div>
 
         {/* Modal Actions */}

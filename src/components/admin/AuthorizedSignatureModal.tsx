@@ -17,7 +17,7 @@ import {
   adminGetAuthorizedSignature,
   adminSaveAuthorizedSignature,
 } from "@/lib/partners.functions";
-import { defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
+import { defaultAuthorizedSignaturePng, officialCorporateSealPng } from "@/lib/receipt-logo";
 
 interface AuthorizedSignatureModalProps {
   isOpen: boolean;
@@ -388,11 +388,11 @@ export function AuthorizedSignatureModal({
                     />
                   )}
                   {/* Circular Seal Overlay */}
-                  <div className="absolute right-2 top-0 h-12 w-12 rounded-full border-2 border-[#0F3D24]/70 flex flex-col items-center justify-center text-[6px] font-black uppercase text-[#0F3D24]/80 text-center leading-tight">
-                    <span>Dignity</span>
-                    <span className="text-[5px] text-[#3F8F3F]">★ SEAL ★</span>
-                    <span>Audited</span>
-                  </div>
+                  <img
+                    src={officialCorporateSealPng}
+                    alt="Official Corporate Seal"
+                    className="absolute right-0 top-0 h-14 w-14 object-contain drop-shadow-sm select-none pointer-events-none"
+                  />
                 </div>
                 <div className="border-t border-slate-300 pt-1">
                   <p className="text-xs font-bold text-[#0F3D24]">{signatoryName}</p>
