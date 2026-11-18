@@ -51,7 +51,7 @@ export function scrubBuyerPII(
 
   // 2. Store Order category
   if (category === "Store Order") {
-    const codeMatch = desc.match(/\b(ORD-[A-Za-z0-9-]+)\b/i);
+    const codeMatch = desc.match(/\b((?:ORD|DAF)-[A-Za-z0-9-]+)\b/i);
     return codeMatch ? `Store Order #${codeMatch[1].toUpperCase()}` : "Store Order";
   }
 
