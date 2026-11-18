@@ -8,7 +8,11 @@ import type {
 } from "@/lib/partners.functions";
 import { getPublicAuthorizedSignature } from "@/lib/partners.functions";
 import { scrubBuyerPII } from "@/lib/partner-privacy";
-import { base64LogoDarkBg, defaultAuthorizedSignaturePng } from "@/lib/receipt-logo";
+import {
+  base64LogoDarkBg,
+  defaultAuthorizedSignaturePng,
+  officialCorporateSealPng,
+} from "@/lib/receipt-logo";
 
 const naira = (n: number) => "NGN " + Math.round(n || 0).toLocaleString("en-NG");
 const nairaSymbol = (n: number) => "₦" + Math.round(n || 0).toLocaleString("en-NG");
@@ -232,11 +236,11 @@ export async function exportPartnerReportPDF(
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.text("Date", 16, y + 4.2);
-    doc.text("Type", 38, y + 4.2);
-    doc.text("Category", 60, y + 4.2);
-    doc.text(isCont ? "Description (Cont.)" : "Description", 95, y + 4.2);
-    doc.text("Method", 150, y + 4.2);
-    doc.text("Amount (NGN)", 175, y + 4.2);
+    doc.text("Type", 36, y + 4.2);
+    doc.text("Category", 56, y + 4.2);
+    doc.text(isCont ? "Description (Cont.)" : "Description", 88, y + 4.2);
+    doc.text("Method", 144, y + 4.2);
+    doc.text("Amount (NGN)", 194, y + 4.2, { align: "right" });
     y += 6;
   };
 
@@ -261,26 +265,26 @@ export async function exportPartnerReportPDF(
     // Type with color
     if (f.type === "expense") {
       doc.setTextColor(180, 40, 40);
-      doc.text("EXPENSE", 38, y + 3.8);
+      doc.text("EXPENSE", 36, y + 3.8);
     } else if (f.type === "income") {
       doc.setTextColor(15, 61, 36);
-      doc.text("INCOME", 38, y + 3.8);
+      doc.text("INCOME", 36, y + 3.8);
     } else {
       doc.setTextColor(30, 80, 180);
-      doc.text("PAYOUT", 38, y + 3.8);
+      doc.text("PAYOUT", 36, y + 3.8);
     }
 
     doc.setTextColor(60, 60, 60);
-    doc.text((f.category || "").slice(0, 20), 60, y + 3.8);
+    doc.text((f.category || "").slice(0, 24), 56, y + 3.8);
 
     const cleanD = scrubBuyerPII(f.description, f.category, f.type, f.birdsSold);
     const desc = f.removedAt ? `[REMOVED: ${f.removalReason || "Correction"}] ${cleanD}` : cleanD;
-    doc.text((desc || "").slice(0, 32), 95, y + 3.8);
-    doc.text((f.paymentMethod || "Bank Transfer").slice(0, 14), 150, y + 3.8);
+    doc.text((desc || "").slice(0, 46), 88, y + 3.8);
+    doc.text((f.paymentMethod || "Bank Transfer").slice(0, 16), 144, y + 3.8);
 
     doc.setFont("helvetica", "bold");
     doc.setTextColor(f.type === "expense" ? 180 : 15, f.type === "expense" ? 40 : 61, f.type === "expense" ? 40 : 36);
-    doc.text(naira(f.amount), 175, y + 3.8);
+    doc.text(naira(f.amount), 194, y + 3.8, { align: "right" });
     doc.setFont("helvetica", "normal");
 
     y += 5.5;
