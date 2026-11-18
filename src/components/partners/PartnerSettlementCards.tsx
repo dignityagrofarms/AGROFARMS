@@ -34,6 +34,7 @@ import type {
   PartnerFinancial,
   PartnerDashboardSummary,
   PartnerPayoutElection,
+  PartnerReceivablesSummary,
 } from "@/lib/partners.functions";
 import {
   partnerSignAgreement,
@@ -436,21 +437,44 @@ export function TermsBanner({
 
 // ─── Result hero ──────────────────────────────────────────────────────────────
 
-export function ResultHero({ partner }: { partner: FarmPartner }) {
+export function ResultHero({
+  partner,
+  receivables,
+}: {
+  partner: FarmPartner;
+  receivables?: PartnerReceivablesSummary | null;
+}) {
   const s = partner.settlement;
   const isProfit = s.result === "profit";
   const isLoss = s.result === "loss";
   const projected = partner.cycleStatus === "open";
+  const coveredByReceivables = Boolean(receivables?.isCoveredByReceivables);
 
-  const tone = isLoss
-    ? "bg-[#7F1D1D] border-rose-900"
-    : isProfit
-      ? "bg-[#0F3D24] border-[#0F3D24]"
-      : "bg-slate-800 border-slate-700";
-  const Icon = isLoss ? TrendingDown : isProfit ? TrendingUp : Minus;
+  // If in loss but covered by pending customer receivables, use reassuring emerald/amber tone instead of alarming deep red
+  const tone = coveredByReceivables
+    ? "bg-gradient-to-r from-[#0F3D24] to-[#164e2e] border-amber-400/50"
+    : isLoss
+      ? "bg-[#7F1D1D] border-rose-900"
+      : isProfit
+        ? "bg-[#0F3D24] border-[#0F3D24]"
+        : "bg-slate-800 border-slate-700";
+
+  const Icon = coveredByReceivables
+    ? Clock
+    : isLoss
+      ? TrendingDown
+      : isProfit
+        ? TrendingUp
+        : Minus;
+
+  const partnerReceivables = receivables?.partnerReceivablesShare || 0;
+  const projectedNet = receivables?.projectedNet ?? s.net;
+  const projectedPartnerShare = Math.round(
+    projectedNet * (partner.profitSharePercentage / 100),
+  );
 
   return (
-    <div className={`rounded-2xl border ${tone} p-6 sm:p-7 text-white shadow-sm`}>
+    <div className={`rounded-2xl border ${tone} p-6 sm:p-7 text-white shadow-sm space-y-4`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -458,19 +482,36 @@ export function ResultHero({ partner }: { partner: FarmPartner }) {
               <Icon size={16} />
             </span>
             <span className="text-[11px] font-bold uppercase tracking-widest text-white/75">
-              {projected ? "Live Operational Position (Cycle Open)" : "Final Certified Settlement (Cycle Closed)"}
+              {coveredByReceivables
+                ? "Cycle In Collection · Receivables Exceed Outlay"
+                : projected
+                  ? "Live Operational Position (Cycle Open)"
+                  : "Final Certified Settlement (Cycle Closed)"}
             </span>
           </div>
+
           <div className="mt-3 text-3xl font-black tracking-tight sm:text-4xl tabular-nums">
-            {isLoss ? "Net Loss Share: " : isProfit ? "Net Profit Share: " : "Break-Even Position "}
-            {s.result !== "breakeven" && signed(s.partnerSignedResult)}
+            {coveredByReceivables ? (
+              <span>Projected Profit: {signed(projectedPartnerShare)}</span>
+            ) : isLoss ? (
+              <span>Net Loss Share: {signed(s.partnerSignedResult)}</span>
+            ) : isProfit ? (
+              <span>Net Profit Share: {signed(s.partnerSignedResult)}</span>
+            ) : (
+              <span>Break-Even Position</span>
+            )}
           </div>
+
           <div className="mt-1 text-xs sm:text-sm font-medium text-white/85">
-            {isProfit &&
-              `Your ${partner.profitSharePercentage}% allocation of ${naira(s.net)} net operational profit`}
-            {isLoss &&
-              `Net operational deficit of ${naira(Math.abs(s.net))} (protected by capital cap under Agreement)`}
-            {!isProfit && !isLoss && "Revenue currently matches operational expenditure (100% capital intact)"}
+            {coveredByReceivables ? (
+              `Realized cash collections show ${signed(s.partnerSignedResult)}, but ${naira(partnerReceivables)} in verified customer receivables brings projected net outcome to a profit.`
+            ) : isProfit ? (
+              `Your ${partner.profitSharePercentage}% allocation of ${naira(s.net)} net operational profit`
+            ) : isLoss ? (
+              `Net operational deficit of ${naira(Math.abs(s.net))} (protected by capital cap under Agreement)`
+            ) : (
+              "Revenue currently matches operational expenditure (100% capital intact)"
+            )}
           </div>
         </div>
 
@@ -480,11 +521,40 @@ export function ResultHero({ partner }: { partner: FarmPartner }) {
           </div>
           <div className="mt-0.5 text-2xl font-black tabular-nums">{naira(s.payoutDue)}</div>
           <div className="text-[11px] text-white/70">
-            Principal {isLoss ? "less allocated loss" : "plus allocated profit"}
+            Principal {isLoss && !coveredByReceivables ? "less allocated loss" : "plus allocated profit"}
           </div>
         </div>
       </div>
-      {s.lossWasCapped && (
+
+      {coveredByReceivables && (
+        <div className="rounded-xl bg-black/25 border border-white/20 p-4 text-xs space-y-2.5">
+          <div className="flex items-center gap-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+            <Info size={14} /> Settlement Breakdown (Cash Collected vs. Pending Receivables)
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div className="rounded-lg bg-white/10 p-2.5">
+              <span className="text-[10px] uppercase tracking-wider text-white/70 block font-bold">1. Cash Collected P&amp;L</span>
+              <strong className="text-sm font-black tabular-nums">{signed(s.net)}</strong>
+              <span className="text-[10px] text-white/70 block">({signed(s.partnerSignedResult)} your share)</span>
+            </div>
+            <div className="rounded-lg bg-white/10 p-2.5">
+              <span className="text-[10px] uppercase tracking-wider text-white/70 block font-bold">2. Money Owed (Receivables)</span>
+              <strong className="text-sm font-black tabular-nums text-amber-300">+{naira(receivables?.batchReceivablesTotal || 0)}</strong>
+              <span className="text-[10px] text-amber-200 block">(+{naira(partnerReceivables)} your share)</span>
+            </div>
+            <div className="rounded-lg bg-emerald-950/40 border border-emerald-400/30 p-2.5">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-300 block font-bold">3. Projected Net Outcome</span>
+              <strong className="text-sm font-black tabular-nums text-emerald-300">{signed(projectedNet)}</strong>
+              <span className="text-[10px] text-emerald-200 block">(+{naira(projectedPartnerShare)} profit share)</span>
+            </div>
+          </div>
+          <p className="text-[11px] text-white/80 leading-relaxed pt-1">
+            Birds from this batch have been fully or partially offloaded to verified commercial buyers. As outstanding invoice balances are remitted to the farm, funds convert directly to realized profit.
+          </p>
+        </div>
+      )}
+
+      {s.lossWasCapped && !coveredByReceivables && (
         <p className="mt-4 rounded-xl border border-white/15 bg-white/10 px-3.5 py-2 text-xs font-medium">
           Capital Loss Cap Active: Your liability is strictly limited to your initial capital ({naira(partner.initialInvestment)}). Dignity Agro Farms absorbs the excess deficit.
         </p>
@@ -493,9 +563,101 @@ export function ResultHero({ partner }: { partner: FarmPartner }) {
   );
 }
 
+// ─── Pending Customer Receivables Card ────────────────────────────────────────
+
+export function PendingReceivablesCard({
+  receivables,
+  partner,
+}: {
+  receivables?: PartnerReceivablesSummary | null;
+  partner: FarmPartner;
+}) {
+  if (!receivables || receivables.batchReceivablesTotal <= 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-br from-amber-50/90 via-white to-amber-50/40 p-5 shadow-sm space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200/60 pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-800 border border-amber-200">
+            <Clock size={18} />
+          </div>
+          <div>
+            <h4 className="text-xs font-black uppercase tracking-wider text-amber-900">
+              Money Owed · Pending Customer Receivables
+            </h4>
+            <p className="text-[11px] text-amber-800/80">
+              Verified bird sales delivered to commercial buyers on approved credit / partial payment terms.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-amber-100 border border-amber-300 px-3 py-1 text-[11px] font-extrabold text-amber-900">
+            {receivables.unpaidDebtorsCount} Active Customer Balance{receivables.unpaidDebtorsCount === 1 ? "" : "s"}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="rounded-xl border border-amber-200/70 bg-white p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Your Proportional Share ({receivables.partnerProfitSharePercentage}%)
+          </span>
+          <div className="mt-1 text-xl font-black text-amber-900 tabular-nums">
+            +{naira(receivables.partnerReceivablesShare)}
+          </div>
+          <span className="text-[11px] text-slate-500">
+            Flows into your payout upon customer remittance
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-amber-200/70 bg-white p-3.5 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Whole-Batch Outstanding Receivables
+          </span>
+          <div className="mt-1 text-xl font-black text-[#0F3D24] tabular-nums">
+            {naira(receivables.batchReceivablesTotal)}
+          </div>
+          <span className="text-[11px] text-slate-500">
+            Total commercial debtor balances for this pen batch
+          </span>
+        </div>
+
+        <div className="rounded-xl border border-amber-200/70 bg-white p-3.5 shadow-2xs sm:col-span-2 lg:col-span-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            Projected Batch Net (Once Collected)
+          </span>
+          <div
+            className={`mt-1 text-xl font-black tabular-nums ${
+              receivables.projectedNet >= 0 ? "text-emerald-700" : "text-rose-700"
+            }`}
+          >
+            {signed(receivables.projectedNet)}
+          </div>
+          <span className="text-[11px] text-slate-500">
+            Realized cash ({signed(receivables.realizedNet)}) + pending receivables
+          </span>
+        </div>
+      </div>
+
+      <div className="rounded-xl bg-amber-100/50 border border-amber-200/80 p-3 text-xs text-amber-950 flex items-start gap-2">
+        <Info size={16} className="text-amber-700 shrink-0 mt-0.5" />
+        <p>
+          <strong>Commercial Payment Settlement Note:</strong> Wholesale offload buyers frequently settle invoices upon final market retail. These customer balances are monitored and audited by Farm Management. They represent active farm assets rather than an operational deficit.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Step-by-step breakdown ───────────────────────────────────────────────────
 
-export function SettlementBreakdown({ partner }: { partner: FarmPartner }) {
+export function SettlementBreakdown({
+  partner,
+  receivables,
+}: {
+  partner: FarmPartner;
+  receivables?: PartnerReceivablesSummary | null;
+}) {
   const s = partner.settlement;
   const isLoss = s.result === "loss";
 
@@ -529,6 +691,15 @@ export function SettlementBreakdown({ partner }: { partner: FarmPartner }) {
       tone: "text-[#0F3D24]",
     },
   ];
+
+  if (receivables && receivables.batchReceivablesTotal > 0) {
+    rows.push({
+      label: "Pending Customer Receivables (Money Owed)",
+      value: "+" + naira(receivables.partnerReceivablesShare),
+      tone: "text-amber-700",
+      note: "Awaiting customer settlement",
+    });
+  }
 
   return (
     <div className="rounded-2xl border border-[#0F3D24]/10 bg-white p-5 shadow-sm">

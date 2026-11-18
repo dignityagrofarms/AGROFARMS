@@ -190,6 +190,16 @@ export interface PartnerActivity {
   cycleName?: string | null;
 }
 
+export interface PartnerReceivablesSummary {
+  batchReceivablesTotal: number;
+  partnerReceivablesShare: number;
+  partnerProfitSharePercentage: number;
+  unpaidDebtorsCount: number;
+  realizedNet: number;
+  projectedNet: number;
+  isCoveredByReceivables: boolean;
+}
+
 export interface PartnerDashboardData {
   batchSales?: { date: string; birds: number }[];
   batchProgress?: { initialBirds: number; birdsSold: number; mortality: number; remaining: number };
@@ -198,6 +208,7 @@ export interface PartnerDashboardData {
   activities: PartnerActivity[];
   charts: PartnerChartData;
   summary: PartnerDashboardSummary;
+  receivables?: PartnerReceivablesSummary | null;
 }
 
 // ─── Role Guard: Owner or Manager Only (Staff Strictly Blocked) ───────────────
@@ -1016,6 +1027,67 @@ async function computePartnerBatchFeedStats(
   };
 }
 
+export async function computeBatchReceivables(
+  supabaseAdmin: any,
+  batchId: string,
+  cycleStartDate?: string | null,
+): Promise<{ batchReceivablesTotal: number; unpaidDebtorsCount: number }> {
+  let finQuery = (supabaseAdmin as any)
+    .from("farm_financials")
+    .select("amount, amount_paid, transaction_date")
+    .eq("batch_id", batchId)
+    .eq("type", "income")
+    .or("approval_status.eq.approved,approval_status.is.null")
+    .is("source_contact_id", null)
+    .not("amount_paid", "is", null);
+
+  let contactQuery = (supabaseAdmin as any)
+    .from("contact_transactions")
+    .select("total_amount, amount_paid, transaction_date")
+    .eq("batch_id", batchId)
+    .eq("transaction_type", "sale_to_contact")
+    .or("approval_status.eq.approved,approval_status.is.null");
+
+  if (cycleStartDate) {
+    finQuery = finQuery.gte("transaction_date", cycleStartDate);
+    contactQuery = contactQuery.gte("transaction_date", cycleStartDate);
+  }
+
+  const [finRes, contactRes] = await Promise.all([finQuery, contactQuery]);
+
+  let batchReceivablesTotal = 0;
+  let unpaidDebtorsCount = 0;
+
+  if (!finRes.error && Array.isArray(finRes.data)) {
+    for (const r of finRes.data) {
+      const amount = Number(r.amount || 0);
+      const paid = Number(r.amount_paid || 0);
+      const balance = Math.max(0, Math.round((amount - paid) * 100) / 100);
+      if (balance > 0.005) {
+        batchReceivablesTotal += balance;
+        unpaidDebtorsCount += 1;
+      }
+    }
+  }
+
+  if (!contactRes.error && Array.isArray(contactRes.data)) {
+    for (const r of contactRes.data) {
+      const total = Number(r.total_amount || 0);
+      const paid = Number(r.amount_paid || 0);
+      const balance = Math.max(0, Math.round((total - paid) * 100) / 100);
+      if (balance > 0.005) {
+        batchReceivablesTotal += balance;
+        unpaidDebtorsCount += 1;
+      }
+    }
+  }
+
+  return {
+    batchReceivablesTotal: Math.round(batchReceivablesTotal * 100) / 100,
+    unpaidDebtorsCount,
+  };
+}
+
 export const adminGetPartnerDetail = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) =>
     z.object({ passcode: z.string().min(1), partnerId: z.string().uuid() }).parse(data),
@@ -1030,6 +1102,7 @@ export const adminGetPartnerDetail = createServerFn({ method: "POST" })
       charts: PartnerChartData;
       summary: PartnerDashboardSummary;
       viewerRole: "owner" | "manager";
+      receivables?: PartnerReceivablesSummary | null;
     }> => {
       const { role } = await checkOwnerOrManager(data.passcode);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -1043,6 +1116,33 @@ export const adminGetPartnerDetail = createServerFn({ method: "POST" })
         partner,
         financials,
       ).catch(() => null);
+
+      let receivables: PartnerReceivablesSummary | null = null;
+      if (partner.batchId) {
+        const rec = await computeBatchReceivables(
+          supabaseAdmin,
+          partner.batchId,
+          partner.cycleStartDate,
+        ).catch(() => ({ batchReceivablesTotal: 0, unpaidDebtorsCount: 0 }));
+
+        const partnerReceivablesShare = Math.round(
+          rec.batchReceivablesTotal * (partner.profitSharePercentage / 100),
+        );
+        const realizedNet = partner.settlement.net;
+        const projectedNet = realizedNet + partnerReceivablesShare;
+        const isCoveredByReceivables = realizedNet < 0 && projectedNet >= 0;
+
+        receivables = {
+          batchReceivablesTotal: rec.batchReceivablesTotal,
+          partnerReceivablesShare,
+          partnerProfitSharePercentage: partner.profitSharePercentage,
+          unpaidDebtorsCount: rec.unpaidDebtorsCount,
+          realizedNet,
+          projectedNet,
+          isCoveredByReceivables,
+        };
+      }
+
       return {
         partner,
         financials,
@@ -1050,6 +1150,7 @@ export const adminGetPartnerDetail = createServerFn({ method: "POST" })
         summary: { ...computed.summary, feedBagStats },
         charts: computed.charts,
         viewerRole: role,
+        receivables,
       };
     },
   );
@@ -2670,6 +2771,32 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
         ? batchProgress.remaining
         : computed.summary.currentStockCount;
 
+    let receivables: PartnerReceivablesSummary | null = null;
+    if (partner.batchId) {
+      const rec = await computeBatchReceivables(
+        supabaseAdmin,
+        partner.batchId,
+        partner.cycleStartDate,
+      ).catch(() => ({ batchReceivablesTotal: 0, unpaidDebtorsCount: 0 }));
+
+      const partnerReceivablesShare = Math.round(
+        rec.batchReceivablesTotal * (partner.profitSharePercentage / 100),
+      );
+      const realizedNet = maskedPartner.settlement.net;
+      const projectedNet = realizedNet + partnerReceivablesShare;
+      const isCoveredByReceivables = realizedNet < 0 && projectedNet >= 0;
+
+      receivables = {
+        batchReceivablesTotal: rec.batchReceivablesTotal,
+        partnerReceivablesShare,
+        partnerProfitSharePercentage: partner.profitSharePercentage,
+        unpaidDebtorsCount: rec.unpaidDebtorsCount,
+        realizedNet,
+        projectedNet,
+        isCoveredByReceivables,
+      };
+    }
+
     return {
       partner: maskedPartner,
       batchProgress,
@@ -2682,6 +2809,7 @@ export const partnerGetMyDashboard = createServerFn({ method: "POST" })
         feedBagStats,
       },
       charts: computed.charts,
+      receivables,
     };
   });
 

@@ -1,6 +1,7 @@
 import React from "react";
-import { X, Receipt, ShieldCheck, Printer } from "lucide-react";
+import { X, Receipt, ShieldCheck, Printer, Lock } from "lucide-react";
 import type { PartnerFinancial } from "@/lib/partners.functions";
+import { scrubBuyerPII } from "@/lib/partner-privacy";
 
 export function DigitalSalesReceiptModal({
   receipt,
@@ -13,16 +14,36 @@ export function DigitalSalesReceiptModal({
   batchName?: string | null;
   onClose: () => void;
 }) {
+  const cleanDesc = scrubBuyerPII(
+    receipt.description,
+    receipt.category,
+    receipt.type,
+    receipt.birdsSold,
+  );
+  const refCode = receipt.referenceNo || `DAF-SLS-${receipt.id.slice(0, 8).toUpperCase()}`;
+  const birdsQty = receipt.birdsSold ? `${receipt.birdsSold} bird${receipt.birdsSold === 1 ? "" : "s"}` : "Direct Farm Sales";
+  const unitPrice =
+    receipt.birdsSold && receipt.birdsSold > 0
+      ? Math.round(Number(receipt.amount) / receipt.birdsSold)
+      : null;
+
+  const formattedAmount = Number(receipt.amount).toLocaleString("en-NG", {
+    style: "currency",
+    currency: "NGN",
+    maximumFractionDigits: 0,
+  });
+
+  const formattedUnitPrice = unitPrice
+    ? unitPrice.toLocaleString("en-NG", {
+        style: "currency",
+        currency: "NGN",
+        maximumFractionDigits: 0,
+      })
+    : null;
+
   const handlePrint = () => {
     const w = window.open("", "_blank", "width=850,height=950");
     if (!w) return;
-    const refCode = receipt.referenceNo || `DAF-SLS-${receipt.id.slice(0, 8).toUpperCase()}`;
-    const birdsQty = receipt.birdsSold ? `${receipt.birdsSold} birds` : "Direct Farm Sales";
-    const formattedAmount = Number(receipt.amount).toLocaleString("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      maximumFractionDigits: 0,
-    });
     const html = `<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"><title>Official Sales Receipt - ${refCode}</title>
 <style>
@@ -47,6 +68,7 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
 .amount-box{margin-top:20px;margin-left:auto;width:340px;background:#F7F5F0;border-radius:14px;padding:20px;border:1px solid #0F3D2415}
 .amount-row{display:flex;justify-content:space-between;align-items:baseline}
 .amount-total{font-size:24px;font-weight:900;color:#0F3D24}
+.privacy-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;color:#0F3D24;background:#fff;padding:3px 8px;border-radius:6px;border:1px solid #0F3D2420}
 .footer{margin-top:36px;padding-top:20px;border-top:1px solid #0F3D2415;text-align:center;font-size:12px;color:#777}
 @media print{body{padding:0}.sheet{border:none;padding:20px}}
 </style></head><body>
@@ -54,7 +76,7 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
   <div class="head">
     <div class="brand">
       Dignity Agro Farms
-      <small>Limited · Agriculture & Livestock Management</small>
+      <small>Limited · Agriculture &amp; Livestock Management</small>
     </div>
     <div class="title-box">
       <div class="doc-title">Official Sales Receipt</div>
@@ -74,15 +96,23 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
     <div>
       <div class="field"><div class="label">Audited By</div><div class="val">${receipt.recordedBy || "Farm Management"}</div></div>
       <div class="field"><div class="label">Investment Partner</div><div class="val">${partnerName}</div></div>
-      <div class="field"><div class="label">Approval Status</div><div class="val" style="color:#15803d">Approved &amp; Reconciled</div></div>
+      <div class="field"><div class="label">Customer / Buyer</div><div class="val"><span class="privacy-badge">🔒 Commercial Offload (Private)</span></div></div>
     </div>
   </div>
   <table>
-    <thead><tr><th>Description</th><th style="text-align:center">Units / Qty</th><th style="text-align:right">Total Verified Amount</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th style="text-align:center">Units / Qty</th>
+        ${formattedUnitPrice ? `<th style="text-align:right">Unit Price</th>` : ""}
+        <th style="text-align:right">Total Verified Amount</th>
+      </tr>
+    </thead>
     <tbody>
       <tr>
-        <td><strong>${receipt.description}</strong><br><span style="font-size:11px;color:#666">Verified revenue entry from commercial poultry offload</span></td>
+        <td><strong>${cleanDesc}</strong><br><span style="font-size:11px;color:#666">Verified revenue entry from commercial poultry offload</span></td>
         <td style="text-align:center;font-weight:700">${birdsQty}</td>
+        ${formattedUnitPrice ? `<td style="text-align:right;font-weight:700;color:#444">${formattedUnitPrice}</td>` : ""}
         <td style="text-align:right;font-weight:900;font-size:16px;color:#0F3D24">${formattedAmount}</td>
       </tr>
     </tbody>
@@ -95,6 +125,7 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
   </div>
   <div class="footer">
     This document serves as verifiable electronic proof of farm revenue deposited to Dignity Agro Farms account.<br>
+    Buyer personal information is strictly protected under commercial confidentiality policies.<br>
     Dignity Agro Farms Limited · dignityagrofarms.com · 08167099492
   </div>
 </div>
@@ -104,9 +135,6 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
     w.focus();
     setTimeout(() => w.print(), 350);
   };
-
-  const refCode = receipt.referenceNo || `DAF-SLS-${receipt.id.slice(0, 8).toUpperCase()}`;
-  const birdsQty = receipt.birdsSold ? `${receipt.birdsSold} birds` : "Direct Farm Sales";
 
   return (
     <div
@@ -177,22 +205,44 @@ td{padding:14px;border-bottom:1px solid #0F3D2415}
             </span>
             <p className="mt-0.5 font-bold text-[#0F3D24]">{receipt.paymentMethod}</p>
           </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
+              Customer / Buyer
+            </span>
+            <p className="mt-0.5 inline-flex items-center gap-1 font-semibold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200 text-[11px]">
+              <Lock size={10} className="text-slate-500" /> Commercial Buyer (Private)
+            </p>
+          </div>
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0F3D24]/60">
+              Approval Status
+            </span>
+            <p className="mt-0.5 font-bold text-emerald-700">Approved &amp; Reconciled</p>
+          </div>
         </div>
 
         {/* Item Details */}
         <div className="rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="bg-[#0F3D24] px-4 py-2.5 text-white flex justify-between text-xs font-bold uppercase tracking-wider">
-            <span>Item Description</span>
-            <span>Quantity</span>
+          <div className="bg-[#0F3D24] px-4 py-2.5 text-white grid grid-cols-12 text-xs font-bold uppercase tracking-wider">
+            <span className="col-span-6">Item Description</span>
+            <span className="col-span-3 text-center">Quantity</span>
+            <span className="col-span-3 text-right">
+              {formattedUnitPrice ? "Unit Price" : "Category"}
+            </span>
           </div>
-          <div className="p-4 bg-white flex justify-between items-center text-xs">
-            <div>
-              <p className="font-bold text-[#0F3D24] text-sm">{receipt.description}</p>
+          <div className="p-4 bg-white grid grid-cols-12 items-center text-xs">
+            <div className="col-span-6 pr-2">
+              <p className="font-bold text-[#0F3D24] text-sm">{cleanDesc}</p>
               <span className="text-[11px] text-[#0F3D24]/60">{receipt.category}</span>
             </div>
-            <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
-              {birdsQty}
-            </span>
+            <div className="col-span-3 text-center">
+              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg">
+                {birdsQty}
+              </span>
+            </div>
+            <div className="col-span-3 text-right font-bold text-slate-700">
+              {formattedUnitPrice || receipt.category}
+            </div>
           </div>
           <div className="border-t border-slate-100 bg-[#F7F5F0]/60 p-4 flex justify-between items-baseline">
             <span className="text-xs font-bold uppercase tracking-wider text-[#0F3D24]/70">

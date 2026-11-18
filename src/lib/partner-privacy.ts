@@ -17,6 +17,82 @@ const categories = new Set([
   "Equipment",
   "Payout",
 ]);
+
+/**
+ * Strict privacy scrubber that strips all buyer personal data (name, phone,
+ * email, delivery address) from sales descriptions and digital receipt particulars
+ * when viewed by investment partners.
+ */
+export function scrubBuyerPII(
+  rawDesc: string | null | undefined,
+  category: string,
+  type: string,
+  birdsSold?: number | null,
+): string {
+  const desc = (rawDesc || "").trim();
+
+  // 1. Bird Sales category or income with birdsSold
+  if (category === "Bird Sales" || (type === "income" && birdsSold && birdsSold > 0)) {
+    if (birdsSold && birdsSold > 0) {
+      return `Bird Sales – ${birdsSold} Broiler${birdsSold === 1 ? "" : "s"}`;
+    }
+    const match =
+      desc.match(/\b(?:sales|purchase)?\s*(?:of)?\s*(\d+)\s*(?:birds?|broilers?)\b/i) ||
+      desc.match(/\b(\d+)\s*(?:birds?|broilers?)\b/i);
+    if (match) {
+      const qty = Number(match[1]);
+      return `Bird Sales – ${qty} Broiler${qty === 1 ? "" : "s"}`;
+    }
+    if (/\bone\s*bird\b/i.test(desc) || /\bsales of one\b/i.test(desc)) {
+      return "Bird Sales – 1 Broiler";
+    }
+    return "Bird Sales";
+  }
+
+  // 2. Store Order category
+  if (category === "Store Order") {
+    const codeMatch = desc.match(/\b(ORD-[A-Za-z0-9-]+)\b/i);
+    return codeMatch ? `Store Order #${codeMatch[1].toUpperCase()}` : "Store Order";
+  }
+
+  // 3. December Pre-Order category
+  if (category === "December Pre-Order") {
+    const codeMatch = desc.match(/\b(PRE-[A-Za-z0-9-]+)\b/i);
+    return codeMatch ? `December Pre-Order #${codeMatch[1].toUpperCase()}` : "December Pre-Order";
+  }
+
+  // 4. For any other income transaction, rigorously scrub buyer PII
+  if (type === "income") {
+    let sanitized = desc
+      // Strip phone numbers
+      .replace(/(?:\+?234|0)[789][01]\d{8}\b/g, "")
+      .replace(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4,5}\b/g, "")
+      // Strip emails
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "")
+      // Strip buyer prefix patterns (e.g. "Sold to John Doe", "Buyer: Alhaji ...")
+      .replace(
+        /(?:sold to|buyer|customer|purchased by|paid by|client|contact|phone|tel)\s*[:\-]?\s*[^,\n\r;]+/gi,
+        "",
+      )
+      // Clean up punctuation and excess whitespace
+      .replace(/\s*[-–—:,]\s*$/, "")
+      .replace(/^\s*[-–—:,]\s*/, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    return sanitized || category || "Farm income";
+  }
+
+  // Expenses or Payouts keep operational particulars (e.g. "Feed purchase 20 bags starter")
+  // but strip any stray buyer phone numbers or emails
+  const sanitized = desc
+    .replace(/(?:\+?234|0)[789][01]\d{8}\b/g, "")
+    .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "")
+    .trim();
+
+  return sanitized || category;
+}
+
 export function partnerFinancialView(f: PartnerFinancial): PartnerFinancial {
   const category = categories.has(f.category)
     ? f.category
@@ -25,6 +101,14 @@ export function partnerFinancialView(f: PartnerFinancial): PartnerFinancial {
       : f.type === "income"
         ? "Farm income"
         : "Partner payout";
+
+  const scrubbedDescription = scrubBuyerPII(
+    f.description,
+    category,
+    f.type,
+    f.birdsSold,
+  );
+
   return {
     id: f.id,
     partnerId: f.partnerId,
@@ -32,7 +116,7 @@ export function partnerFinancialView(f: PartnerFinancial): PartnerFinancial {
     type: f.type,
     category,
     amount: f.amount,
-    description: f.description || category,
+    description: scrubbedDescription,
     paymentMethod: [
       "Cash",
       "Bank Transfer",

@@ -1,5 +1,11 @@
 import { jsPDF } from "jspdf";
-import type { FarmPartner, PartnerFinancial, PartnerActivity } from "@/lib/partners.functions";
+import type {
+  FarmPartner,
+  PartnerFinancial,
+  PartnerActivity,
+  PartnerReceivablesSummary,
+} from "@/lib/partners.functions";
+import { scrubBuyerPII } from "@/lib/partner-privacy";
 
 const naira = (n: number) => "NGN " + Math.round(n || 0).toLocaleString("en-NG");
 const nairaSymbol = (n: number) => "₦" + Math.round(n || 0).toLocaleString("en-NG");
@@ -11,6 +17,7 @@ export function exportPartnerReportPDF(
   partner: FarmPartner,
   financials: PartnerFinancial[],
   activities: PartnerActivity[],
+  receivables?: PartnerReceivablesSummary | null,
 ) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const s = partner.settlement;
@@ -136,9 +143,11 @@ export function exportPartnerReportPDF(
   y += cardH + 5;
 
   // Payout Position Box
+  const hasReceivables = Boolean(receivables && receivables.batchReceivablesTotal > 0);
+  const payoutBoxH = hasReceivables ? 22 : 16;
   doc.setFillColor(240, 245, 255);
   doc.setDrawColor(180, 200, 240);
-  doc.roundedRect(14, y, 182, 16, 2, 2, "FD");
+  doc.roundedRect(14, y, 182, payoutBoxH, 2, 2, "FD");
 
   doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
@@ -146,10 +155,21 @@ export function exportPartnerReportPDF(
   doc.text(
     `Total Capital Position: ${naira(s.payoutDue)}   |   Payouts Disbursed: ${naira(s.paidOut)}   |   Remaining Balance Due: ${naira(Math.max(0, s.balanceOwed))}`,
     18,
-    y + 10,
+    y + 8,
   );
 
-  y += 22;
+  if (hasReceivables && receivables) {
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(160, 80, 0);
+    doc.text(
+      `Pending Receivables (Money Owed): +${naira(receivables.partnerReceivablesShare)} (${receivables.partnerProfitSharePercentage}% share of ${naira(receivables.batchReceivablesTotal)} batch total)  |  Projected Net: ${naira(receivables.projectedNet)}`,
+      18,
+      y + 16,
+    );
+  }
+
+  y += payoutBoxH + 6;
 
   // Section: Itemized Financial Ledger
   doc.setFontSize(10);
@@ -204,7 +224,8 @@ export function exportPartnerReportPDF(
     doc.setTextColor(60, 60, 60);
     doc.text((f.category || "").slice(0, 20), 60, y + 3.8);
 
-    const desc = f.removedAt ? `[REMOVED: ${f.removalReason || "Correction"}] ${f.description}` : f.description;
+    const cleanD = scrubBuyerPII(f.description, f.category, f.type, f.birdsSold);
+    const desc = f.removedAt ? `[REMOVED: ${f.removalReason || "Correction"}] ${cleanD}` : cleanD;
     doc.text((desc || "").slice(0, 32), 95, y + 3.8);
     doc.text((f.paymentMethod || "Bank Transfer").slice(0, 14), 150, y + 3.8);
 
@@ -304,6 +325,7 @@ export function exportPartnerReportCSV(
   partner: FarmPartner,
   financials: PartnerFinancial[],
   activities: PartnerActivity[],
+  receivables?: PartnerReceivablesSummary | null,
 ) {
   const lines: string[] = [];
   const s = partner.settlement;
@@ -334,13 +356,19 @@ export function exportPartnerReportCSV(
   lines.push(`"Total Capital Due to Partner","NGN ${s.payoutDue.toLocaleString()}"`);
   lines.push(`"Payouts Disbursed to Date","NGN ${s.paidOut.toLocaleString()}"`);
   lines.push(`"Net Balance Owed","NGN ${Math.max(0, s.balanceOwed).toLocaleString()}"`);
+  if (receivables && receivables.batchReceivablesTotal > 0) {
+    lines.push(`"Pending Batch Receivables (Money Owed)","NGN ${receivables.batchReceivablesTotal.toLocaleString()}"`);
+    lines.push(`"Partner Share of Receivables (${receivables.partnerProfitSharePercentage}%)","NGN ${receivables.partnerReceivablesShare.toLocaleString()}"`);
+    lines.push(`"Projected Final Net Position (Once Remitted)","NGN ${receivables.projectedNet.toLocaleString()}"`);
+  }
   lines.push("");
 
   lines.push(`"=== ITEMIZED FINANCIAL LEDGER ==="`);
   lines.push("Date,Type,Category,Description,Payment Method,Amount (NGN),Status,Removal Reason");
 
   financials.forEach((f) => {
-    const desc = `"${(f.description || "").replace(/"/g, '""')}"`;
+    const cleanD = scrubBuyerPII(f.description, f.category, f.type, f.birdsSold);
+    const desc = `"${(cleanD || "").replace(/"/g, '""')}"`;
     const reason = f.removedAt ? `"${(f.removalReason || "").replace(/"/g, '""')}"` : "";
     lines.push(
       [

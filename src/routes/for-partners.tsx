@@ -45,6 +45,7 @@ import {
   PartnershipCertificateModal,
   EvidenceLightboxModal,
   ResultHero,
+  PendingReceivablesCard,
   SettlementBreakdown,
   PayoutTracker,
   HowCalculated,
@@ -544,7 +545,14 @@ function PartnersAccountPortal({
               >
                 <button
                   type="button"
-                  onClick={() => exportPartnerReportPDF(displayPartner, financials, activities)}
+                  onClick={() =>
+                    exportPartnerReportPDF(
+                      displayPartner,
+                      financials,
+                      activities,
+                      dashboardQuery.data.receivables,
+                    )
+                  }
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
                 >
                   <Download size={14} className="text-emerald-700" />
@@ -558,7 +566,14 @@ function PartnersAccountPortal({
 
                 <button
                   type="button"
-                  onClick={() => exportPartnerReportCSV(displayPartner, financials, activities)}
+                  onClick={() =>
+                    exportPartnerReportCSV(
+                      displayPartner,
+                      financials,
+                      activities,
+                      dashboardQuery.data.receivables,
+                    )
+                  }
                   className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left hover:bg-[#0F3D24]/10 transition"
                 >
                   <Download size={14} className="text-blue-700" />
@@ -626,7 +641,16 @@ function PartnersAccountPortal({
       )}
 
       {/* 1. Main Profit/Loss Result Hero */}
-      <ResultHero partner={displayPartner} />
+      <ResultHero
+        partner={displayPartner}
+        receivables={dashboardQuery.data.receivables}
+      />
+
+      {/* 1a. Pending Customer Receivables (Money Owed) Banner */}
+      <PendingReceivablesCard
+        receivables={dashboardQuery.data.receivables}
+        partner={displayPartner}
+      />
 
       {/* 1b. Biological & Unit Economics Strip (Cost per bird, FCR, Break-even price) */}
       <UnitEconomicsStrip partner={displayPartner} summary={summary} />
@@ -711,7 +735,10 @@ function PartnersAccountPortal({
 
       {/* 3. Settlement Breakdown & Payout Tracker */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <SettlementBreakdown partner={displayPartner} />
+        <SettlementBreakdown
+          partner={displayPartner}
+          receivables={dashboardQuery.data.receivables}
+        />
         <PayoutTracker partner={displayPartner} financials={financials} />
       </div>
 
@@ -851,6 +878,14 @@ function PartnersAccountPortal({
                     <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 font-bold text-emerald-800">
                       Sales: {naira(displayPartner.settlement.totalIncome)}
                     </span>
+                    {Boolean(dashboardQuery.data.receivables?.batchReceivablesTotal) && (
+                      <span
+                        className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 font-bold text-amber-800"
+                        title={`Whole batch owes ${naira(dashboardQuery.data.receivables?.batchReceivablesTotal || 0)} across ${dashboardQuery.data.receivables?.unpaidDebtorsCount || 0} commercial customer balance(s)`}
+                      >
+                        Money Owed: {naira(dashboardQuery.data.receivables?.partnerReceivablesShare || 0)}
+                      </span>
+                    )}
                     <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 font-bold text-blue-800">
                       Paid Out: {naira(displayPartner.settlement.paidOut)}
                     </span>
